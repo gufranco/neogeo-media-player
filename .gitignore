@@ -34,3 +34,8 @@ Thumbs.db
 
 # CI scratch
 ci-source.mp4
+
+# The maintained spec travels with the repo; dated plan folders stay local.
+!specs/
+specs/*
+!specs/current/

@@ -505,7 +505,7 @@ What you give up is C-ROM, since the movie's tile dictionary and your own sprite
 <summary><strong>Why not just use a video codec?</strong></summary>
 <br>
 
-There is nothing to run it on. The console has no video decoder and no framebuffer, and the 68000 at 12 MHz has roughly 18,000 cycles of blanking per frame, which is about what rewriting the screen once already costs. Every codec technique that assumes a residual path fails here, because a correction cannot nudge a pixel. It can only point a slot at a tile that already exists.
+There is nothing to run it on. The console has no video decoder and no framebuffer, and the 68000 at 12 MHz has about 30,000 cycles of blanking per frame, while rewriting every one of the 280 slots costs about 18,000 of them. Every codec technique that assumes a residual path fails here, because a correction cannot nudge a pixel. It can only point a slot at a tile that already exists.
 
 </details>
 

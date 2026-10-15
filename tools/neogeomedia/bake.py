@@ -131,14 +131,9 @@ only. A frame also pays a setup per run, twenty of them on a full
 keyframe, so a budget taken from this is a floor rather than a ceiling.
 """
 
-VBLANK_CYCLES: Final = 24 * 768
-"""Cycles the blanking interval affords, at 768 cycles across 24 lines.
-
-`wait_vblank` returns at the start of blanking rather than at the tail
-of it, so a frame gets all 24 lines. Overrunning is permitted by the
-hardware and counted rather than fatal, which is why this is a budget
-and not a limit.
-"""
+CYCLES_PER_LINE: Final = 768
+BLANK_LINES: Final = 40
+VBLANK_CYCLES: Final = (BLANK_LINES - 1) * CYCLES_PER_LINE
 
 
 def has_audio_stream(source: Path) -> bool:

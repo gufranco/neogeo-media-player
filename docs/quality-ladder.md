@@ -62,7 +62,7 @@ The levers, in order of how much they cost perceptually:
 
 **Per-scene palettes.** CRAM holds 240 palettes for video, and one set stretched over a whole feature has to cover every scene in it. The baker cuts the movie into epochs and refits colours for each, which measures about 6% less error on real footage for 1.5% more tiles.
 
-A full set is around 17,900 cycles against the 18,432 the blanking interval affords, so it cannot be written in one frame alongside the picture. Epochs alternate between the two halves of the allocation: while one half is being read, the next epoch is written into the other, a slice per frame across the hundreds of frames an epoch lasts. Seeks and rewinds have no run-up, so they make the target epoch resident at once.
+A full set is around 17,900 cycles against the 29,952 the blanking window affords, so it fits one window on its own; whether it fits alongside a keyframe's rewrite of all 280 slots is not measured yet, so epochs still alternate between the two halves of the allocation: while one half is being read, the next epoch is written into the other, a slice per frame across the hundreds of frames an epoch lasts. Seeks and rewinds have no run-up, so they make the target epoch resident at once.
 
 Epochs never share dictionary entries. A tile stores palette indices rather than colours, so one interned while a bank held one epoch's colours draws wrong once that bank holds another's. Scenes share about 0.1% of their tiles. Set `--palette-epoch-seconds 0` for a single shared set.
 

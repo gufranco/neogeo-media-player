@@ -350,8 +350,15 @@ class TestTickCost:
 
         assert f"#define MOVIE_VBLANK_CYCLES {bake.VBLANK_CYCLES}" in text
 
-    def test_the_blanking_budget_is_the_whole_interval(self):
-        assert bake.VBLANK_CYCLES == 18432
+    def test_the_blanking_budget_is_39_of_the_40_blank_lines(self):
+        # Arrange
+        cycles_per_line = 384 * 12_000_000 // 6_000_000
+
+        # Act
+        budget = bake.VBLANK_CYCLES
+
+        # Assert
+        assert budget == 39 * cycles_per_line == 29_952
 
 
 class TestBundleOption:

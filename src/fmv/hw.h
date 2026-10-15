@@ -98,8 +98,8 @@ static inline uint16_t scb4_word(uint16_t left)
 
 #define LSPC_LINE_SHIFT      7
 #define LSPC_LINE_MASK       0x01FFu
-#define LSPC_LINE_FIRST_DRAWN 0x0100u
-#define LSPC_LINE_LAST_DRAWN  0x01EFu
+#define LSPC_LINE_PREPARE      0x010Fu
+#define LSPC_LINE_LAST_VISIBLE 0x01EFu
 
 static inline uint16_t raster_line(void)
 {
@@ -110,7 +110,7 @@ static inline int in_vblank(void)
 {
     uint16_t line = raster_line();
 
-    return line < LSPC_LINE_FIRST_DRAWN || line > LSPC_LINE_LAST_DRAWN;
+    return line < LSPC_LINE_PREPARE || line > LSPC_LINE_LAST_VISIBLE;
 }
 
 static inline void wait_vblank(void)

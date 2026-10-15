@@ -176,7 +176,7 @@ dictionary grows into the space you wanted.
 | Frames | {frames} |
 | Worst frame | {max_updates} slot updates |
 | Worst frame, inner loop | about {tick_cycles} cycles |
-| Blanking interval | about 18432 cycles |
+| Blanking interval | about 29952 cycles |
 
 The worst frame is a keyframe, which rewrites every slot on screen. The
 cycle figure counts the per-tile inner loop only; a frame also pays a

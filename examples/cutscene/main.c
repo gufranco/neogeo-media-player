@@ -19,8 +19,8 @@
 
 #define RASTER_LINE_SHIFT 7
 #define RASTER_LINE_MASK  0x01FF
-#define RASTER_FIRST_DRAWN 0x0100
-#define RASTER_LAST_DRAWN  0x01EF
+#define RASTER_PREPARE      0x010F
+#define RASTER_LAST_VISIBLE 0x01EF
 
 #define PAD_ANY_BUTTON (FMV_PAD_A | FMV_PAD_B | FMV_PAD_C | FMV_PAD_D)
 
@@ -101,7 +101,7 @@ static int in_vblank(void)
 {
     u16 line = (u16)((*REG_LSPCMODE >> RASTER_LINE_SHIFT) & RASTER_LINE_MASK);
 
-    return line < RASTER_FIRST_DRAWN || line > RASTER_LAST_DRAWN;
+    return line < RASTER_PREPARE || line > RASTER_LAST_VISIBLE;
 }
 
 static void wait_vblank(void)

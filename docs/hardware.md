@@ -36,7 +36,7 @@ VRAM write spacing clears the 12 and 16 cycle minimums across 2 object(s)
 
 The tightest pair anywhere in the player is 20 cycles.
 
-One documented claim did not survive a source read. Bit 15 of `$3C0006` is described as a vblank flag; the register is a raster line counter, and bit 15 is bit 8 of that counter, low for values `0xF8` to `0xFF` and high for `0x100` to `0x1FF`. It marks 8 scanlines out of 264 rather than a blanking interval. `wait_vblank` waits for the start of blanking instead, which hands each frame all 24 blanking lines. Measured under MAME on the same cartridge across 60 emulated seconds each:
+One documented claim did not survive a source read. Bit 15 of `$3C0006` is described as a vblank flag; the register is a raster line counter, and bit 15 is bit 8 of that counter, low for values `0xF8` to `0xFF` and high for `0x100` to `0x1FF`. It marks 8 scanlines out of 264 rather than a blanking interval. `wait_vblank` waits for the start of blanking instead. Blanking is 40 lines, not 24: MAME's raster is 264 lines with 224 visible, `NEOGEO_VBEND` 0x010 to `NEOGEO_VBSTART` 0x0F0 in `neogeo_spr.h`, its line counter is the screen line plus 0x100 wrapping to 0xF8 (`get_video_control` in `neogeo_v.cpp`), and geolith draws the same 224 visible lines. So the counter is blank from 0x1F0 to 0x1FF, from 0xF8 to 0xFF and from 0x100 to 0x10F. The player counts 39 of those lines, 29,952 cycles at 768 a line, and leaves out 0x10F because the video chip prepares the first visible line during it. Measured under MAME on the same cartridge across 60 emulated seconds each:
 
 | Sync point | Frames | Overruns | Rate |
 |---|---|---|---|

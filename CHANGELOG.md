@@ -8,6 +8,7 @@ was paid for once and does not need paying for again.
 
 ## Contents
 
+- [Blanking was 40 lines, not 24](#blanking-was-40-lines-not-24)
 - [A blank screen that was not the library's fault](#a-blank-screen-that-was-not-the-librarys-fault)
 - [Three registers that cannot be read](#three-registers-that-cannot-be-read)
 - [A verification gate that was guessing](#a-verification-gate-that-was-guessing)
@@ -18,6 +19,26 @@ was paid for once and does not need paying for again.
 - [It plays on a board](#it-plays-on-a-board)
 - [What is left](#what-is-left)
 - [Standing rules for this project](#standing-rules-for-this-project)
+
+## Blanking was 40 lines, not 24
+
+The player treated line-counter values 0x100 to 0x1EF as drawn, 240 lines,
+so it counted 24 blank lines and budgeted 18,432 cycles a frame. The visible
+picture is 224 lines. MAME's screen is 264 lines visible from 0x010 to 0x0EF,
+with the line counter at the screen line plus 0x100, wrapping to 0xF8, and
+geolith shows the same 224 lines. So the 16 top-border lines, counter 0x100
+to 0x10F, are blank too, and the window is 40 lines, 30,720 cycles.
+
+The budget is now 39 of those lines, 29,952 cycles, leaving out 0x10F,
+during which the video chip prepares the first visible line. Nothing in the
+player waited on the old figure: `wait_vblank` already started at the
+beginning of blanking, and the budget was only reported. What changed is
+the overrun counter, which no longer counts the top border as late, and
+what the larger window allows: a full palette set, about 17,900 cycles, now
+fits in one window on its own. Whether it also fits beside a keyframe's
+rewrite of all 280 slots decides whether an epoch can use all 240 palettes
+instead of half of them, and that is the next measurement. Not yet run on
+a board.
 
 ## A blank screen that was not the library's fault
 

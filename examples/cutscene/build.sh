@@ -55,7 +55,7 @@ cp -f "$HERE/main.c" "$PROJECT/main.c"
 cp -Rf "$BUNDLE" "$PROJECT/fmv"
 
 echo "[integrate] the edits the bundle's guide asks for"
-uv --project "$HERE/../../tools" run python -m aesmovie.integrate "$PROJECT" $AUDIO_FLAG
+PYTHONPATH="$HERE/../../tools" python3 -m aesmovie.integrate "$PROJECT" $AUDIO_FLAG
 
 echo "[build] the cartridge"
 # shellcheck disable=SC2016

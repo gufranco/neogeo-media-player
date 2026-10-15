@@ -142,11 +142,7 @@ jobs:
             --build-dir build --bundle build/bundle
 
       - name: A developer's project builds against the bundle
-        run: |
-          set -euo pipefail
-          sudo apt-get install -y --no-install-recommends autoconf automake
-          BUNDLE=$PWD/build/bundle WORK=$PWD/build/example \
-            bash examples/cutscene/build.sh
+        run: make cutscene
 
       - name: The example produced a cartridge
         run: |
@@ -160,19 +156,10 @@ jobs:
       - name: The same project builds with the movie's soundtrack
         run: |
           set -euo pipefail
-          BUNDLE=$PWD/build/bundle WORK=$PWD/build/example-audio FMV_AUDIO=yes \
-            bash examples/cutscene/build.sh
-          rom=build/example-audio/cutscene/build/rom
-          share=$(pkg-config --variable=prefix ngdevkit)/share/ngdevkit
-          z80-neogeo-ihx-sdobjcopy -I ihex -O binary \
-            "$share/nullsound_driver.ihx" /tmp/nullsound.m1 --pad-to 131072
-          test "$(wc -c < "$rom/ngdevkit-m1.m1")" -eq 131072
-          if cmp -s "$rom/ngdevkit-m1.m1" /tmp/nullsound.m1; then
-            echo "the cartridge has the empty driver, not the movie's" >&2
-            exit 1
-          fi
-          echo "the movie's own sound driver built from the bundle"
-
+          make cutscene EXAMPLE=build/example-audio FMV_AUDIO=yes
+          docker run --rm --platform linux/amd64 --user "$(id -u):$(id -g)" \
+            -v "$PWD:/work" -w /work aes-movie-player-toolchain \
+            bash examples/cutscene/check_audio.sh build/example-audio
       - uses: actions/upload-artifact@v7.0.1
         with:
           name: cartridge

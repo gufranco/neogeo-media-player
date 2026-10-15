@@ -1,12 +1,15 @@
 PROJECT      := aes-movie-player
 DOCKER_IMAGE := $(PROJECT)-toolchain
 DOCKER_USER  := $(shell id -u):$(shell id -g)
-DOCKER_RUN   := docker run --rm --platform linux/amd64 --user $(DOCKER_USER) \
-                -v "$(CURDIR):/work" -w /work $(DOCKER_IMAGE)
+DOCKER       := docker run --rm --platform linux/amd64 --user $(DOCKER_USER) \
+                -e HOME=/tmp -v "$(CURDIR):/work" -w /work
+DOCKER_RUN   := $(DOCKER) $(DOCKER_IMAGE)
 BUILD        := build
+EXAMPLE      := $(BUILD)/example
+FMV_AUDIO    := no
 OBJECTS      := $(BUILD)/main.o $(BUILD)/menu.o $(BUILD)/fmv.o $(BUILD)/timeline.o
 
-.PHONY: all image rom analyse timing hooks shell clean distclean
+.PHONY: all image rom analyse timing cutscene hooks shell clean distclean
 all: rom
 
 image:
@@ -25,6 +28,10 @@ analyse: image
 
 timing:
 	uv --project tools run python tools/scripts/check_vram_timing.py $(OBJECTS)
+
+cutscene: image
+	$(DOCKER) -e BUNDLE=/work/$(BUILD)/bundle -e WORK=/work/$(EXAMPLE) \
+	    -e FMV_AUDIO=$(FMV_AUDIO) $(DOCKER_IMAGE) bash examples/cutscene/build.sh
 
 hooks:
 	git config core.hooksPath .githooks

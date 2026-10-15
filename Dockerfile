@@ -2,6 +2,8 @@ FROM ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+RUN printf 'Acquire::Retries "8";\nAcquire::http::Timeout "60";\nAcquire::https::Timeout "60";\n' > /etc/apt/apt.conf.d/80retries
+
 ARG UBUNTU_SNAPSHOT=20261014T000000Z
 ARG CA_CERTIFICATES=20260601~24.04.1
 ARG PPA_POOL=https://ppa.launchpadcontent.net/dciabrin/ngdevkit/ubuntu/pool/main/n
@@ -13,9 +15,12 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends "ca-certificates=${CA_CERTIFICATES}" \
  && apt-get update --snapshot "${UBUNTU_SNAPSHOT}" \
  && apt-get install -y --no-install-recommends --snapshot "${UBUNTU_SNAPSHOT}" \
+      autoconf \
+      automake \
       binutils \
       cppcheck \
       curl \
+      git \
       make \
       pkg-config \
       python3 \

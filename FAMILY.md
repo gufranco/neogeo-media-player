@@ -240,6 +240,7 @@ That choice has a price, paid deliberately:
 | ROMs | Never committed, and never published when built from someone else's work |
 | Names | Players are `<console>-media-player` with a `<console>media` package; the core is `fmv-core-python` with the `fmvcore` package |
 | Language | Everything committed is English, except the README translations |
+| Licence | MIT in every member, one `LICENSE` file at the root. Code is never copied from a project under a licence MIT cannot carry, such as GPL; such a project is read for ideas only and cited in the development log |
 | Builds | Docker for every player build, in an image pinned by digest, run as the calling user; no host toolchain path |
 
 ---
@@ -259,7 +260,13 @@ concerns there is in progress.
 
 Gaps against "What every player does" (as of 2026-10-15):
 
-- Its transport has play, pause, fast forward, rewind and seek. Whether its
-  menu shows a position bar with elapsed and total time is still to be
-  checked against the requirement.
-- It uses no shared demo GIF yet; its README shows a still of Big Buck Bunny.
+- The cartridge command has no silent build. A library bundle can leave sound
+  out with `FMV_AUDIO=no`, and sound lives in its own V-ROM, so leaving it out
+  frees no character ROM for the picture.
+- `--fit letterbox` still adds bars, which the picture rule forbids.
+- The build script compiles with a host toolchain when one is on the path,
+  where the conventions require Docker for every build.
+- The menu has play, pause, fast forward, rewind, seek and a position bar with
+  elapsed and total time. Sound on and off is not checked, and a 5.0-second
+  film shows a total of 00:04 on the bar in MAME, which reads as a rounding
+  defect.

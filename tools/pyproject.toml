@@ -3,6 +3,7 @@ name = "neogeomedia"
 version = "2.0.0"
 description = "Offline baker that turns a video file into a Neo Geo AES cartridge movie ROM"
 requires-python = ">=3.12"
+license = "MIT"
 dependencies = [
     "numpy>=2.1",
 ]

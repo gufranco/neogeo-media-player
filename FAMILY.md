@@ -75,9 +75,12 @@ the requirement.
 - **The whole cartridge.** A player can fill the largest cartridge its
   console's standard mapper or board addresses, with no extra hardware on the
   cartridge beyond that standard. The ceiling is the documented one.
-- **Quality follows length.** The baker fits the film into the cartridge it is
-  given: a short film gets more bytes per second of picture and sound, a long
-  one fewer, settled by measurement rather than a fixed setting.
+- **Quality steps down until the film fits.** Every player carries sound, and
+  the baker starts at the best picture and sound the console can show, then
+  steps both down a measured ladder, one rung at a time, until the film fits
+  the cartridge. A short film keeps the top rung; a long one goes down only as
+  far as it must. Rungs are settled by baking, never by a fixed table, and the
+  ladder keeps getting better as the players do.
 - **A menu in the style of a media player.** Before and during playback the
   viewer has play and pause, seek backward and forward, restart and stop, a
   position bar with elapsed and total time, and sound on and off where there

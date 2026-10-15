@@ -383,6 +383,7 @@ A five minute source with grain added at the cartridge's own resolution was buil
 | [`tools/tests/`](tools/tests) | 944 tests, including the emulator transcriptions used as oracles |
 | [`tools/scripts/`](tools/scripts) | Capture, verification, timing and ladder-sweep helpers |
 | [`toolchain/`](toolchain) | The ngdevkit build, native or containerised |
+| [`FAMILY.md`](FAMILY.md) | The standard shared with sms-movie-player and fmv-core-python, identical in each |
 | [`CHANGELOG.md`](CHANGELOG.md) | What was measured, and what was rejected |
 | [`RELEASES.md`](RELEASES.md) | Generated release notes, one entry per version |
 

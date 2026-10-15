@@ -1,0 +1,184 @@
+# The family standard
+
+One standard, carried identically by every repository in the family. It records
+the decisions that were expensive to reach, so a repository does not reach them
+again and a running one does not drift away from them quietly.
+
+The family plays full-motion video on consoles that were never meant to show
+it, on the original hardware. Where two members differ, the difference is one
+the hardware forces.
+
+| Member | What it is | Kind |
+|:--|:--|:--|
+| [aes-movie-player](https://github.com/gufranco/aes-movie-player) | A full-screen movie with sound on a Neo Geo AES or MVS, and a library that plays one inside another game | Player |
+| [sms-movie-player](https://github.com/gufranco/sms-movie-player) | A full-screen game opening on a Sega Master System, paged through VRAM as it plays | Player |
+| [fmv-core-python](https://github.com/gufranco/fmv-core-python) | The baker and measurement code both players share: decoding, colour, dither, the regression set, capture comparison, the write-timing walk, the test helpers | Core |
+
+## How a repository joins
+
+Copy this file in unchanged, follow it, and add the repository to the table above
+in every member in the same task. Everything above the closing line is shared
+and must match across the members. Each player checks its copy against the one
+in its `fmv-core-python` submodule, so a drifted copy fails that player's suite:
+
+```bash
+diff <(sed '/^---$/q' FAMILY.md) <(sed '/^---$/q' fmv-core-python/FAMILY.md)
+```
+
+A rule that needs changing is changed in every member in the same task. A copy
+that has drifted is worse than no copy, because a reader trusts it.
+
+## The rule above every other rule
+
+**The picture on the original hardware wins every decision.** When it pulls
+against speed, a smaller diff, a nicer interface or finishing today, the
+hardware wins and the cost is reported rather than negotiated.
+
+- **An emulator is not evidence about the console.** Emulators accept writes at
+  any rate and show a perfect picture. A clean emulator run, a green suite and a
+  good-looking capture are evidence about an emulator.
+- **A change the console can disagree with is unverified until it has run on
+  one.** That covers the transfer loop, port and register access, the bank
+  mapper, the interrupts and the header. Say so in the change and ask for the
+  run.
+- **A documented figure binds over a looser measured one.** Looser is never a
+  reason.
+
+## The authority ladder
+
+Every hardware question is answered by the highest rung that has an answer, and
+a lower rung never overrules a higher one.
+
+1. **The manufacturer's documentation.** Cited with the page or section it came
+   from.
+2. **A run on the original hardware.** A board, a console or a handheld running
+   the build in question, reported with what was run and what was seen.
+3. **An emulator's source, read.** The decoder or core that implements the
+   behaviour, cited by file and function, never a prose summary of it.
+4. **Anything else.** A community measurement or another implementation, cited
+   as what it is and never the sole support for a figure a manufacturer would
+   have printed.
+
+When two rungs disagree and the ones above are silent, the answer is unknown. It
+is written down with the run that would settle it, and no member picks the more
+convenient figure and moves on.
+
+## What lives once, and what each player keeps
+
+Code that the hardware does not force exists once, in `fmv-core-python`, and
+both players use it. A player that keeps its own copy of a shared concern is a
+defect, because the two copies drift and the better one stops reaching the
+other player.
+
+| In the core | In each player |
+|:--|:--|
+| Decoding a source, probing it, refusing a failed or torn decode | The stream format and the player that replays it |
+| Range-checked command-line values | The console's write rules and their binding numbers |
+| Colour distance, the blurred error, the ordered dither | How tiles reach the screen: resident or paged |
+| The clip manifest, its fetch and verification, the regression-set scaffolding | Sound, where the console carries it |
+| Capture comparison against the source | The cartridge layout and its packaging |
+| Search windows, scoring and ties | What the search tunes, while the two still differ |
+| The cheapest-path write-timing walk, with a reader per instruction set | The listing that walk reads, and the floors it holds |
+| Seeded test fakes, the required-tool marker, the golden-test shape | The hardware gates that run the player's own code |
+
+When both players have a module, the better-tested and better-guarded one moves
+to the core and the other player adapts to it.
+
+## How a player depends on the core
+
+The core is a git submodule on the import path, at the repository root under its
+own name, never a published package:
+
+```bash
+git clone --recurse-submodules https://github.com/gufranco/<player>.git
+```
+
+That choice has a price, paid deliberately:
+
+- **A source archive cannot carry a submodule.** The download-zip link produces a
+  checkout that cannot run. The README says so at the install step.
+- **A submodule pins a commit, and a pin goes stale.** A weekly job in each
+  player reports how many commits its pin is behind the core's head, and a pin
+  is moved because the report says so.
+- **Moving a pin is a change to the player's behaviour until shown otherwise.**
+  The golden test and the regression set run against the newer core before the
+  bump is committed. When an output changes, find the core commit that changed
+  it and why before touching anything that records what the output should be.
+
+## What every repository carries
+
+| File | Holds |
+|:--|:--|
+| [`README.md`](README.md) | The document for a person: what it is, how to build and run it, and why it can be trusted |
+| `AGENTS.md` | The engineering contract: the hardware's binding numbers with their sources, the gates, the things that bite, what is not done |
+| `FAMILY.md` | This file, identical in every member |
+| `DESIGN.md` | Why each part of the code is shaped as it is, with the measurements behind it. Source files carry none of this |
+| [`CHANGELOG.md`](CHANGELOG.md) | What was tried, measured and rejected, and what each failure cost |
+| [`RELEASES.md`](RELEASES.md) | The version history, generated from commit subjects |
+| `Dockerfile` | A player's toolchain image: base by digest, packages from a dated snapshot, every third-party package by exact version and SHA-256 |
+| `Makefile` | A player's `rom`, `analyse`, `timing`, `hooks`, `shell`, `clean`, `distclean`, each running in the image as the calling user. The core carries `hooks` and `clean` |
+| `.githooks/pre-commit` | Format, lint, types and tests on every commit, plus a player's hardware gates when a staged path can change the player |
+| [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | The same gates on every push and pull request, and the commit-subject check |
+| [`.github/workflows/release.yml`](.github/workflows/release.yml) | Gates in a read-only job; only the publish job holds a write token |
+| [`.github/dependabot.yml`](.github/dependabot.yml) | Weekly grouped updates for actions, the Python lockfile and the Docker base |
+
+## How the picture is judged
+
+- **Against one fixed reference.** A variant is scored against the source, never
+  against its own output.
+- **By eye as well as by number.** A dither moves pixels away from the source on
+  purpose, so a per-pixel error always scores it as loss. It is judged by the
+  error after the same blur on both sides and by a rendered sheet looked at
+  beside the source, and both must agree.
+- **On more than one film.** A parameter fitted to one clip is a fit, not a
+  setting. Every encoder change is measured on the regression set: films of
+  different kinds, fetched by manifest and verified by SHA-256, never committed.
+- **Render before reasoning about a screen.** A capture settles in one look what
+  an argument about which write reaches which table can get wrong for weeks.
+
+## Verification
+
+- **A check nobody has seen fail is not known to work.** Every gate is driven
+  once against input that should fail it before it is trusted.
+- **Silence and success produce the same output.** A check that found no files,
+  no listings or no clips exits zero like one that examined everything. Print
+  what was examined, and fail when it was nothing.
+- **Nothing is skipped quietly.** A test that needs a tool, a built ROM or the
+  films skips without it, and fails when the matching `*_REQUIRED=1` is set,
+  which CI and the pre-commit hook set.
+- **A passing check expires when what it covers changes.** Run it again after
+  touching anything within its reach.
+- **Measure before claiming.** Every number in a document is one somebody ran.
+
+## Conventions that are not negotiable
+
+| Thing | Rule |
+|:--|:--|
+| Baker language | Python, at the version the core pins, managed with `uv` and a committed lockfile |
+| Player language | C and assembly for the console's CPUs, built only in the pinned image |
+| Comments | None in source and no docstrings. Names carry the meaning; `DESIGN.md` carries the reasoning |
+| Size | Functions under 30 lines, files under 500 |
+| Types and lint | `mypy` strict, `ruff` clean, magic numbers named outside tests |
+| Static analysis | `cppcheck` at exhaustive level on the player, zero findings |
+| Test shape | Arrange, Act, Assert, each opened by its bare marker, one act |
+| Test data | Values that do not matter come from the core's seeded fakes |
+| Coverage | 95% of statements and branches, including the scripts |
+| Commits | Conventional Commits, subject at most 50 characters, lowercase start |
+| Actions | Pinned by full commit SHA |
+| Films | Fetched and verified by manifest, never committed |
+| ROMs | Never committed, and never published when built from someone else's work |
+
+---
+
+*Everything above this line is identical in every member. A member may add
+sections below it about its own state, and nothing may be added above it that
+the others do not also get.*
+
+## The state of this repository
+
+aes-movie-player is the base the family grew from. Its tile dictionary is
+resident in character ROM, so its encoder settles a rung on a 35-rung quality
+ladder by real bakes rather than paging patterns, and it carries what the other
+player does not: ADPCM-B sound, the library and its drop-in bundle, subtitles
+and seeking. It does not consume `fmv-core-python` yet; moving its shared
+concerns there is in progress.

@@ -5,6 +5,14 @@ every member of the family follows, and it binds first; this file adds what is
 particular to the Neo Geo. The [README](README.md) says what the project is and
 how to use it.
 
+## One family, no ports
+
+Owner's instruction, 2026-10-15: the players and the core are members of one
+family of tools. Never describe one as a port, fork, translation or derivative
+of another, in a README, a commit, a comment or any other text, in any
+language. The Neo Geo player came first, but work has moved between the
+members in both directions since, and more consoles will join.
+
 ## Original hardware is the only target
 
 Everything here is built to run on a real AES or MVS board. A clean emulator

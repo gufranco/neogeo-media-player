@@ -9,11 +9,11 @@ and a library that puts one inside your own game.</strong>
 
 <br>
 
-[![Tests](https://img.shields.io/badge/tests-944%20passing-brightgreen?style=flat-square)](tools/tests)
+[![CI](https://img.shields.io/github/actions/workflow/status/gufranco/neogeo-media-player/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/gufranco/neogeo-media-player/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)](RELEASES.md)
 [![Licence](https://img.shields.io/badge/licence-MIT-blue?style=flat-square)](LICENSE)
-[![Hardware](https://img.shields.io/badge/runs%20on-real%20AES%20and%20MVS-success?style=flat-square)](#verification)
-[![Verified](https://img.shields.io/badge/verified-geolith%20%2B%20MAME-blueviolet?style=flat-square)](#verification)
+[![Target](https://img.shields.io/badge/target-Neo%20Geo%20AES%20and%20MVS-red?style=flat-square)](#hardware-ceilings)
+[![Hardware](https://img.shields.io/badge/hardware-runs%20on%20an%20AES%20and%20an%20MVS-brightgreen?style=flat-square)](#verification)
 
 </div>
 
@@ -423,7 +423,7 @@ The [cutscene example](examples/cutscene) has run on a board too and came back t
 | [`src/player/`](src/player) | The movie cartridge, built on the library. Transport, menu, subtitles, diagnostics |
 | [`examples/cutscene/`](examples/cutscene) | A game that plays a cutscene and carries on, built from an emitted bundle |
 | [`tools/neogeomedia/`](tools/neogeomedia) | The baker: decode, colour, palettes, dictionary, encoder, quality ladder, audio, ROM containers, bundle emission |
-| [`tools/tests/`](tools/tests) | 944 tests, including the emulator transcriptions used as oracles |
+| [`tools/tests/`](tools/tests) | 974 tests, including the emulator transcriptions used as oracles |
 | [`tools/scripts/`](tools/scripts) | Capture, verification, timing and ladder-sweep helpers |
 | [`toolchain/`](toolchain) | The ngdevkit build, native or containerised |
 | [`FAMILY.md`](FAMILY.md) | The standard shared with sms-media-player and fmv-core-python, identical in each |
@@ -432,18 +432,37 @@ The [cutscene example](examples/cutscene) has run on a board too and came back t
 
 ## Development
 
-| Command | What it does |
-|:--------|:-------------|
-| `uv --project tools sync --all-groups` | Install the baker and its dev tools |
-| `uv --project tools run python -m pytest tools/tests` | Run the 944 tests |
-| `uv --project tools run ruff format --check tools/` | Format gate |
-| `uv --project tools run ruff check tools/` | Lint gate |
-| `uv --project tools run mypy tools/neogeomedia tools/scripts` | Type gate |
-| `make rom` | Build the ROM from whatever is already baked, in the pinned toolchain image |
-| `make analyse` | Static analysis of the player with cppcheck, which must exit 0 |
-| `make timing` | VRAM write spacing in the compiled objects, after `make rom` |
-| `make shell` | A shell inside the toolchain image |
-| `bash tools/scripts/verify_mame.sh` | Compare a finished cartridge against MAME |
+```bash
+# Install the baker and its dev tools
+uv --project tools sync --all-groups
+
+# Run the 974 tests
+uv --project tools run python -m pytest tools/tests
+
+# Format gate
+uv --project tools run ruff format --check tools/
+
+# Lint gate
+uv --project tools run ruff check tools/
+
+# Type gate
+uv --project tools run mypy tools/neogeomedia tools/scripts
+
+# Build the ROM from whatever is already baked, in the pinned toolchain image
+make rom
+
+# Static analysis of the player with cppcheck, which must exit 0
+make analyse
+
+# VRAM write spacing in the compiled objects, after make rom
+make timing
+
+# A shell inside the toolchain image
+make shell
+
+# Compare a finished cartridge against MAME
+bash tools/scripts/verify_mame.sh
+```
 
 Coverage is gated at 95% in [CI](.github/workflows/ci.yml), which also builds a cartridge end to end and builds the cutscene example twice, once video-only and once with the movie's own sound driver.
 

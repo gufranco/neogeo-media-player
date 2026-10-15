@@ -9,11 +9,11 @@
 
 <br>
 
-[![Tests](https://img.shields.io/badge/tests-944%20passing-brightgreen?style=flat-square)](tools/tests)
+[![CI](https://img.shields.io/github/actions/workflow/status/gufranco/neogeo-media-player/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/gufranco/neogeo-media-player/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)](RELEASES.md)
 [![Licence](https://img.shields.io/badge/licence-MIT-blue?style=flat-square)](LICENSE)
-[![Hardware](https://img.shields.io/badge/runs%20on-real%20AES%20and%20MVS-success?style=flat-square)](#検証)
-[![Verified](https://img.shields.io/badge/verified-geolith%20%2B%20MAME-blueviolet?style=flat-square)](#検証)
+[![Target](https://img.shields.io/badge/target-Neo%20Geo%20AES%20and%20MVS-red?style=flat-square)](#ハードウェアの上限)
+[![Hardware](https://img.shields.io/badge/hardware-runs%20on%20an%20AES%20and%20an%20MVS-brightgreen?style=flat-square)](#検証)
 
 </div>
 
@@ -417,7 +417,7 @@ MAMEは224行すべてで列0を黒で返します。それを除くと、残差
 | [`src/player/`](src/player) | ライブラリの上に構築した映像カートリッジです。トランスポート、メニュー、字幕、診断 |
 | [`examples/cutscene/`](examples/cutscene) | カットシーンを再生してから処理を続けるゲームで、出力されたバンドルからビルドされます |
 | [`tools/neogeomedia/`](tools/neogeomedia) | ベイカーです。デコード、色、パレット、辞書、エンコーダー、品質ラダー、音声、ROMコンテナ、バンドルの出力 |
-| [`tools/tests/`](tools/tests) | 944個のテストで、オラクルとして使うエミュレーターの書き起こしを含みます |
+| [`tools/tests/`](tools/tests) | 974個のテストで、オラクルとして使うエミュレーターの書き起こしを含みます |
 | [`tools/scripts/`](tools/scripts) | キャプチャ、検証、タイミング、ラダーのスイープ用のヘルパー |
 | [`toolchain/`](toolchain) | ネイティブまたはコンテナ化したngdevkitビルド |
 | [`FAMILY.md`](FAMILY.md) | sms-media-playerおよびfmv-core-pythonと共有する標準で、それぞれで同一です |
@@ -426,18 +426,37 @@ MAMEは224行すべてで列0を黒で返します。それを除くと、残差
 
 ## 開発
 
-| コマンド | 内容 |
-|:--------|:-------------|
-| `uv --project tools sync --all-groups` | ベイカーとその開発ツールをインストールします |
-| `uv --project tools run python -m pytest tools/tests` | 944個のテストを実行します |
-| `uv --project tools run ruff format --check tools/` | フォーマットゲート |
-| `uv --project tools run ruff check tools/` | リントゲート |
-| `uv --project tools run mypy tools/neogeomedia tools/scripts` | 型ゲート |
-| `make rom` | ベイク済みのものから、固定したツールチェーンイメージ内でROMをビルドします |
-| `make analyse` | cppcheckによるプレイヤーの静的解析で、終了コード0が必須です |
-| `make timing` | コンパイル済みオブジェクト内のVRAM書き込み間隔を検査します。`make rom`の後に実行します |
-| `make shell` | ツールチェーンイメージ内のシェル |
-| `bash tools/scripts/verify_mame.sh` | 完成したカートリッジをMAMEと比較します |
+```bash
+# ベイカーとその開発ツールをインストールします
+uv --project tools sync --all-groups
+
+# 974個のテストを実行します
+uv --project tools run python -m pytest tools/tests
+
+# フォーマットゲート
+uv --project tools run ruff format --check tools/
+
+# リントゲート
+uv --project tools run ruff check tools/
+
+# 型ゲート
+uv --project tools run mypy tools/neogeomedia tools/scripts
+
+# ベイク済みのものから、固定したツールチェーンイメージ内でROMをビルドします
+make rom
+
+# cppcheckによるプレイヤーの静的解析で、終了コード0が必須です
+make analyse
+
+# コンパイル済みオブジェクト内のVRAM書き込み間隔を検査します。make romの後に実行します
+make timing
+
+# ツールチェーンイメージ内のシェル
+make shell
+
+# 完成したカートリッジをMAMEと比較します
+bash tools/scripts/verify_mame.sh
+```
 
 カバレッジは[CI](.github/workflows/ci.yml)で95%をゲートとしています。CIはカートリッジをエンドツーエンドでビルドし、カットシーンの例を、映像のみと、映像自身のサウンドドライバー付きの2通りでビルドします。
 

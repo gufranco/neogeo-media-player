@@ -87,7 +87,7 @@ the requirement.
   is sound. The controls show on input and get out of the picture's way while
   it plays.
 
-## How a new port starts
+## How a new member starts
 
 1. Read this file, then the newest player end to end, before writing anything.
 2. Name it `<console>-media-player`, its baker package `<console>media`, and
@@ -202,7 +202,12 @@ That choice has a price, paid deliberately:
 ## How the work is done
 
 - **Every requirement the owner states is written into this file in the same
-  task**, in every member, so no port has to be told twice.
+  task**, in every member, so no member has to be told twice.
+- **No member is a port of another.** Every repository is a member of one
+  family of tools, and the text says so. Never describe one as a port, fork,
+  translation or derivative of another, in any language: the Neo Geo player
+  came first, but work has moved between the members in both directions
+  since, and more consoles will join.
 - **Capture before asking.** When something is wrong on screen, record the
   emulator, cut the recording into frames and read them. Ask only when that
   loop has run and cannot settle the question, and say what it showed.

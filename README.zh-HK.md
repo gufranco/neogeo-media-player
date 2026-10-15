@@ -9,11 +9,11 @@
 
 <br>
 
-[![Tests](https://img.shields.io/badge/tests-944%20passing-brightgreen?style=flat-square)](tools/tests)
+[![CI](https://img.shields.io/github/actions/workflow/status/gufranco/neogeo-media-player/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/gufranco/neogeo-media-player/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)](RELEASES.md)
 [![Licence](https://img.shields.io/badge/licence-MIT-blue?style=flat-square)](LICENSE)
-[![Hardware](https://img.shields.io/badge/runs%20on-real%20AES%20and%20MVS-success?style=flat-square)](#驗證)
-[![Verified](https://img.shields.io/badge/verified-geolith%20%2B%20MAME-blueviolet?style=flat-square)](#驗證)
+[![Target](https://img.shields.io/badge/target-Neo%20Geo%20AES%20and%20MVS-red?style=flat-square)](#硬件上限)
+[![Hardware](https://img.shields.io/badge/hardware-runs%20on%20an%20AES%20and%20an%20MVS-brightgreen?style=flat-square)](#驗證)
 
 </div>
 
@@ -417,7 +417,7 @@ MAME 在全部 224 行中把第 0 欄傳回為黑色。排除這一欄後，剩�
 | [`src/player/`](src/player) | 建基於程式庫的影片卡帶。播放控制、選單、字幕、診斷 |
 | [`examples/cutscene/`](examples/cutscene) | 一個播放過場動畫後繼續運行的遊戲，由輸出的套件建置 |
 | [`tools/neogeomedia/`](tools/neogeomedia) | 烘焙器：解碼、顏色、調色盤、字典、編碼器、質素階梯、音訊、ROM 容器、套件輸出 |
-| [`tools/tests/`](tools/tests) | 944 個測試，包括用作測試基準的模擬器轉寫 |
+| [`tools/tests/`](tools/tests) | 974 個測試，包括用作測試基準的模擬器轉寫 |
 | [`tools/scripts/`](tools/scripts) | 擷取、驗證、時序和階梯掃描的輔助工具 |
 | [`toolchain/`](toolchain) | ngdevkit 建置，原生或容器化 |
 | [`FAMILY.md`](FAMILY.md) | 與 sms-media-player 和 fmv-core-python 共用的標準，三者內容相同 |
@@ -426,18 +426,37 @@ MAME 在全部 224 行中把第 0 欄傳回為黑色。排除這一欄後，剩�
 
 ## 開發
 
-| 指令 | 作用 |
-|:--------|:-------------|
-| `uv --project tools sync --all-groups` | 安裝烘焙器及其開發工具 |
-| `uv --project tools run python -m pytest tools/tests` | 運行 944 個測試 |
-| `uv --project tools run ruff format --check tools/` | 格式檢查 |
-| `uv --project tools run ruff check tools/` | Lint 檢查 |
-| `uv --project tools run mypy tools/neogeomedia tools/scripts` | 型別檢查 |
-| `make rom` | 在固定的工具鏈映像中，以已烘焙的內容建置 ROM |
-| `make analyse` | 以 cppcheck 對播放器作靜態分析，必須以 0 結束 |
-| `make timing` | 檢查已編譯物件中的 VRAM 寫入間隔，在 `make rom` 之後執行 |
-| `make shell` | 在工具鏈映像內開啟 shell |
-| `bash tools/scripts/verify_mame.sh` | 把完成的卡帶與 MAME 比較 |
+```bash
+# 安裝烘焙器及其開發工具
+uv --project tools sync --all-groups
+
+# 運行 974 個測試
+uv --project tools run python -m pytest tools/tests
+
+# 格式檢查
+uv --project tools run ruff format --check tools/
+
+# Lint 檢查
+uv --project tools run ruff check tools/
+
+# 型別檢查
+uv --project tools run mypy tools/neogeomedia tools/scripts
+
+# 在固定的工具鏈映像中，以已烘焙的內容建置 ROM
+make rom
+
+# 以 cppcheck 對播放器作靜態分析，必須以 0 結束
+make analyse
+
+# 檢查已編譯物件中的 VRAM 寫入間隔，在 make rom 之後執行
+make timing
+
+# 在工具鏈映像內開啟 shell
+make shell
+
+# 把完成的卡帶與 MAME 比較
+bash tools/scripts/verify_mame.sh
+```
 
 覆蓋率在 [CI](.github/workflows/ci.yml) 中以 95% 為門檻，CI 也會端對端建置一個卡帶，並建置過場動畫範例兩次，一次只有影片，一次附帶影片自己的音效驅動程式。
 

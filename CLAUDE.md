@@ -4,6 +4,14 @@ This file governs assistant behaviour in this repository. The engineering
 contract is [AGENTS.md](AGENTS.md) and the family standard is
 [FAMILY.md](FAMILY.md); read both first.
 
+## One family, no ports
+
+Owner's instruction, 2026-10-15: the players and the core are members of one
+family of tools. Never describe one as a port, fork, translation or derivative
+of another, in a README, a commit, a comment or any other text, in any
+language. The Neo Geo player came first, but work has moved between the
+members in both directions since, and more consoles will join.
+
 ## Everything must run on the original hardware
 
 A change the board could disagree with is reported as unverified until the

@@ -24,6 +24,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from fmvcore import ffmpeg
+
 from neogeomedia import frames, quality
 
 DEFAULT_START = 180.0
@@ -129,7 +131,7 @@ def measure(
     source: Path, out: Path, *, start: float, duration: float, keep: bool
 ) -> list[Measurement]:
     out.mkdir(parents=True, exist_ok=True)
-    source_fps = float(frames.probe(source).fps)
+    source_fps = float(ffmpeg.probe(source).fps)
     vblank = float(frames.VBLANK_FPS)
     rows: list[Measurement] = []
 

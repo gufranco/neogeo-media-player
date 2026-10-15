@@ -10,18 +10,18 @@ is unchanged.
 
 from __future__ import annotations
 
-import json
 import re
-import shutil
 import subprocess
 from collections.abc import Iterator
 from dataclasses import dataclass
 from fractions import Fraction
+from itertools import islice
 from pathlib import Path
 from typing import Final, Literal
 
 import numpy as np
 import numpy.typing as npt
+from fmvcore import ffmpeg
 
 _MULTI_FIELDS: Final = re.compile(r"(TFF|BFF|Progressive|Undetermined):(\d+)")
 _ANALYSIS_SECONDS: Final = 8.0
@@ -35,17 +35,10 @@ _ROW_EPSILON: Final = 1e-6
 TARGET_WIDTH: Final = 320
 TARGET_HEIGHT: Final = 224
 TILE_PX: Final = 16
+RGB_CHANNELS: Final = 3
 
 FitMode = Literal["fill", "letterbox"]
 _FIT_MODES: Final = ("fill", "letterbox")
-
-
-@dataclass(frozen=True, slots=True)
-class VideoInfo:
-    width: int
-    height: int
-    duration: float
-    fps: Fraction
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,47 +86,6 @@ def frame_count(*, seconds: float) -> int:
     return int(seconds * VBLANK_FPS)
 
 
-def require_tool(name: str) -> str:
-    path = shutil.which(name)
-    if path is None:
-        msg = f"{name} not found on PATH"
-        raise RuntimeError(msg)
-    return path
-
-
-def probe(path: Path) -> VideoInfo:
-    """Read the source geometry and duration with ffprobe."""
-    path = Path(path)
-    if not path.is_file():
-        msg = f"source clip not found: {path}"
-        raise FileNotFoundError(msg)
-    result = subprocess.run(
-        [
-            require_tool("ffprobe"),
-            "-v",
-            "error",
-            "-select_streams",
-            "v:0",
-            "-show_entries",
-            "stream=width,height,r_frame_rate:format=duration",
-            "-of",
-            "json",
-            str(path),
-        ],
-        capture_output=True,
-        check=True,
-        text=True,
-    )
-    payload = json.loads(result.stdout)
-    stream = payload["streams"][0]
-    return VideoInfo(
-        width=int(stream["width"]),
-        height=int(stream["height"]),
-        duration=float(payload["format"]["duration"]),
-        fps=Fraction(stream["r_frame_rate"]),
-    )
-
-
 def hold_for_target_fps(target: float) -> int:
     """Refreshes to hold each frame to land nearest a wanted rate."""
     if target <= 0.0:
@@ -142,7 +94,7 @@ def hold_for_target_fps(target: float) -> int:
     return max(1, round(float(VBLANK_FPS) / target))
 
 
-def source_frames_kept(hold: int, source_fps: Fraction) -> float:
+def source_frames_kept(hold: int, source_fps: float) -> float:
     """Fraction of the source's own frames a hold preserves.
 
     A hold counts display refreshes, not source frames, and the two
@@ -167,7 +119,7 @@ def _run_filter(path: Path, filter_spec: str, *, start: float, duration: float) 
     """Run an analysis filter and hand back what it wrote to stderr."""
     result = subprocess.run(
         [
-            require_tool("ffmpeg"),
+            ffmpeg.require_tool("ffmpeg"),
             "-hide_banner",
             "-ss",
             f"{start:.6f}",
@@ -215,13 +167,13 @@ def analyse(path: Path, *, start: float = 0.0, duration: float = 8.0) -> SourceA
     matches = _CROP.findall(bars)
     if matches:
         width, height, left, top = (int(value) for value in matches[-1])
-        info = probe(path)
+        info = ffmpeg.probe(path)
         if width < info.width or height < info.height:
             crop = (width, height, left, top)
     return SourceAnalysis(interlaced=interlaced, crop=crop)
 
 
-def _analysed_size(info: VideoInfo, analysis: SourceAnalysis) -> tuple[int, int]:
+def _analysed_size(info: ffmpeg.SourceInfo, analysis: SourceAnalysis) -> tuple[int, int]:
     """The frame size after black bars are removed."""
     if analysis.crop is None:
         return info.width, info.height
@@ -337,106 +289,31 @@ def decode(
     motion_blur: int = 0,
 ) -> npt.NDArray[np.uint8]:
     """Decode a clip window into vblank-rate RGB frames."""
-    info = probe(path)
-    analysis = analyse(path, start=start, duration=min(duration, _ANALYSIS_SECONDS))
-    width, height = _analysed_size(info, analysis)
-    geometry = plan_geometry(width, height, target_width, target_height, fit=fit)
     wanted = frame_count(seconds=duration)
-    result = subprocess.run(
-        [
-            require_tool("ffmpeg"),
-            "-v",
-            "error",
-            "-ss",
-            f"{start:.6f}",
-            "-i",
-            str(path),
-            "-t",
-            f"{duration:.6f}",
-            "-vf",
-            build_filter(
-                geometry,
-                denoise=denoise,
-                motion_blur=motion_blur,
-                deinterlace=analysis.interlaced,
-                pre_crop=analysis.crop,
-            ),
-            "-an",
-            "-sn",
-            "-f",
-            "rawvideo",
-            "-pix_fmt",
-            "rgb24",
-            "-",
-        ],
-        capture_output=True,
-        check=True,
-    )
-    stride = target_width * target_height * 3
-    produced = len(result.stdout) // stride
-    if produced == 0:
+    window = Window(start, duration, fit, (target_width, target_height), denoise, motion_blur)
+    produced = list(_frames(Path(path), window, wanted))
+    if not produced:
         msg = f"ffmpeg produced no frames for {path} at {start}s for {duration}s"
         raise RuntimeError(msg)
-    clip = np.frombuffer(result.stdout[: produced * stride], dtype=np.uint8).reshape(
-        produced, target_height, target_width, 3
-    )
-    if produced >= wanted:
-        return np.array(clip[:wanted])
-    if wanted - produced > 2:
-        msg = f"ffmpeg produced {produced} frames, expected {wanted}"
+    if wanted - len(produced) > MAX_SHORTFALL:
+        msg = f"ffmpeg produced {len(produced)} frames, expected {wanted}"
         raise RuntimeError(msg)
-    tail = np.repeat(clip[-1:], wanted - produced, axis=0)
-    return np.concatenate([clip, tail], axis=0)
+    tail = [produced[-1]] * (wanted - len(produced))
+    return np.stack([*produced, *tail])
 
 
 DEFAULT_CHUNK_FRAMES: Final = 64
+MAX_SHORTFALL: Final = 2
 
 
-def _decode_process(
-    path: Path,
-    *,
-    start: float,
-    duration: float,
-    fit: FitMode,
-    target_width: int,
-    target_height: int,
-    denoise: float,
-    motion_blur: int,
-) -> subprocess.Popen[bytes]:
-    info = probe(path)
-    analysis = analyse(path, start=start, duration=min(duration, _ANALYSIS_SECONDS))
-    width, height = _analysed_size(info, analysis)
-    geometry = plan_geometry(width, height, target_width, target_height, fit=fit)
-    return subprocess.Popen(
-        [
-            require_tool("ffmpeg"),
-            "-v",
-            "error",
-            "-ss",
-            f"{start:.6f}",
-            "-i",
-            str(path),
-            "-t",
-            f"{duration:.6f}",
-            "-vf",
-            build_filter(
-                geometry,
-                denoise=denoise,
-                motion_blur=motion_blur,
-                deinterlace=analysis.interlaced,
-                pre_crop=analysis.crop,
-            ),
-            "-an",
-            "-sn",
-            "-f",
-            "rawvideo",
-            "-pix_fmt",
-            "rgb24",
-            "-",
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-    )
+@dataclass(frozen=True, slots=True)
+class Window:
+    start: float
+    duration: float
+    fit: FitMode
+    size: tuple[int, int]
+    denoise: float
+    motion_blur: int
 
 
 def stream(
@@ -459,36 +336,36 @@ def stream(
     allocated anything, so a full-capacity bake is only possible if the
     frames arrive a chunk at a time.
     """
-    stride = target_width * target_height * 3
     wanted = frame_count(seconds=duration)
-    process = _decode_process(
-        path,
-        start=start,
-        duration=duration,
-        fit=fit,
-        target_width=target_width,
-        target_height=target_height,
-        denoise=denoise,
-        motion_blur=motion_blur,
+    window = Window(start, duration, fit, (target_width, target_height), denoise, motion_blur)
+    pending = iter(_frames(Path(path), window, wanted))
+    for _ in range(wanted):
+        batch = list(islice(pending, chunk_frames))
+        if not batch:
+            return
+        yield np.stack(batch)
+
+
+def _frames(path: Path, window: Window, wanted: int) -> Iterator[npt.NDArray[np.uint8]]:
+    info = ffmpeg.probe(path)
+    analysis = analyse(path, start=window.start, duration=min(window.duration, _ANALYSIS_SECONDS))
+    width, height = _analysed_size(info, analysis)
+    target_width, target_height = window.size
+    geometry = plan_geometry(width, height, target_width, target_height, fit=window.fit)
+    chain = build_filter(
+        geometry,
+        denoise=window.denoise,
+        motion_blur=window.motion_blur,
+        deinterlace=analysis.interlaced,
+        pre_crop=analysis.crop,
     )
-    assert process.stdout is not None
-    produced = 0
-    try:
-        while produced < wanted:
-            batch = min(chunk_frames, wanted - produced)
-            payload = process.stdout.read(batch * stride)
-            if not payload:
-                break
-            whole = len(payload) // stride
-            if whole == 0:
-                break
-            yield np.frombuffer(payload[: whole * stride], dtype=np.uint8).reshape(
-                whole, target_height, target_width, 3
-            )
-            produced += whole
-    finally:
-        process.stdout.close()
-        process.wait()
+    command = ffmpeg.frame_command(
+        path, start=window.start, duration=window.duration, stages=[chain]
+    )
+    shape = (target_height, target_width, RGB_CHANNELS)
+    yield from islice(
+        ffmpeg.stream_frames(command, path=path, shape=shape, max_frames=wanted), wanted
+    )
 
 
 def sample(

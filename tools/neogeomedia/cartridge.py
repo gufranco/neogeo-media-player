@@ -17,6 +17,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from fmvcore import ffmpeg
+
 from neogeomedia import bake, frames, probe, quality, tiercache
 
 BUILD_SCRIPT = Path(__file__).resolve().parents[2] / "toolchain" / "build-in-docker.sh"
@@ -106,7 +108,7 @@ def bake_argv(args: argparse.Namespace) -> list[str]:
 
 def _measured_tier(args: argparse.Namespace) -> quality.Tier | None:
     """Resolve a tier by baking rather than by sampling, remembering the result."""
-    info = frames.probe(args.source)
+    info = ffmpeg.probe(args.source)
     span = args.duration if args.duration is not None else max(0.0, info.duration - args.start)
     minutes = span / quality.SECONDS_PER_MINUTE
     store = args.tier_cache or tiercache.default_store()

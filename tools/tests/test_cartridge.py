@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 import subprocess
-from fractions import Fraction
 from pathlib import Path
 
 import pytest
+from fmvcore import ffmpeg
 
 from neogeomedia import cartridge, frames, tiercache
 
@@ -147,7 +147,7 @@ class TestSearchingForTheTier:
                 tier=cartridge.quality.tier_by_name("q19"), minutes=10.0
             ),
         )
-        monkeypatch.setattr(cartridge.frames, "probe", lambda *_a, **_k: _stub_info())
+        monkeypatch.setattr(cartridge.ffmpeg, "probe", lambda *_a, **_k: _stub_info())
 
         cartridge.main([str(movie), "--quality", "search"])
 
@@ -163,7 +163,7 @@ class TestSearchingForTheTier:
             "search",
             lambda **_k: cartridge.probe.Outcome(tier=None, minutes=10.0),
         )
-        monkeypatch.setattr(cartridge.frames, "probe", lambda *_a, **_k: _stub_info())
+        monkeypatch.setattr(cartridge.ffmpeg, "probe", lambda *_a, **_k: _stub_info())
 
         code = cartridge.main([str(movie), "--quality", "search"])
 
@@ -173,7 +173,7 @@ class TestSearchingForTheTier:
 
 
 def _stub_info():
-    return frames.VideoInfo(width=1280, height=720, duration=600.0, fps=Fraction(24, 1))
+    return ffmpeg.SourceInfo(width=1280, height=720, fps=24.0, duration=600.0)
 
 
 def _reading_bake(monkeypatch, *, tiles, full=False, exceeded=False, status=0, write_report=True):
@@ -198,7 +198,7 @@ def _reading_bake(monkeypatch, *, tiles, full=False, exceeded=False, status=0, w
         return status
 
     monkeypatch.setattr(cartridge.bake, "main", fake_bake)
-    monkeypatch.setattr(cartridge.frames, "probe", lambda *_a, **_k: _stub_info())
+    monkeypatch.setattr(cartridge.ffmpeg, "probe", lambda *_a, **_k: _stub_info())
     return seen
 
 
@@ -314,7 +314,7 @@ class TestMeasuringARung:
             return 0
 
         monkeypatch.setattr(cartridge.bake, "main", fake_bake)
-        monkeypatch.setattr(cartridge.frames, "probe", lambda *_a, **_k: _stub_info())
+        monkeypatch.setattr(cartridge.ffmpeg, "probe", lambda *_a, **_k: _stub_info())
 
         cartridge.main(
             [
@@ -344,7 +344,7 @@ class TestTheDefaultIsMeasured:
                 asked.append("searched") or cartridge.probe.Outcome(tier=None, minutes=1.0)
             ),
         )
-        monkeypatch.setattr(cartridge.frames, "probe", lambda *_a, **_k: _stub_info())
+        monkeypatch.setattr(cartridge.ffmpeg, "probe", lambda *_a, **_k: _stub_info())
 
         cartridge.main([str(movie)])
 
@@ -369,7 +369,7 @@ class TestTheSearchKnowsTheSource:
             return cartridge.probe.Outcome(tier=cartridge.quality.tier_by_name("q17"), minutes=1.0)
 
         monkeypatch.setattr(cartridge.probe, "search", capture)
-        monkeypatch.setattr(cartridge.frames, "probe", lambda *_a, **_k: _stub_info())
+        monkeypatch.setattr(cartridge.ffmpeg, "probe", lambda *_a, **_k: _stub_info())
         monkeypatch.setattr(cartridge.bake, "main", lambda _argv: 0)
         monkeypatch.setattr(cartridge.subprocess, "run", lambda *_a, **_k: None)
 

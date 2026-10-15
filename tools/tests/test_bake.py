@@ -10,6 +10,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from fmvcore import ffmpeg
 
 from neogeomedia import adpcmb, bake, bundle, content, crom, quality, stream
 from neogeomedia import frames as frames_mod
@@ -91,7 +92,7 @@ class TestSourceDefaults:
 
         resolved = bake._resolve_duration(args)
 
-        assert resolved == pytest.approx(frames_mod.probe(synthetic_clip).duration, abs=0.05)
+        assert resolved == pytest.approx(ffmpeg.probe(synthetic_clip).duration, abs=0.05)
 
     def test_an_explicit_duration_still_wins(self, synthetic_clip):
         args = bake._parse_args(["--source", str(synthetic_clip), "--duration", "0.25"])
@@ -101,7 +102,7 @@ class TestSourceDefaults:
     def test_a_start_offset_shortens_the_default_duration(self, synthetic_clip):
         args = bake._parse_args(["--source", str(synthetic_clip), "--start", "0.4"])
 
-        full = frames_mod.probe(synthetic_clip).duration
+        full = ffmpeg.probe(synthetic_clip).duration
 
         assert bake._resolve_duration(args) == pytest.approx(full - 0.4, abs=0.05)
 

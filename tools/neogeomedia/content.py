@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Final
 
 import numpy as np
+from fmvcore import ffmpeg
 
 from neogeomedia import encode, frames, neocolor, palettes
 
@@ -59,7 +60,7 @@ def _metadata_values(path: Path, filter_spec: str, key: str, *, duration: float)
     """Run a filter that prints metadata and collect one key from it."""
     result = subprocess.run(
         [
-            frames.require_tool("ffmpeg"),
+            ffmpeg.require_tool("ffmpeg"),
             "-hide_banner",
             "-v",
             "error",

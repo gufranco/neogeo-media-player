@@ -27,6 +27,7 @@ from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
+from fmvcore import ffmpeg
 
 from neogeomedia import encode, frames, neocolor, quality
 
@@ -79,7 +80,7 @@ def measure_reference_rate(
     calibrated on content it is never going to encode.
     """
     source = Path(source)
-    info = frames.probe(source)
+    info = ffmpeg.probe(source)
     span_total = info.duration - start
     if duration is not None:
         span_total = min(span_total, duration)
@@ -130,7 +131,7 @@ def measure_anchors(
     costs two encodes rather than two decodes.
     """
     source = Path(source)
-    info = frames.probe(source)
+    info = ffmpeg.probe(source)
     span_total = info.duration - start
     if duration is not None:
         span_total = min(span_total, duration)

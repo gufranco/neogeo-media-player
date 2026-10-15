@@ -140,22 +140,6 @@ class TestFilterChain:
             frames.plan_geometry(1280, 720, 320, 224, fit="stretch")
 
 
-class TestProbe:
-    def test_probe_reports_the_source_geometry(self, synthetic_clip):
-        info = frames.probe(synthetic_clip)
-
-        assert (info.width, info.height) == (1280, 720)
-
-    def test_probe_reports_the_source_duration(self, synthetic_clip):
-        info = frames.probe(synthetic_clip)
-
-        assert info.duration == pytest.approx(2.0, abs=0.1)
-
-    def test_probing_a_missing_file_is_rejected(self, tmp_path):
-        with pytest.raises(FileNotFoundError):
-            frames.probe(tmp_path / "absent.mp4")
-
-
 class TestDecode:
     def test_decode_returns_frames_at_the_target_resolution(self, synthetic_clip):
         clip = frames.decode(synthetic_clip, start=0.0, duration=0.5)
@@ -197,12 +181,6 @@ class TestDecodeLimits:
     def test_seeking_past_the_end_is_rejected(self, synthetic_clip):
         with pytest.raises(RuntimeError, match="no frames"):
             frames.decode(synthetic_clip, start=30.0, duration=0.5)
-
-    def test_a_missing_tool_is_reported_by_name(self, monkeypatch):
-        monkeypatch.setattr(frames.shutil, "which", lambda _: None)
-
-        with pytest.raises(RuntimeError, match="ffprobe"):
-            frames.require_tool("ffprobe")
 
 
 class TestDenoise:

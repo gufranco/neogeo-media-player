@@ -36,8 +36,8 @@ def flat_reconstruction(measure_drift, monkeypatch):
         def render(self, *_args):
             return np.full((224, 320), painted.get(self.step, 0), dtype=np.uint8)
 
-    monkeypatch.setattr(measure_drift.vc, "StreamPlayer", Player)
-    monkeypatch.setattr(measure_drift.vc, "GeolithTileReader", lambda *_args: object())
+    monkeypatch.setattr(measure_drift, "StreamPlayer", Player)
+    monkeypatch.setattr(measure_drift, "GeolithTileReader", lambda *_args: object())
     monkeypatch.setattr(
         measure_drift.vc, "_palette_colors", lambda *_args: np.zeros((1, 15, 3), np.uint8)
     )

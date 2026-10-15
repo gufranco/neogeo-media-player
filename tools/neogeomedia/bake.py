@@ -38,6 +38,7 @@ from typing import Any, Final
 
 import numpy as np
 import numpy.typing as npt
+from fmvcore import ffmpeg
 
 from neogeomedia import (
     adpcmb,
@@ -1004,7 +1005,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 def _resolve_duration(args: argparse.Namespace) -> float:
     if args.duration is not None:
         return float(args.duration)
-    return max(0.0, frames.probe(args.source).duration - float(args.start))
+    return max(0.0, ffmpeg.probe(args.source).duration - float(args.start))
 
 
 def _resolve_quality(args: argparse.Namespace) -> quality.Tier | None:
@@ -1055,7 +1056,7 @@ def _resolve_frame_hold(args: argparse.Namespace, tier: quality.Tier | None) -> 
         hold = frames.hold_for_target_fps(args.target_fps)
     if hold <= 1:
         return 1
-    source_fps = frames.probe(args.source).fps
+    source_fps = ffmpeg.probe(args.source).fps
     if frames.source_frames_kept(hold, source_fps) >= 1.0:
         effective = float(frames.VBLANK_FPS) / hold
         msg = (

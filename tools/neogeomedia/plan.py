@@ -13,6 +13,8 @@ import argparse
 import sys
 from pathlib import Path
 
+from fmvcore import ffmpeg
+
 from neogeomedia import bake, calibrate, frames, quality
 
 
@@ -31,7 +33,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(sys.argv[1:] if argv is None else argv)
-    info = frames.probe(args.source)
+    info = ffmpeg.probe(args.source)
     windows = calibrate.sample_windows(
         info.duration, count=args.samples, seconds=args.sample_seconds
     )

@@ -23,6 +23,7 @@ from typing import Final
 
 import numpy as np
 import numpy.typing as npt
+from fmvcore import ffmpeg
 
 from neogeomedia import calibrate, encode, frames, neocolor, quality
 
@@ -168,7 +169,7 @@ def sweep(
     seed: int = 0,
 ) -> list[Point]:
     """Measure every setting in the grid against one source."""
-    info = frames.probe(source)
+    info = ffmpeg.probe(source)
     windows = calibrate.sample_windows(info.duration, count=count, seconds=seconds)
     clip = np.concatenate(
         [

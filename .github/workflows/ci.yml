@@ -42,7 +42,8 @@ jobs:
             fi
           done < <(git log --format=%s "$BASE..$HEAD")
           if [ "$bad" -ne 0 ]; then
-            echo "The release version is derived from these subjects, so the format is load-bearing." >&2
+            echo "The release version is derived from these subjects," >&2
+            echo "so the format is load-bearing." >&2
             exit 1
           fi
           echo "every subject parses"
@@ -145,8 +146,9 @@ jobs:
 
       - name: Emit a drop-in bundle
         run: |
-          uv --project tools run python -m aesmovie.bake --source ci-source.mp4 \
-            --quality q17 --duration 4 --build-dir build --bundle build/bundle
+          uv --project tools run python -m aesmovie.bake \
+            --source ci-source.mp4 --quality q17 --duration 4 \
+            --build-dir build --bundle build/bundle
 
       - name: A developer's project builds against the bundle
         run: |
@@ -175,7 +177,7 @@ jobs:
             "$share/nullsound_driver.ihx" /tmp/nullsound.m1 --pad-to 131072
           test "$(wc -c < "$rom/ngdevkit-m1.m1")" -eq 131072
           if cmp -s "$rom/ngdevkit-m1.m1" /tmp/nullsound.m1; then
-            echo "the cartridge carries ngdevkit's empty driver, not the movie's" >&2
+            echo "the cartridge has the empty driver, not the movie's" >&2
             exit 1
           fi
           echo "the movie's own sound driver built from the bundle"

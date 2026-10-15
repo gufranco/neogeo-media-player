@@ -4,7 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       level:
-        description: "Force a bump level. Leave as commits to let the history decide."
+        description: >-
+          Force a bump level. Leave as commits to let the history decide.
         required: false
         default: commits
         type: choice
@@ -55,10 +56,11 @@ jobs:
           LEVEL: ${{ inputs.level }}
         run: |
           set -euo pipefail
+          release=(uv --project tools run semantic-release)
           if [ "$LEVEL" = "commits" ]; then
-            uv --project tools run semantic-release --noop version --print
+            "${release[@]}" --noop version --print
           else
-            uv --project tools run semantic-release --noop version "--$LEVEL" --print
+            "${release[@]}" --noop version "--$LEVEL" --print
           fi
 
       - name: Tag and publish
@@ -69,8 +71,9 @@ jobs:
           set -euo pipefail
           git config user.name "${GITHUB_ACTOR}"
           git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          release=(uv --project tools run semantic-release)
           if [ "$LEVEL" = "commits" ]; then
-            uv --project tools run semantic-release version --push --vcs-release
+            "${release[@]}" version --push --vcs-release
           else
-            uv --project tools run semantic-release version "--$LEVEL" --push --vcs-release
+            "${release[@]}" version "--$LEVEL" --push --vcs-release
           fi

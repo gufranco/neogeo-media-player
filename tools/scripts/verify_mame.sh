@@ -33,7 +33,7 @@ unzip -o -q -j "$BIOS_ZIP" "$BIOS_ROM" "000-lo.lo" -d "$WORK/bios"
 cp -f "$BUILD/neogeomedia.zip" "$WORK/roms/"
 cp -f "$BUILD/mame-hash/neogeo.xml" "$WORK/hash/"
 
-mame aes -bios "$BIOS_OPTION" -cart neogeomedia \
+SDL_VIDEODRIVER=dummy mame aes -bios "$BIOS_OPTION" -cart neogeomedia \
     -rompath "$WORK/roms" -hashpath "$WORK/hash" -snapshot_directory "$WORK/snap" \
     -cfg_directory "$WORK/cfg" -nvram_directory "$WORK/nvram" -inipath "$WORK" \
     -noreadconfig -video none -sound none -window -nomaximize \

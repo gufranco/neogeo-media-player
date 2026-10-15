@@ -196,8 +196,16 @@ That choice has a price, paid deliberately:
   loop has run and cannot settle the question, and say what it showed.
 - **A measurement answers what happened, never on its own what is better.**
   Render it and look before quoting a number for a change.
-- **Emulators run windowed**, never fullscreen, and minimised when a run only
-  produces a capture.
+- **An emulator never takes the screen.** A scripted run is headless: MAME
+  with `SDL_VIDEODRIVER=dummy` and `-window -video none -sound none`, because
+  MAME starts full screen on macOS and `-video none` alone still opens a
+  window; RetroArch through `open -g -j`; mednafen with `-video.fs 0 -sound 0`,
+  minimised. A run the owner asked to watch opens windowed and minimised,
+  never full screen.
+- **MAME is a cross-check, never the first witness.** Its BIOS and
+  configuration defaults have produced failures and false positives, so the
+  evidence comes from another emulator first: geolith for the Neo Geo,
+  mednafen or Emulicious for the Master System.
 - **Private projects are never named** in a public member: not their name, path,
   remote or functions. A figure taken from one is cited by its documented
   source or by a run on hardware.

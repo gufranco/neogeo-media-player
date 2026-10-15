@@ -17,6 +17,13 @@ if [[ ! -f "$CORE" ]]; then
     exit 1
 fi
 
+absolute() {
+    case "$1" in
+        /*) printf '%s\n' "$1" ;;
+        *) printf '%s/%s\n' "$PWD" "$1" ;;
+    esac
+}
+
 restore_opts() {
     if [[ -n "${OPTS_BACKUP:-}" && -f "$OPTS_BACKUP" ]]; then
         mv -f "$OPTS_BACKUP" "$OPTS"
@@ -36,12 +43,13 @@ fi
 mkdir -p "$(dirname "$OUT")"
 rm -f "$OUT"
 
-/Applications/RetroArch.app/Contents/MacOS/RetroArch \
-    -L "$CORE" \
+open -W -g -j -n /Applications/RetroArch.app \
+    --stdout /tmp/capture_rom.log --stderr /tmp/capture_rom.log \
+    --args -L "$CORE" \
     --max-frames="$FRAMES" \
     --max-frames-ss \
-    --max-frames-ss-path="$OUT" \
-    "$ROM" >/tmp/capture_rom.log 2>&1
+    --max-frames-ss-path="$(absolute "$OUT")" \
+    "$(absolute "$ROM")"
 
 if [[ ! -s "$OUT" ]]; then
     echo "no screenshot produced; tail of log:" >&2

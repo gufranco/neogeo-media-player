@@ -54,7 +54,7 @@ capture_at() {
 
     rm -rf "$snap"
     mkdir -p "$snap"
-    mame aes -bios "$BIOS_OPTION" -cart ngdevkit \
+    SDL_VIDEODRIVER=dummy mame aes -bios "$BIOS_OPTION" -cart ngdevkit \
         -rompath "$STAGE/roms" -hashpath "$STAGE/hash" -snapshot_directory "$snap" \
         -cfg_directory "$STAGE/cfg" -nvram_directory "$STAGE/nvram" -inipath "$STAGE" \
         -noreadconfig -video none -sound none -window -nomaximize \

@@ -12,57 +12,90 @@ on:
         options: [commits, patch, minor, major]
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   UV_FROZEN: "1"
   NEOGEOMEDIA_CC_REQUIRED: "1"
 
 jobs:
-  release:
-    name: Publish
+  gates:
+    name: Gates
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          persist-credentials: false
           submodules: true
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
         with:
+          version: "0.12.23"
           enable-cache: true
-          cache-dependency-glob: tools/uv.lock
           cache-suffix: release
 
-      - name: Install ffmpeg
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y --no-install-recommends ffmpeg
-
-      - name: Sync
-        run: uv --project tools sync --all-groups
-
-      - name: Every gate, again, before anything is tagged
+      - name: Install ffmpeg, which the decode path shells out to
         run: |
           set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: The gate the baker job runs
+        run: |
+          set -euo pipefail
+          uv --project tools sync --all-groups
           uv --project tools run ruff format --check tools/
           uv --project tools run ruff check tools/
           uv --project tools run mypy tools/neogeomedia tools/scripts
           uv --project tools run python -m pytest tools/tests \
-            --cov=neogeomedia --cov-fail-under=95
+            --cov=neogeomedia \
+            --cov=tools/scripts \
+            --cov-config=tools/pyproject.toml \
+            --cov-fail-under=95
+
+      - name: The gate the cartridge job runs
+        run: |
+          set -euo pipefail
+          make image
+          make analyse
+          ffmpeg -y -loglevel error \
+            -f lavfi -i "testsrc2=size=640x480:rate=24:duration=8" \
+            -f lavfi -i "sine=frequency=440:duration=8" \
+            -pix_fmt yuv420p -c:a aac ci-source.mp4
+          uv --project tools run python -m neogeomedia.cartridge ci-source.mp4 \
+            --quality q17 --build-dir build
+          make timing
+          test -s build/neogeomedia.neo
+
+  publish:
+    name: Publish
+    needs: gates
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          submodules: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+        with:
+          version: "0.12.23"
 
       - name: What the next version will be
         env:
           LEVEL: ${{ inputs.level }}
         run: |
           set -euo pipefail
-          release=(uv --project tools run semantic-release)
+          release=(uv --project tools run --only-group release)
           if [ "$LEVEL" = "commits" ]; then
-            "${release[@]}" --noop version --print
+            "${release[@]}" semantic-release --noop version --print
           else
-            "${release[@]}" --noop version "--$LEVEL" --print
+            "${release[@]}" semantic-release --noop version "--$LEVEL" --print
           fi
 
       - name: Tag and publish
@@ -73,9 +106,10 @@ jobs:
           set -euo pipefail
           git config user.name "${GITHUB_ACTOR}"
           git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
-          release=(uv --project tools run semantic-release)
+          release=(uv --project tools run --only-group release)
           if [ "$LEVEL" = "commits" ]; then
-            "${release[@]}" version --push --vcs-release
+            "${release[@]}" semantic-release version --push --vcs-release
           else
-            "${release[@]}" version "--$LEVEL" --push --vcs-release
+            "${release[@]}" semantic-release \
+              version "--$LEVEL" --push --vcs-release
           fi

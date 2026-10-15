@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "fmv-core-python"))
+
+from fmvcore.hook import Check, Gates, run  # noqa: E402
+
+UV = ("uv", "--project", "tools", "run")
+GATES = Gates(
+    always=(
+        Check("format", (*UV, "ruff", "format", "--check", "tools/")),
+        Check("lint", (*UV, "ruff", "check", "tools/")),
+        Check("types", (*UV, "mypy", "tools/neogeomedia", "tools/scripts")),
+        Check(
+            "tests",
+            (
+                *UV,
+                "python",
+                "-m",
+                "pytest",
+                "tools/tests",
+                "--cov=neogeomedia",
+                "--cov=tools/scripts",
+                "--cov-config=tools/pyproject.toml",
+                "--cov-fail-under=95",
+            ),
+        ),
+    ),
+    player=(
+        Check("rom", ("make", "rom")),
+        Check("analyse", ("make", "analyse")),
+        Check("timing", ("make", "timing")),
+    ),
+    player_paths=(
+        "src/",
+        "toolchain/",
+        "Makefile",
+        "Dockerfile",
+        "tools/scripts/check_vram_timing.py",
+    ),
+    always_required={"NEOGEOMEDIA_CC_REQUIRED": "1"},
+    player_required={"NEOGEOMEDIA_CC_REQUIRED": "1"},
+)
+
+if __name__ == "__main__":
+    sys.exit(run(ROOT, GATES))

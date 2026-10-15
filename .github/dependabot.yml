@@ -12,6 +12,18 @@ updates:
         patterns:
           - "*"
 
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      base-image:
+        patterns:
+          - "*"
+
   - package-ecosystem: uv
     directory: /tools
     schedule:

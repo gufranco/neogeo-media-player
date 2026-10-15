@@ -28,7 +28,7 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 
-from aesmovie import encode, frames, neocolor, quality
+from neogeomedia import encode, frames, neocolor, quality
 
 DEFAULT_SAMPLE_COUNT: int = 24
 DEFAULT_SAMPLE_SECONDS: float = 3.0

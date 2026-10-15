@@ -14,7 +14,7 @@ from fractions import Fraction
 import numpy as np
 import pytest
 
-from aesmovie import adpcmb
+from neogeomedia import adpcmb
 
 STEP_SCALE = (57, 57, 57, 57, 77, 102, 128, 153)
 STEP_MIN = 127

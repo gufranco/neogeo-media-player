@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from aesmovie import neocolor
+from neogeomedia import neocolor
 
 
 def geolith_reference_rgb(word: int) -> tuple[int, int, int]:

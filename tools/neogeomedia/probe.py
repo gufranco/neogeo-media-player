@@ -38,7 +38,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from aesmovie import quality, tiercache
+from neogeomedia import quality, tiercache
 
 
 @dataclass(frozen=True, slots=True)

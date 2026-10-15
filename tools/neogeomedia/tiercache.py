@@ -37,11 +37,11 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from aesmovie import quality
+from neogeomedia import quality
 
 SAMPLE_BYTES = 1 << 20
 CACHE_VERSION = 3
-STORE_NAME = "aesmovie-tiers.json"
+STORE_NAME = "neogeomedia-tiers.json"
 
 
 @dataclass(frozen=True, slots=True)

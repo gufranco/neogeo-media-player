@@ -48,7 +48,7 @@ import math
 from dataclasses import dataclass
 from typing import Final
 
-from aesmovie import adpcmb
+from neogeomedia import adpcmb
 
 CROM_BYTES: Final = 128 << 20
 CROM_TILES: Final = 1 << 20

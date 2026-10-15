@@ -113,8 +113,8 @@ def write_neo(
     *,
     rom_dir: Path,
     output: Path,
-    name: str = "AES Movie Player",
-    manufacturer: str = "aesmovie",
+    name: str = "Neo Geo Media Player",
+    manufacturer: str = "neogeomedia",
     year: int = 2026,
     genre: int = 0,
     screenshot: int = 1,
@@ -162,8 +162,8 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Assemble a .neo cart container.")
     parser.add_argument("--rom-dir", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--name", default="AES Movie Player")
-    parser.add_argument("--manufacturer", default="aesmovie")
+    parser.add_argument("--name", default="Neo Geo Media Player")
+    parser.add_argument("--manufacturer", default="neogeomedia")
     parser.add_argument("--year", type=int, default=2026)
     parser.add_argument("--ngh", type=lambda value: int(value, 0), default=0x9999)
     args = parser.parse_args(argv)

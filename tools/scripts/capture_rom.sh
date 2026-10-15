@@ -3,7 +3,7 @@ set -euo pipefail
 
 FRAMES="${1:-600}"
 OUT="${2:-build/last-capture.png}"
-ROM="${ROM:-build/aesmovie.neo}"
+ROM="${ROM:-build/neogeomedia.neo}"
 CORE="${CORE:-$HOME/Library/Application Support/RetroArch/cores/geolith_libretro.dylib}"
 OPTS="${OPTS:-$HOME/Library/Application Support/RetroArch/config/Geolith/Geolith.opt}"
 FULL_RASTER="${FULL_RASTER:-0}"

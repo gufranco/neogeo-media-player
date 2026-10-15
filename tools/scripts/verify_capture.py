@@ -24,7 +24,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from aesmovie import neocolor
+from neogeomedia import neocolor
 from tests.geolith_model import GeolithTileReader, StreamPlayer
 
 RASTER_WIDTH = 320

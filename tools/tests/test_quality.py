@@ -10,7 +10,7 @@ import itertools
 
 import pytest
 
-from aesmovie import quality
+from neogeomedia import quality
 
 
 class TestLadder:

@@ -1,5 +1,5 @@
-#ifndef AES_MOVIE_MENU_H
-#define AES_MOVIE_MENU_H
+#ifndef NEOGEO_MEDIA_MENU_H
+#define NEOGEO_MEDIA_MENU_H
 
 #include <stdint.h>
 

@@ -4,7 +4,7 @@ import struct
 
 import pytest
 
-from aesmovie import stream
+from neogeomedia import stream
 
 
 def update(col, row, *, tile=0, palette=16, hflip=False, vflip=False):

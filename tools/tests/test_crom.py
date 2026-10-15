@@ -13,7 +13,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from aesmovie import crom
+from neogeomedia import crom
 from tests.geolith_model import GeolithTileReader
 
 TILE_BYTES = 128

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from aesmovie import bake, stamp
+from neogeomedia import bake, stamp
 
 HEADER = """#ifndef FMV_H
 #define FMV_H

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from aesmovie import palettes
+from neogeomedia import palettes
 
 
 def a_ramp_tile(low: int, high: int) -> np.ndarray:

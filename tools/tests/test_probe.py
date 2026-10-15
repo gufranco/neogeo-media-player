@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from aesmovie import probe, quality
+from neogeomedia import probe, quality
 
 BUDGET = 1_048_576
 MINUTES = 10.0

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from aesmovie import bundle
+from neogeomedia import bundle
 
 
 def _library(root):

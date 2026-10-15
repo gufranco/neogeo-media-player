@@ -13,7 +13,7 @@ from fractions import Fraction
 import numpy as np
 import pytest
 
-from aesmovie import frames
+from neogeomedia import frames
 
 VBLANK_FPS = frames.VBLANK_FPS
 

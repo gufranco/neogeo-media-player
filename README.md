@@ -1,6 +1,6 @@
 <div align="center">
 
-# AES Movie Player
+# Neo Geo Media Player
 
 <strong>A full-screen movie with sound on a stock Neo Geo AES,<br>
 and a library that puts one inside your own game.</strong>
@@ -37,8 +37,8 @@ and a library that puts one inside your own game.</strong>
 </div>
 
 ```bash
-uv --project tools run python -m aesmovie.cartridge ~/Movies/my-film.mkv
-# build/aesmovie.neo
+uv --project tools run python -m neogeomedia.cartridge ~/Movies/my-film.mkv
+# build/neogeomedia.neo
 ```
 
 ---
@@ -184,7 +184,7 @@ Any video file ffmpeg can read works. Nothing has to live in a particular folder
 ### One command
 
 ```bash
-uv --project tools run python -m aesmovie.cartridge ~/Movies/my-film.mkv
+uv --project tools run python -m neogeomedia.cartridge ~/Movies/my-film.mkv
 ```
 
 That measures the source, settles the highest quality rung that fits a cartridge, bakes it, builds the ROM, and leaves a `.neo` in `build/`. Add subtitles with `--subtitles ~/Movies/my-film.srt`, or leave the flag off and a `.srt` sitting beside the source under the same name is picked up on its own.
@@ -200,8 +200,8 @@ That measures the source, settles the highest quality rung that fits a cartridge
 
 | Path | What it is |
 |:-----|:-----------|
-| `build/aesmovie.neo` | The cartridge. This is the file a NeoSD or an emulator loads |
-| `build/aesmovie.zip` | The same ROMs as a MAME software-list archive |
+| `build/neogeomedia.neo` | The cartridge. This is the file a NeoSD or an emulator loads |
+| `build/neogeomedia.zip` | The same ROMs as a MAME software-list archive |
 | `build/mame-hash/neogeo.xml` | The software-list entry MAME needs to find that archive |
 | `build/baked/` | Intermediate ROM images, kept so the ROM can be rebuilt without re-baking |
 | `build/preview.mp4` | Only when `--preview` was asked for |
@@ -221,18 +221,18 @@ That measures the source, settles the highest quality rung that fits a cartridge
 
 ### Running it
 
-On hardware, copy `build/aesmovie.neo` to a NeoSD flash cart and load it like any other title.
+On hardware, copy `build/neogeomedia.neo` to a NeoSD flash cart and load it like any other title.
 
 Under MAME, point it at the archive and the hash file the build wrote, with the BIOS directory on the ROM path:
 
 ```bash
-mame aes -bios unibios23 -cart aesmovie \
+mame aes -bios unibios23 -cart neogeomedia \
     -rompath build:/path/to/bios -hashpath build/mame-hash
 ```
 
 [`verify_mame.sh`](tools/scripts/verify_mame.sh) does that staging and then compares what MAME drew against the baker's own render.
 
-Under a libretro front end, load `build/aesmovie.neo` with the geolith core and set `geolith_overscan_*` to zero to see all 320 columns.
+Under a libretro front end, load `build/neogeomedia.neo` with the geolith core and set `geolith_overscan_*` to zero to see all 320 columns.
 
 ### Toolchain
 
@@ -253,7 +253,7 @@ brew install --force-bottle dciabrin/ngdevkit/ngdevkit-toolchain \
 The renderer is a library, and the baker emits it as a folder you drop into an ngdevkit project. Everything ships as source.
 
 ```bash
-uv --project tools run python -m aesmovie.bake \
+uv --project tools run python -m neogeomedia.bake \
     --source intro.mkv --quality q17 --duration 30 \
     --build-dir build --bundle game/fmv
 ```
@@ -315,12 +315,12 @@ Flat-shaded animation is the best case for a tile dictionary by a wide margin. A
 
 A rung has to fit on its own terms. Rate control degrades a picture to keep it inside the budget, so a rung that only fits because the controller reached its ceiling does not count as fitting.
 
-Every rung it settles is written to [`aesmovie-tiers.json`](aesmovie-tiers.json), which is meant to be committed: what it holds is a property of the film and the ladder rather than of one workstation, so checking it in lets anyone building the same cartridge skip the same bakes.
+Every rung it settles is written to [`neogeomedia-tiers.json`](neogeomedia-tiers.json), which is meant to be committed: what it holds is a property of the film and the ladder rather than of one workstation, so checking it in lets anyone building the same cartridge skip the same bakes.
 
-To see the ladder before committing to a long run, `aesmovie.plan` prints every rung with its exact overshoot in about two minutes and bakes nothing:
+To see the ladder before committing to a long run, `neogeomedia.plan` prints every rung with its exact overshoot in about two minutes and bakes nothing:
 
 ```bash
-uv --project tools run python -m aesmovie.plan --source film.mkv
+uv --project tools run python -m neogeomedia.plan --source film.mkv
 ```
 
 [`docs/quality-ladder.md`](docs/quality-ladder.md) lists all 35 rungs with their settings, and covers per-scene palettes, rate control and the colour model.
@@ -379,11 +379,11 @@ A five minute source with grain added at the cartridge's own resolution was buil
 | [`src/fmv/`](src/fmv) | The library: VRAM setup, the sprite grid, palette epochs, the per-frame replay, keyframe seek, and the optional ADPCM-B paging |
 | [`src/player/`](src/player) | The movie cartridge, built on the library. Transport, menu, subtitles, diagnostics |
 | [`examples/cutscene/`](examples/cutscene) | A game that plays a cutscene and carries on, built from an emitted bundle |
-| [`tools/aesmovie/`](tools/aesmovie) | The baker: decode, colour, palettes, dictionary, encoder, quality ladder, audio, ROM containers, bundle emission |
+| [`tools/neogeomedia/`](tools/neogeomedia) | The baker: decode, colour, palettes, dictionary, encoder, quality ladder, audio, ROM containers, bundle emission |
 | [`tools/tests/`](tools/tests) | 944 tests, including the emulator transcriptions used as oracles |
 | [`tools/scripts/`](tools/scripts) | Capture, verification, timing and ladder-sweep helpers |
 | [`toolchain/`](toolchain) | The ngdevkit build, native or containerised |
-| [`FAMILY.md`](FAMILY.md) | The standard shared with sms-movie-player and fmv-core-python, identical in each |
+| [`FAMILY.md`](FAMILY.md) | The standard shared with sms-media-player and fmv-core-python, identical in each |
 | [`CHANGELOG.md`](CHANGELOG.md) | What was measured, and what was rejected |
 | [`RELEASES.md`](RELEASES.md) | Generated release notes, one entry per version |
 
@@ -395,7 +395,7 @@ A five minute source with grain added at the cartridge's own resolution was buil
 | `uv --project tools run python -m pytest tools/tests` | Run the 944 tests |
 | `uv --project tools run ruff format --check tools/` | Format gate |
 | `uv --project tools run ruff check tools/` | Lint gate |
-| `uv --project tools run mypy tools/aesmovie tools/scripts` | Type gate |
+| `uv --project tools run mypy tools/neogeomedia tools/scripts` | Type gate |
 | `make rom` | Build the ROM from whatever is already baked, in the pinned toolchain image |
 | `make analyse` | Static analysis of the player with cppcheck, which must exit 0 |
 | `make timing` | VRAM write spacing in the compiled objects, after `make rom` |
@@ -420,12 +420,12 @@ From 2.0 these are a promise. Anything that would break them is a major version.
 
 | Surface | Promise |
 |:--------|:--------|
-| `python -m aesmovie.cartridge <source>` | The one command. Its flags keep their names and meanings |
-| `python -m aesmovie.plan --source <file>` | Prints the ladder as an estimate and bakes nothing |
-| `python -m aesmovie.bake --bundle DIR` | Emits a drop-in folder. Its shape keeps its names: `src/`, `movie/`, `package/`, `fmv.mk`, `README.md` |
+| `python -m neogeomedia.cartridge <source>` | The one command. Its flags keep their names and meanings |
+| `python -m neogeomedia.plan --source <file>` | Prints the ladder as an estimate and bakes nothing |
+| `python -m neogeomedia.bake --bundle DIR` | Emits a drop-in folder. Its shape keeps its names: `src/`, `movie/`, `package/`, `fmv.mk`, `README.md` |
 | Rung names `q01` to `q35` | A name always means the same settings. Rungs are never renumbered |
-| [`aesmovie-tiers.json`](aesmovie-tiers.json) | Readable, diffable, and safe to commit. Its `version` field guards the shape |
-| `build/aesmovie.neo` and `build/aesmovie.zip` | Where the cartridge lands, and what it is called |
+| [`neogeomedia-tiers.json`](neogeomedia-tiers.json) | Readable, diffable, and safe to commit. Its `version` field guards the shape |
+| `build/neogeomedia.neo` and `build/neogeomedia.zip` | Where the cartridge lands, and what it is called |
 | Exit codes | 0 on success, non-zero on failure, and a distinct code when a bake ran out of dictionary |
 
 The C library surface is [`fmv.h`](src/fmv/fmv.h):
@@ -440,11 +440,11 @@ The C library surface is [`fmv.h`](src/fmv/fmv.h):
 
 An emitted folder carries the library source it was baked against, and compiling one against the other across a major version stops the build with both versions named.
 
-`python -m aesmovie.bake` carries knobs that exist to be experimented with, so its surface can move apart from `--bundle`. The numbers a bake reports in `report.json` are measurements rather than an interface.
+`python -m neogeomedia.bake` carries knobs that exist to be experimented with, so its surface can move apart from `--bundle`. The numbers a bake reports in `report.json` are measurements rather than an interface.
 
 ## Versioning
 
-This project follows [Semantic Versioning](https://semver.org/). Every release is tagged and the version is derived from commit subjects. See [releases](https://github.com/gufranco/aes-movie-player/releases) and [`RELEASES.md`](RELEASES.md).
+This project follows [Semantic Versioning](https://semver.org/). Every release is tagged and the version is derived from commit subjects. See [releases](https://github.com/gufranco/neogeo-media-player/releases) and [`RELEASES.md`](RELEASES.md).
 
 ## FAQ
 

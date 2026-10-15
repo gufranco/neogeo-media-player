@@ -29,7 +29,7 @@ come back wrong or not at all.
 ## Building it
 
 ```bash
-uv --project tools run python -m aesmovie.bake \
+uv --project tools run python -m neogeomedia.bake \
     --source my-film.mkv --quality q17 --duration 30 \
     --build-dir build --preview build/preview.mkv --bundle build/bundle
 

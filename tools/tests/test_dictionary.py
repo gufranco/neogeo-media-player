@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from aesmovie.dictionary import TileDictionary
+from neogeomedia.dictionary import TileDictionary
 
 
 def random_tile(seed: int) -> np.ndarray:

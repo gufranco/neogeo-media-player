@@ -12,7 +12,7 @@ import struct
 
 import pytest
 
-from aesmovie import neofile
+from neogeomedia import neofile
 
 HEADER_BYTES = 4096
 

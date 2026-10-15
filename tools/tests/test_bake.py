@@ -11,9 +11,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from aesmovie import adpcmb, bake, bundle, content, crom, quality, stream
-from aesmovie import frames as frames_mod
-from aesmovie import subtitles as subtitles_mod
+from neogeomedia import adpcmb, bake, bundle, content, crom, quality, stream
+from neogeomedia import frames as frames_mod
+from neogeomedia import subtitles as subtitles_mod
 
 _spec = importlib.util.spec_from_file_location(
     "verify_capture", Path(__file__).resolve().parents[1] / "scripts" / "verify_capture.py"
@@ -306,7 +306,7 @@ class TestVersionStamp:
         assert "FMV_VERSION_STRING)" in text
 
     def test_the_baker_version_is_the_installed_one(self):
-        major, minor = version("aesmovie").split(".")[:2]
+        major, minor = version("neogeomedia").split(".")[:2]
 
         assert bake.baker_version() == (int(major), int(minor))
 

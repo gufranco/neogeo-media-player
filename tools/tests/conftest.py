@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from aesmovie import tiercache
+from neogeomedia import tiercache
 
 
 @pytest.fixture(autouse=True)

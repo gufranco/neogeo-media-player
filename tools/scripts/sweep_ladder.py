@@ -24,7 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from aesmovie import frames, quality
+from neogeomedia import frames, quality
 
 DEFAULT_START = 180.0
 DEFAULT_DURATION = 45.0
@@ -143,7 +143,7 @@ def measure(
             command = [
                 sys.executable,
                 "-m",
-                "aesmovie.bake",
+                "neogeomedia.bake",
                 "--source",
                 str(source),
                 "--start",

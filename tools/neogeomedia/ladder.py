@@ -24,7 +24,7 @@ from typing import Final
 import numpy as np
 import numpy.typing as npt
 
-from aesmovie import calibrate, encode, frames, neocolor, quality
+from neogeomedia import calibrate, encode, frames, neocolor, quality
 
 SECONDS_PER_MINUTE: Final = 60.0
 

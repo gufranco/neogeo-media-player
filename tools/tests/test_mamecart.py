@@ -15,7 +15,7 @@ from xml.etree import ElementTree
 
 import pytest
 
-from aesmovie import mamecart
+from neogeomedia import mamecart
 
 
 @pytest.fixture

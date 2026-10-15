@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from aesmovie import integrate
+from neogeomedia import integrate
 
 STOCK_ROM_MK = """PROMSIZE=1048576
 PROM1=$(ROM)/$(GAMEROM)-p1.p1

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-IMAGE="${AESMOVIE_TOOLCHAIN_IMAGE:-aes-movie-player-toolchain}"
+IMAGE="${NEOGEOMEDIA_TOOLCHAIN_IMAGE:-neogeo-media-player-toolchain}"
 
 if ! command -v m68k-neogeo-elf-gcc >/dev/null; then
     if ! command -v docker >/dev/null; then
@@ -191,8 +191,8 @@ rm -f "$ROM/p1.raw"
 echo "[rom] sizes:"
 ls -la "$ROM"
 
-python3 tools/aesmovie/neofile.py --rom-dir "$ROM" --output "$BUILD/aesmovie.neo"
-python3 tools/aesmovie/mamecart.py --rom-dir "$ROM" --output "$BUILD/aesmovie.zip"
+python3 tools/neogeomedia/neofile.py --rom-dir "$ROM" --output "$BUILD/neogeomedia.neo"
+python3 tools/neogeomedia/mamecart.py --rom-dir "$ROM" --output "$BUILD/neogeomedia.zip"
 
-ls -la "$BUILD/aesmovie.neo"
+ls -la "$BUILD/neogeomedia.neo"
 echo "DONE"

@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from aesmovie import bake as baker
+from neogeomedia import bake as baker
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "verify_capture.py"
 _spec = importlib.util.spec_from_file_location("verify_capture", SCRIPT)

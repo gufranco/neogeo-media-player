@@ -1,4 +1,4 @@
-PROJECT      := aes-movie-player
+PROJECT      := neogeo-media-player
 DOCKER_IMAGE := $(PROJECT)-toolchain
 DOCKER_USER  := $(shell id -u):$(shell id -g)
 DOCKER       := docker run --rm --platform linux/amd64 --user $(DOCKER_USER) \
@@ -16,7 +16,7 @@ image:
 	docker build --platform linux/amd64 --provenance=false --target toolchain -t $(DOCKER_IMAGE) .
 
 rom: image
-	AESMOVIE_TOOLCHAIN_IMAGE=$(DOCKER_IMAGE) bash toolchain/build-in-docker.sh
+	NEOGEOMEDIA_TOOLCHAIN_IMAGE=$(DOCKER_IMAGE) bash toolchain/build-in-docker.sh
 
 analyse: image
 	$(DOCKER_RUN) cppcheck --std=c99 --enable=warning,style,performance,portability \

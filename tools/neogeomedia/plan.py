@@ -13,12 +13,12 @@ import argparse
 import sys
 from pathlib import Path
 
-from aesmovie import bake, calibrate, frames, quality
+from neogeomedia import bake, calibrate, frames, quality
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="aesmovie plan",
+        prog="neogeomedia plan",
         description="Measure a source and report which quality tiers fit a cartridge.",
     )
     parser.add_argument("--source", type=Path, required=True)

@@ -26,8 +26,8 @@ from typing import Final
 import numpy as np
 import numpy.typing as npt
 
-from aesmovie import crom, neocolor, palettes, stream
-from aesmovie.dictionary import TileDictionary, TileRef
+from neogeomedia import crom, neocolor, palettes, stream
+from neogeomedia.dictionary import TileDictionary, TileRef
 
 GRID_COLS: Final = stream.GRID_COLS
 GRID_ROWS: Final = stream.GRID_ROWS

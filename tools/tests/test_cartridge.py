@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from aesmovie import cartridge, frames, tiercache
+from neogeomedia import cartridge, frames, tiercache
 
 
 @pytest.fixture
@@ -130,12 +130,12 @@ class TestReporting:
     def test_it_reports_the_cartridge_path_on_success(self, movie, tmp_path, recorded, capsys):
         out = tmp_path / "out"
         out.mkdir()
-        (out / "aesmovie.neo").write_bytes(b"")
+        (out / "neogeomedia.neo").write_bytes(b"")
 
         cartridge.main([str(movie), "--quality", "q17", "--build-dir", str(out)])
 
         assert "build" in recorded
-        assert "aesmovie.neo" in capsys.readouterr().out
+        assert "neogeomedia.neo" in capsys.readouterr().out
 
 
 class TestSearchingForTheTier:

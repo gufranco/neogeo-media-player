@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from aesmovie import fixtiles
+from neogeomedia import fixtiles
 
 
 def geolith_fix_pixel(tile: bytes, x: int, y: int) -> int:

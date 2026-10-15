@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 
-from aesmovie import content
+from neogeomedia import content
 
 
 @pytest.fixture(scope="module")

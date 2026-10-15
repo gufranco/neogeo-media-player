@@ -17,16 +17,16 @@ import subprocess
 import sys
 from pathlib import Path
 
-from aesmovie import bake, frames, probe, quality, tiercache
+from neogeomedia import bake, frames, probe, quality, tiercache
 
 BUILD_SCRIPT = Path(__file__).resolve().parents[2] / "toolchain" / "build-in-docker.sh"
-CARTRIDGE_NAME = "aesmovie.neo"
-ARCHIVE_NAME = "aesmovie.zip"
+CARTRIDGE_NAME = "neogeomedia.neo"
+ARCHIVE_NAME = "neogeomedia.zip"
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="aesmovie",
+        prog="neogeomedia",
         description="Bake a movie and build the cartridge that plays it.",
     )
     parser.add_argument("source", type=Path, help="the video file to put on the cartridge")

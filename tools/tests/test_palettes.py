@@ -5,7 +5,7 @@ import struct
 import numpy as np
 import pytest
 
-from aesmovie import neocolor, palettes
+from neogeomedia import neocolor, palettes
 
 
 def color(r5: int, g5: int, b5: int) -> int:

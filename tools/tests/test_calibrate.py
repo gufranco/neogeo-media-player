@@ -11,7 +11,7 @@ import subprocess
 
 import pytest
 
-from aesmovie import calibrate, quality
+from neogeomedia import calibrate, quality
 
 
 @pytest.fixture(scope="module")

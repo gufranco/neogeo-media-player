@@ -136,10 +136,10 @@ def write_cart(
     *,
     rom_dir: Path,
     output: Path,
-    name: str = "aesmovie",
-    description: str = "AES Movie Player",
+    name: str = "neogeomedia",
+    description: str = "Neo Geo Media Player",
     year: int = 2026,
-    publisher: str = "aesmovie",
+    publisher: str = "neogeomedia",
 ) -> CartPackage:
     """Write the MAME zip and the software list that binds it."""
     rom_dir = Path(rom_dir)

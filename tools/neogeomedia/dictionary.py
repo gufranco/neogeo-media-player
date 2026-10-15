@@ -26,7 +26,7 @@ from typing import Final
 import numpy as np
 import numpy.typing as npt
 
-from aesmovie import crom
+from neogeomedia import crom
 
 TILE_PX: Final = 16
 MAX_TILES: Final = 1 << 20

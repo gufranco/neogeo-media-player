@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import verify_capture as vc
 
-from aesmovie import neocolor
+from neogeomedia import neocolor
 
 # The menu owns the first sixteen palettes, so video starts above them.
 VIDEO_BASE_BANK = 16

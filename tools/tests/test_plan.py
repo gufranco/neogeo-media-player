@@ -10,7 +10,7 @@ import subprocess
 
 import pytest
 
-from aesmovie import plan, quality
+from neogeomedia import plan, quality
 
 
 @pytest.fixture(scope="module")

@@ -114,7 +114,7 @@ static void wait_vblank(void)
 
 static void draw_title(fmv_result outcome)
 {
-    draw_centred(TITLE_ROW, "AES MOVIE PLAYER");
+    draw_centred(TITLE_ROW, "NEO GEO MEDIA PLAYER");
     draw_centred(SUBTITLE_ROW, "CUTSCENE EXAMPLE");
     draw_centred(PROMPT_ROW, "PRESS START TO REPLAY");
     draw_centred(OUTCOME_ROW,

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Final
 
-from aesmovie.neocolor import pack_palette_word
+from neogeomedia.neocolor import pack_palette_word
 
 TILE_PX: Final = 8
 TILE_BYTES: Final = 32

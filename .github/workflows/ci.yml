@@ -76,15 +76,15 @@ jobs:
         run: uv --project tools run ruff check tools/
 
       - name: Types
-        run: uv --project tools run mypy tools/aesmovie tools/scripts
+        run: uv --project tools run mypy tools/neogeomedia tools/scripts
 
       - name: Tests
         run: |
           uv --project tools run python -m pytest tools/tests \
-            --cov=aesmovie --cov-report=term-missing --cov-fail-under=95
+            --cov=neogeomedia --cov-report=term-missing --cov-fail-under=95
 
       - name: The committed tier file is not a test artefact
-        run: git diff --exit-code -- aesmovie-tiers.json
+        run: git diff --exit-code -- neogeomedia-tiers.json
 
   cartridge:
     name: Cartridge
@@ -123,21 +123,21 @@ jobs:
 
       - name: Build a cartridge end to end
         run: |
-          uv --project tools run python -m aesmovie.cartridge ci-source.mp4 \
+          uv --project tools run python -m neogeomedia.cartridge ci-source.mp4 \
             --quality q17 --build-dir build
 
       - name: The cartridge is real
         run: |
           set -euo pipefail
-          test -s build/aesmovie.neo
-          test -s build/aesmovie.zip
-          size=$(wc -c < build/aesmovie.neo)
-          echo "aesmovie.neo is $size bytes"
+          test -s build/neogeomedia.neo
+          test -s build/neogeomedia.zip
+          size=$(wc -c < build/neogeomedia.neo)
+          echo "neogeomedia.neo is $size bytes"
           test "$size" -ge 1048576
 
       - name: Emit a drop-in bundle
         run: |
-          uv --project tools run python -m aesmovie.bake \
+          uv --project tools run python -m neogeomedia.bake \
             --source ci-source.mp4 --quality q17 --duration 4 \
             --build-dir build --bundle build/bundle
 
@@ -158,13 +158,13 @@ jobs:
           set -euo pipefail
           make cutscene EXAMPLE=build/example-audio FMV_AUDIO=yes
           docker run --rm --platform linux/amd64 --user "$(id -u):$(id -g)" \
-            -v "$PWD:/work" -w /work aes-movie-player-toolchain \
+            -v "$PWD:/work" -w /work neogeo-media-player-toolchain \
             bash examples/cutscene/check_audio.sh build/example-audio
       - uses: actions/upload-artifact@v7.0.1
         with:
           name: cartridge
           path: |
-            build/aesmovie.neo
-            build/aesmovie.zip
+            build/neogeomedia.neo
+            build/neogeomedia.zip
             build/report.json
           retention-days: 14

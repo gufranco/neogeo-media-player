@@ -13,7 +13,7 @@ if ! command -v mame >/dev/null; then
     echo "mame not found on PATH" >&2
     exit 1
 fi
-for required in "$BUILD/aesmovie.zip" "$BUILD/mame-hash/neogeo.xml" "$PREVIEW"; do
+for required in "$BUILD/neogeomedia.zip" "$BUILD/mame-hash/neogeo.xml" "$PREVIEW"; do
     if [[ ! -f "$required" ]]; then
         echo "missing $required; bake and build first" >&2
         exit 1
@@ -24,16 +24,16 @@ if [[ ! -f "$BIOS_ZIP" ]]; then
     exit 1
 fi
 
-WORK="$(mktemp -d -t aesmovie-mame-XXXXXX)"
+WORK="$(mktemp -d -t neogeomedia-mame-XXXXXX)"
 trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/roms" "$WORK/hash" "$WORK/snap" "$WORK/bios"
 
 unzip -o -q -j "$BIOS_ZIP" "$BIOS_ROM" "000-lo.lo" -d "$WORK/bios"
 ( cd "$WORK/bios" && zip -q -X "$WORK/roms/aes.zip" "$BIOS_ROM" "000-lo.lo" )
-cp -f "$BUILD/aesmovie.zip" "$WORK/roms/"
+cp -f "$BUILD/neogeomedia.zip" "$WORK/roms/"
 cp -f "$BUILD/mame-hash/neogeo.xml" "$WORK/hash/"
 
-mame aes -bios "$BIOS_OPTION" -cart aesmovie \
+mame aes -bios "$BIOS_OPTION" -cart neogeomedia \
     -rompath "$WORK/roms" -hashpath "$WORK/hash" -snapshot_directory "$WORK/snap" \
     -cfg_directory "$WORK/cfg" -nvram_directory "$WORK/nvram" -inipath "$WORK" \
     -noreadconfig -video none -sound none -window -nomaximize \

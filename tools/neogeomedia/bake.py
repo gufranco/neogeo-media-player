@@ -39,7 +39,7 @@ from typing import Any, Final
 import numpy as np
 import numpy.typing as npt
 
-from aesmovie import (
+from neogeomedia import (
     adpcmb,
     bundle,
     content,
@@ -52,7 +52,7 @@ from aesmovie import (
     quality,
     subtitles,
 )
-from aesmovie import stream as stream_mod
+from neogeomedia import stream as stream_mod
 
 SECONDS_PER_MINUTE: Final = 60.0
 CROM_BANK_BYTES: Final = 128 << 20
@@ -243,7 +243,7 @@ _HEADER_TEMPLATE: Final = """#ifndef MOVIE_DATA_H
 
 #if MOVIE_BAKER_VERSION_MAJOR != FMV_VERSION_MAJOR \\
     || MOVIE_BAKER_VERSION_MINOR != FMV_VERSION_MINOR
-#pragma message("this movie was baked by aesmovie " MOVIE_BAKER_VERSION_STRING)
+#pragma message("this movie was baked by neogeomedia " MOVIE_BAKER_VERSION_STRING)
 #pragma message("the fmv library beside it is " FMV_VERSION_STRING)
 #error "baked movie and fmv library are different versions; re-bake, or replace fmv/"
 #endif
@@ -503,7 +503,7 @@ def baker_version() -> tuple[int, int]:
     apart, and a patch that fixes a bake without moving the data layout
     is not that.
     """
-    major, minor = version("aesmovie").split(".")[:2]
+    major, minor = version("neogeomedia").split(".")[:2]
     return int(major), int(minor)
 
 
@@ -1014,7 +1014,7 @@ def _resolve_quality(args: argparse.Namespace) -> quality.Tier | None:
     sample was measured to be wrong in both directions and cannot be
     fixed, because what a colour reduction saves depends on the content
     rather than on the setting. The cartridge tool settles it by baking;
-    `aesmovie.plan` prints the estimate for a human to look at.
+    `neogeomedia.plan` prints the estimate for a human to look at.
     """
     if args.quality is None:
         return None
@@ -1023,7 +1023,7 @@ def _resolve_quality(args: argparse.Namespace) -> quality.Tier | None:
             "'auto' is gone: it guessed the tier from a sample and the guess was wrong "
             "in both directions. Name a rung, or let the cartridge tool measure one "
             "with --quality search. To see the estimate without acting on it, run "
-            "python -m aesmovie.plan."
+            "python -m neogeomedia.plan."
         )
         raise SystemExit(message)
     return quality.tier_by_name(args.quality)

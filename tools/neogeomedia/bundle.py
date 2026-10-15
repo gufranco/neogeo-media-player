@@ -18,8 +18,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
-from aesmovie import crom
-from aesmovie import stream as stream_mod
+from neogeomedia import crom
+from neogeomedia import stream as stream_mod
 
 LIBRARY_DIR_NAME: Final = "src"
 MOVIE_DIR_NAME: Final = "movie"

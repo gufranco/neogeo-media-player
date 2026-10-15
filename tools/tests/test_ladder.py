@@ -5,7 +5,7 @@ import itertools
 import numpy as np
 import pytest
 
-from aesmovie import ladder
+from neogeomedia import ladder
 
 
 def point(cost: float, error: float, chroma: float = 1.0, hold: int = 1) -> ladder.Point:

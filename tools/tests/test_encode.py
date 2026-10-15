@@ -5,7 +5,7 @@ import itertools
 import numpy as np
 import pytest
 
-from aesmovie import crom, encode, neocolor, palettes, stream
+from neogeomedia import crom, encode, neocolor, palettes, stream
 from tests.geolith_model import GeolithTileReader, StreamPlayer
 
 HEIGHT = 224

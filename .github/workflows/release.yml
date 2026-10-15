@@ -47,9 +47,9 @@ jobs:
           set -euo pipefail
           uv --project tools run ruff format --check tools/
           uv --project tools run ruff check tools/
-          uv --project tools run mypy tools/aesmovie tools/scripts
+          uv --project tools run mypy tools/neogeomedia tools/scripts
           uv --project tools run python -m pytest tools/tests \
-            --cov=aesmovie --cov-fail-under=95
+            --cov=neogeomedia --cov-fail-under=95
 
       - name: What the next version will be
         env:

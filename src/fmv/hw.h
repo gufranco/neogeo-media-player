@@ -1,5 +1,5 @@
-#ifndef AES_MOVIE_HW_H
-#define AES_MOVIE_HW_H
+#ifndef NEOGEO_MEDIA_HW_H
+#define NEOGEO_MEDIA_HW_H
 
 #include <stdint.h>
 

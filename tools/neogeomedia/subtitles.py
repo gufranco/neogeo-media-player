@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
-from aesmovie import fixtiles
+from neogeomedia import fixtiles
 
 COLUMNS: Final = 40
 MAX_LINES: Final = 2

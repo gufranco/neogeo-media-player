@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from aesmovie import quality, tiercache
+from neogeomedia import quality, tiercache
 
 
 @pytest.fixture

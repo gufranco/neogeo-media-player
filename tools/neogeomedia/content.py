@@ -37,7 +37,7 @@ from typing import Final
 
 import numpy as np
 
-from aesmovie import encode, frames, neocolor, palettes
+from neogeomedia import encode, frames, neocolor, palettes
 
 MIN_EPOCH_SECONDS: Final = 2.5
 MAX_EPOCH_SECONDS: Final = 8.0

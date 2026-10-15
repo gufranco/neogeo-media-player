@@ -40,7 +40,7 @@ from typing import Final
 import numpy as np
 import numpy.typing as npt
 
-from aesmovie import neocolor
+from neogeomedia import neocolor
 
 TILE_PX: Final = 16
 TILE_PIXELS: Final = TILE_PX * TILE_PX

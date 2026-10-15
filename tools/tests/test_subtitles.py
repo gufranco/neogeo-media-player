@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from aesmovie import fixtiles, subtitles
+from neogeomedia import fixtiles, subtitles
 
 SAMPLE = """1
 00:00:01,000 --> 00:00:03,500

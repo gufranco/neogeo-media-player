@@ -79,8 +79,12 @@ retry_build m68k-neogeo-elf-gcc "${CFLAGS[@]}" -c "$GENERATED/movie_data_value.c
     -o "$BUILD/movie_data_value.o"
 
 echo "CHECK VRAM write spacing"
-python3 tools/scripts/check_vram_timing.py "$BUILD/main.o" "$BUILD/menu.o" \
-    "$BUILD/fmv.o" "$BUILD/timeline.o"
+DISASSEMBLIES=()
+for name in main menu fmv timeline fmv_audio; do
+    m68k-neogeo-elf-objdump -dr "$BUILD/$name.o" > "$BUILD/$name.o.dis"
+    DISASSEMBLIES+=("$BUILD/$name.o.dis")
+done
+PYTHONPATH=fmv-core-python python3 tools/scripts/check_vram_timing.py "${DISASSEMBLIES[@]}"
 
 echo "AS $GENERATED/movie_data.S"
 retry_build m68k-neogeo-elf-gcc "${CFLAGS[@]}" -c "$GENERATED/movie_data.S" -o "$BUILD/movie_data.o"

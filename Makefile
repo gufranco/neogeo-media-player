@@ -7,7 +7,8 @@ DOCKER_RUN   := $(DOCKER) $(DOCKER_IMAGE)
 BUILD        := build
 EXAMPLE      := $(BUILD)/example
 FMV_AUDIO    := no
-OBJECTS      := $(BUILD)/main.o $(BUILD)/menu.o $(BUILD)/fmv.o $(BUILD)/timeline.o
+OBJECTS      := $(BUILD)/main.o $(BUILD)/menu.o $(BUILD)/fmv.o $(BUILD)/timeline.o \
+                $(BUILD)/fmv_audio.o
 
 .PHONY: all image rom analyse timing cutscene hooks shell clean distclean
 all: rom
@@ -26,8 +27,10 @@ analyse: image
 	    -Isrc -Isrc/fmv -Isrc/player src
 	@echo "static analysis clean"
 
-timing:
-	uv --project tools run python tools/scripts/check_vram_timing.py $(OBJECTS)
+timing: image
+	$(DOCKER_RUN) bash -c 'for object in $(OBJECTS); do \
+	    m68k-neogeo-elf-objdump -dr "$$object" > "$$object.dis"; done'
+	uv --project tools run python tools/scripts/check_vram_timing.py $(OBJECTS:.o=.o.dis)
 
 cutscene: image
 	$(DOCKER) -e BUNDLE=/work/$(BUILD)/bundle -e WORK=/work/$(EXAMPLE) \

@@ -27,14 +27,14 @@ Where the two disagree, the board decides. MAME masks the program-ROM bank regis
 
 The NeoGeo Development Wiki's VRAM page requires at least 12 CPU cycles between consecutive data writes and at least 16 cycles after a write before setting a new address. C cannot express instruction spacing, so a check holds the result instead.
 
-[`check_vram_timing.py`](../tools/scripts/check_vram_timing.py) walks the compiled objects, models each write as its bus cycles rather than as an instruction, follows branches across the whole reachable window, and fails on any pair under the floor. It runs right after the compile step in [`build-in-docker.sh`](../toolchain/build-in-docker.sh):
+[`check_vram_timing.py`](../tools/scripts/check_vram_timing.py) reads every player object together, disassembled with relocations, and walks them as one program through the family's shared timing walker. It models each write as its bus cycles rather than as an instruction, follows branches, calls into the callee, returns to every call site, follows tail jumps into other objects, and fails on any pair under the floor. It runs right after the compile step in [`build-in-docker.sh`](../toolchain/build-in-docker.sh):
 
 ```
 CHECK VRAM write spacing
-VRAM write spacing clears the 12 and 16 cycle minimums across 2 object(s)
+VRAM write spacing clears the 12 and 16 cycle minimums across 5 object(s)
 ```
 
-The tightest pair anywhere in the player is 20 cycles.
+The walk measures 180 pairs, 30 of them across a section or an object, which the earlier per-object walk could not see. The tightest data-to-data and data-to-address pairs anywhere in the player are 20 cycles.
 
 One documented claim did not survive a source read. Bit 15 of `$3C0006` is described as a vblank flag; the register is a raster line counter, and bit 15 is bit 8 of that counter, low for values `0xF8` to `0xFF` and high for `0x100` to `0x1FF`. It marks 8 scanlines out of 264 rather than a blanking interval. `wait_vblank` waits for the start of blanking instead. Blanking is 40 lines, not 24: MAME's raster is 264 lines with 224 visible, `NEOGEO_VBEND` 0x010 to `NEOGEO_VBSTART` 0x0F0 in `neogeo_spr.h`, its line counter is the screen line plus 0x100 wrapping to 0xF8 (`get_video_control` in `neogeo_v.cpp`), and geolith draws the same 224 visible lines. So the counter is blank from 0x1F0 to 0x1FF, from 0xF8 to 0xFF and from 0x100 to 0x10F. The player counts 39 of those lines, 29,952 cycles at 768 a line, and leaves out 0x10F because the video chip prepares the first visible line during it. Measured under MAME on the same cartridge across 60 emulated seconds each:
 

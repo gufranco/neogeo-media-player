@@ -10,8 +10,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 
 
 @pytest.fixture(scope="module")
-def check_vram_timing():
-    sys.path.insert(0, str(SCRIPTS))
+def timing():
     spec = importlib.util.spec_from_file_location(
         "check_vram_timing", SCRIPTS / "check_vram_timing.py"
     )
@@ -22,157 +21,217 @@ def check_vram_timing():
     return module
 
 
-def listing(*rows: str) -> str:
-    header = [
-        "sample.o:     file format elf32-m68k",
-        "",
-        "",
-        "Disassembly of section .text:",
-        "",
-        "00000000 <sample>:",
-    ]
+def listing(name: str, *rows: str) -> str:
+    header = [f"{name}:     file format elf32-m68k", "", "", "Disassembly of section .text:"]
     return "\n".join(header + list(rows)) + "\n"
 
 
-def instruction(address: int, encoding: str, text: str) -> str:
+def symbol(address: int, name: str) -> str:
+    return f"\n{address:08x} <{name}>:"
+
+
+def op(address: int, encoding: str, text: str) -> str:
     return f" {address:x}:\t{encoding} \t{text}"
 
 
-def continuation(address: int, encoding: str) -> str:
+def tail(address: int, encoding: str) -> str:
     return f" {address:x}:\t{encoding} "
 
 
-class TestPairsUnderTheDocumentedFloor:
-    def test_it_flags_a_long_immediate_poke_followed_directly_by_a_register_poke(
-        self, check_vram_timing
-    ):
-        source = listing(
-            instruction(0x4D6, "23fc 74ba 1016", "movel #1958350870,3c0000 <x>"),
-            continuation(0x4DC, "003c 0000"),
-            instruction(0x4E0, "23c9 003c 0000", "movel %a1,3c0000 <x>"),
-            instruction(0x4E6, "4e75", "rts"),
+def reloc(address: int, name: str) -> str:
+    return f"\t\t\t{address:x}: R_68K_32\t{name}"
+
+
+def found(violations) -> list[tuple[str, str, int, int]]:
+    return [
+        (v.spacing.leaving.kind, v.spacing.arriving.kind, v.spacing.cycles, v.floor)
+        for v in violations
+    ]
+
+
+class TestPairsUnderTheFloor:
+    def test_a_long_immediate_write_then_a_register_write_is_flagged(self, timing):
+        # Arrange
+        text = listing(
+            "a.o",
+            symbol(0x4D6, "sample"),
+            op(0x4D6, "23fc 74ba 1016", "movel #1958350870,3c0000 <x>"),
+            tail(0x4DC, "003c 0000"),
+            op(0x4E0, "23c9 003c 0000", "movel %a1,3c0000 <x>"),
+            op(0x4E6, "4e75", "rts"),
         )
 
-        found = check_vram_timing.analyse(source, "sample.o")
+        # Act
+        violations = timing.violations({"a.o": text})
 
-        assert len(found) == 1
-        assert found[0].gap == 12
-        assert found[0].floor == check_vram_timing.MIN_CYCLES_DATA_TO_ADDRESS
-        assert found[0].to_kind == check_vram_timing.ADDRESS
+        # Assert
+        assert found(violations) == [("data", "address", 12, 16)]
 
-    def test_it_flags_two_adjacent_register_indirect_pokes(self, check_vram_timing):
-        source = listing(
-            instruction(0x100, "207c 003c 0000", "moveal #3932160,%a0"),
-            instruction(0x106, "2080", "movel %d0,%a0@"),
-            instruction(0x108, "2081", "movel %d1,%a0@"),
-            instruction(0x10A, "4e75", "rts"),
+    def test_two_adjacent_register_indirect_writes_are_flagged(self, timing):
+        # Arrange
+        text = listing(
+            "a.o",
+            symbol(0x100, "sample"),
+            op(0x100, "207c 003c 0000", "moveal #3932160,%a0"),
+            op(0x106, "2080", "movel %d0,%a0@"),
+            op(0x108, "2081", "movel %d1,%a0@"),
+            op(0x10A, "4e75", "rts"),
         )
 
-        found = check_vram_timing.analyse(source, "sample.o")
+        # Act
+        violations = timing.violations({"a.o": text})
 
-        assert len(found) == 1
-        assert found[0].gap == 4
+        # Assert
+        assert found(violations) == [("data", "address", 4, 16)]
 
-    def test_one_cheap_instruction_between_two_pokes_reaches_the_floor(self, check_vram_timing):
-        source = listing(
-            instruction(0x4D6, "23fc 74ba 1016", "movel #1958350870,3c0000 <x>"),
-            continuation(0x4DC, "003c 0000"),
-            instruction(0x4E0, "4e71", "nop"),
-            instruction(0x4E2, "23c9 003c 0000", "movel %a1,3c0000 <x>"),
-            instruction(0x4E8, "4e75", "rts"),
+    def test_a_write_in_a_callee_from_another_object_is_flagged(self, timing):
+        # Arrange
+        caller = listing(
+            "a.o",
+            symbol(0x0, "main"),
+            op(0x0, "207c 003c 0002", "moveal #3932162,%a0"),
+            op(0x6, "3080", "movew %d0,%a0@"),
+            op(0x8, "4ef9 0000 0000", "jmp 0 <main>"),
+            reloc(0xA, "poke"),
+        )
+        callee = listing(
+            "b.o",
+            symbol(0x0, "setup"),
+            op(0x0, "227c 003c 0000", "moveal #3932160,%a1"),
+            op(0x6, "4e75", "rts"),
+            symbol(0x8, "poke"),
+            op(0x8, "3281", "movew %d1,%a1@"),
+            op(0xA, "4e75", "rts"),
         )
 
-        found = check_vram_timing.analyse(source, "sample.o")
+        # Act
+        violations = timing.violations({"a.o": caller, "b.o": callee})
 
-        assert found == []
+        # Assert
+        assert [(v.spacing.source, v.spacing.to_source, v.spacing.cycles) for v in violations] == [
+            ("a.o:.text", "b.o:.text", 14)
+        ]
 
 
 class TestPairsThatClearTheFloor:
-    def test_the_stream_write_loop_passes(self, check_vram_timing):
-        source = listing(
-            instruction(0x226, "227c 003c 0002", "moveal #3932162,%a1"),
-            instruction(0x22C, "3290", "movew %a0@,%a1@"),
-            instruction(0x22E, "5888", "addql #4,%a0"),
-            instruction(0x230, "32a8 fffe", "movew %a0@(-2),%a1@"),
-            instruction(0x234, "b088", "cmpl %a0,%d0"),
-            instruction(0x236, "66ee", "bnes 226 <x>"),
-            instruction(0x238, "4e75", "rts"),
+    def test_one_cheap_instruction_between_two_writes_reaches_the_floor(self, timing):
+        # Arrange
+        text = listing(
+            "a.o",
+            symbol(0x4D6, "sample"),
+            op(0x4D6, "23fc 74ba 1016", "movel #1958350870,3c0000 <x>"),
+            tail(0x4DC, "003c 0000"),
+            op(0x4E0, "4e71", "nop"),
+            op(0x4E2, "23c9 003c 0000", "movel %a1,3c0000 <x>"),
+            op(0x4E8, "4e75", "rts"),
         )
 
-        found = check_vram_timing.analyse(source, "sample.o")
+        # Act
+        violations = timing.violations({"a.o": text})
 
-        assert found == []
+        # Assert
+        assert violations == []
 
-    def test_adjacent_long_immediate_pokes_pass(self, check_vram_timing):
-        source = listing(
-            instruction(0x126, "23fc 8001 0fff", "movel #-2147414017,3c0000 <x>"),
-            continuation(0x12C, "003c 0000"),
-            instruction(0x130, "23fc 8201 f80e", "movel #-2113800178,3c0000 <x>"),
-            continuation(0x136, "003c 0000"),
-            instruction(0x13A, "4e75", "rts"),
+    def test_the_stream_write_loop_passes(self, timing):
+        # Arrange
+        text = listing(
+            "a.o",
+            symbol(0x226, "sample"),
+            op(0x226, "227c 003c 0002", "moveal #3932162,%a1"),
+            op(0x22C, "3290", "movew %a0@,%a1@"),
+            op(0x22E, "5888", "addql #4,%a0"),
+            op(0x230, "32a8 fffe", "movew %a0@(-2),%a1@"),
+            op(0x234, "b088", "cmpl %a0,%d0"),
+            op(0x236, "66ee", "bnes 226 <x>"),
+            op(0x238, "4e75", "rts"),
         )
 
-        found = check_vram_timing.analyse(source, "sample.o")
+        # Act
+        violations = timing.violations({"a.o": text})
 
-        assert found == []
+        # Assert
+        assert violations == []
 
-    def test_the_address_and_data_halves_of_one_long_write_are_not_a_pair(self, check_vram_timing):
-        source = listing(
-            instruction(0x100, "23c1 003c 0000", "movel %d1,3c0000 <x>"),
-            instruction(0x106, "4e75", "rts"),
+    def test_a_word_fill_loop_passes(self, timing):
+        # Arrange
+        text = listing(
+            "a.o",
+            symbol(0x6C, "sample"),
+            op(0x6C, "33fc 0000 003c", "movew #0,3c0002 <x>"),
+            tail(0x72, "0002"),
+            op(0x74, "5342", "subqw #1,%d2"),
+            op(0x76, "66f4", "bnes 6c <x>"),
+            op(0x78, "4e75", "rts"),
         )
 
-        found = check_vram_timing.analyse(source, "sample.o")
+        # Act
+        violations = timing.violations({"a.o": text})
 
-        assert found == []
+        # Assert
+        assert violations == []
 
-    def test_a_word_fill_loop_passes(self, check_vram_timing):
-        source = listing(
-            instruction(0x6C, "33fc 0000 003c", "movew #0,3c0002 <x>"),
-            continuation(0x72, "0002"),
-            instruction(0x74, "5342", "subqw #1,%d2"),
-            instruction(0x76, "66f4", "bnes 6c <x>"),
-            instruction(0x78, "4e75", "rts"),
+
+class TestTheCommand:
+    def test_clean_objects_exit_zero_and_say_so(self, timing, tmp_path, capsys):
+        # Arrange
+        path = tmp_path / "a.o.dis"
+        path.write_text(listing("a.o", symbol(0x0, "main"), op(0x0, "4e75", "rts")))
+
+        # Act
+        code = timing.main([str(path)])
+
+        # Assert
+        assert (code, capsys.readouterr().out) == (
+            0,
+            "VRAM write spacing clears the 12 and 16 cycle minimums across 1 object(s)\n",
         )
 
-        found = check_vram_timing.analyse(source, "sample.o")
-
-        assert found == []
-
-
-class TestControlFlow:
-    def test_it_follows_a_backward_branch_to_reach_the_next_write(self, check_vram_timing):
-        source = listing(
-            instruction(0x100, "207c 003c 0000", "moveal #3932160,%a0"),
-            instruction(0x106, "2080", "movel %d0,%a0@"),
-            instruction(0x108, "60fc", "bras 106 <x>"),
+    def test_a_violation_exits_one_and_names_both_writes(self, timing, tmp_path, capsys):
+        # Arrange
+        path = tmp_path / "a.o.dis"
+        path.write_text(
+            listing(
+                "a.o",
+                symbol(0x100, "sample"),
+                op(0x100, "207c 003c 0000", "moveal #3932160,%a0"),
+                op(0x106, "2080", "movel %d0,%a0@"),
+                op(0x108, "2081", "movel %d1,%a0@"),
+                op(0x10A, "4e75", "rts"),
+            )
         )
 
-        found = check_vram_timing.analyse(source, "sample.o")
+        # Act
+        code = timing.main([str(path)])
 
-        assert len(found) == 1
-        assert found[0].gap == 14
-
-    def test_a_return_between_two_writes_breaks_the_path(self, check_vram_timing):
-        source = listing(
-            instruction(0x100, "207c 003c 0000", "moveal #3932160,%a0"),
-            instruction(0x106, "2080", "movel %d0,%a0@"),
-            instruction(0x108, "4e75", "rts"),
-            instruction(0x10A, "2081", "movel %d1,%a0@"),
+        # Assert
+        assert (code, capsys.readouterr().err.splitlines()) == (
+            1,
+            [
+                "a.o:.text sample: data write to address write is 4 cycles, needs 16",
+                "    0x0106: movel %d0,%a0@",
+                "    0x0108: movel %d1,%a0@",
+                "1 VRAM write pair(s) under the minimum",
+            ],
         )
 
-        found = check_vram_timing.analyse(source, "sample.o")
-
-        assert found == []
-
-
-class TestUnmodelledForms:
-    def test_an_unrecognised_write_form_is_reported_rather_than_passed(self, check_vram_timing):
-        source = listing(
-            instruction(0x100, "33f0 0800 003c", "movew %a0@(0,%d0:l),3c0002 <x>"),
-            continuation(0x106, "0002"),
-            instruction(0x108, "4e75", "rts"),
+    def test_an_unmodelled_write_form_exits_two(self, timing, tmp_path, capsys):
+        # Arrange
+        path = tmp_path / "a.o.dis"
+        path.write_text(
+            listing(
+                "a.o",
+                symbol(0x100, "main"),
+                op(0x100, "33f0 0800 003c", "movew %a0@(0,%d0:l),3c0002 <x>"),
+                tail(0x106, "0002"),
+                op(0x108, "4e75", "rts"),
+            )
         )
 
-        with pytest.raises(check_vram_timing.UnmodelledAccessError):
-            check_vram_timing.analyse(source, "sample.o")
+        # Act
+        code = timing.main([str(path)])
+
+        # Assert
+        assert (code, capsys.readouterr().err) == (
+            2,
+            "cannot check VRAM timing: word absolute write from '%a0@(0,%d0:l)'\n",
+        )

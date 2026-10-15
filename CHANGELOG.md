@@ -8,6 +8,7 @@ was paid for once and does not need paying for again.
 
 ## Contents
 
+- [The timing gate reads the whole player](#the-timing-gate-reads-the-whole-player)
 - [The BIOS drew its logo from film tiles](#the-bios-drew-its-logo-from-film-tiles)
 - [Blanking was 40 lines, not 24](#blanking-was-40-lines-not-24)
 - [A blank screen that was not the library's fault](#a-blank-screen-that-was-not-the-librarys-fault)
@@ -20,6 +21,21 @@ was paid for once and does not need paying for again.
 - [It plays on a board](#it-plays-on-a-board)
 - [What is left](#what-is-left)
 - [Standing rules for this project](#standing-rules-for-this-project)
+
+## The timing gate reads the whole player
+
+The VRAM write check walked one object at a time and stopped at every call
+and return, so a write in one function followed by a write in the function
+it called, returned to or jumped into was never measured. It also skipped
+the audio object.
+
+It now reads all five objects together, disassembled with relocations so an
+unlinked `jsr` names its callee, and walks them as one program through the
+family's shared walker, the same one the Master System player's gate uses.
+Of the 180 write pairs it measures, 30 cross a section or an object. All of
+them clear the floor: the tightest data-to-data and data-to-address pairs
+are 20 cycles against 12 and 16, the same figure as before. The gate also
+runs in CI now, after the end-to-end cartridge build.
 
 ## The BIOS drew its logo from film tiles
 

@@ -132,6 +132,9 @@ jobs:
           uv --project tools run python -m neogeomedia.cartridge ci-source.mp4 \
             --quality q17 --build-dir build
 
+      - name: VRAM write spacing across the whole player
+        run: make timing
+
       - name: The cartridge is real
         run: |
           set -euo pipefail

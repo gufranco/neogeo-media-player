@@ -37,33 +37,13 @@ from typing import Final
 
 import numpy as np
 import numpy.typing as npt
+from fmvcore import colour
 
 C5_LEVELS: Final = 32
 COLOR_INDEX_COUNT: Final = C5_LEVELS**3
 PALETTE_COLORS: Final = 16
 PALETTE_USABLE_COLORS: Final = PALETTE_COLORS - 1
 TRANSPARENT_INDEX: Final = 0
-
-_SRGB_LINEAR_THRESHOLD: Final = 0.04045
-
-_OKLAB_M1: Final = np.array(
-    [
-        [0.4122214708, 0.5363325363, 0.0514459929],
-        [0.2119034982, 0.6806995451, 0.1073969566],
-        [0.0883024619, 0.2817188376, 0.6299787005],
-    ],
-    dtype=np.float64,
-)
-
-_OKLAB_M2: Final = np.array(
-    [
-        [0.2104542553, 0.7936177850, -0.0040720468],
-        [1.9779984951, -2.4285922050, 0.4505937099],
-        [0.0259040371, 0.7827717662, -0.8086757660],
-    ],
-    dtype=np.float64,
-)
-
 
 _LADDER_OHMS: Final = (3900.0, 2200.0, 1000.0, 470.0, 220.0)
 _SMOOTHING_WEIGHT: Final = 1.6
@@ -170,19 +150,7 @@ def color_index_to_palette_word(index: npt.NDArray[np.integer]) -> npt.NDArray[n
     ).astype(np.uint16)
 
 
-def srgb_to_oklab(rgb: npt.NDArray[np.integer]) -> npt.NDArray[np.float32]:
-    """Convert 8-bit sRGB triples to Oklab."""
-    channel = rgb.astype(np.float64) / 255.0
-    linear = np.where(
-        channel <= _SRGB_LINEAR_THRESHOLD,
-        channel / 12.92,
-        ((channel + 0.055) / 1.055) ** 2.4,
-    )
-    lms = linear @ _OKLAB_M1.T
-    return (np.cbrt(lms) @ _OKLAB_M2.T).astype(np.float32)
-
-
 def build_oklab_grid() -> npt.NDArray[np.float32]:
     """Oklab coordinates of every color on the 15-bit Neo Geo grid."""
     index = np.arange(COLOR_INDEX_COUNT)
-    return srgb_to_oklab(color_index_to_rgb(index))
+    return colour.srgb_to_oklab(color_index_to_rgb(index) / colour.BYTE_MAX)

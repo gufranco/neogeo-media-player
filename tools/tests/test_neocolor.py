@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from fmvcore import colour
 
 from neogeomedia import neocolor
 
@@ -200,26 +201,10 @@ class TestColourIndex:
 
 
 class TestOklab:
-    def test_white_maps_to_unit_lightness_and_neutral_chroma(self):
-        white = np.array([[255, 255, 255]], dtype=np.uint8)
-
-        lab = neocolor.srgb_to_oklab(white)[0]
-
-        assert lab[0] == pytest.approx(1.0, abs=1e-3)
-        assert lab[1] == pytest.approx(0.0, abs=1e-3)
-        assert lab[2] == pytest.approx(0.0, abs=1e-3)
-
-    def test_black_maps_to_the_origin(self):
-        black = np.array([[0, 0, 0]], dtype=np.uint8)
-
-        lab = neocolor.srgb_to_oklab(black)[0]
-
-        assert np.allclose(lab, 0.0, atol=1e-6)
-
     def test_pure_red_has_positive_a_and_positive_b(self):
         red = np.array([[255, 0, 0]], dtype=np.uint8)
 
-        lab = neocolor.srgb_to_oklab(red)[0]
+        lab = colour.srgb_to_oklab(red / colour.BYTE_MAX)[0]
 
         assert lab[1] > 0.0
         assert lab[2] > 0.0
@@ -227,7 +212,7 @@ class TestOklab:
     def test_lightness_is_monotonic_along_the_grey_axis(self):
         greys = np.stack([np.arange(256)] * 3, axis=-1).astype(np.uint8)
 
-        lightness = neocolor.srgb_to_oklab(greys)[:, 0]
+        lightness = colour.srgb_to_oklab(greys / colour.BYTE_MAX)[:, 0]
 
         assert np.all(np.diff(lightness) > 0)
 
@@ -241,5 +226,5 @@ class TestOklab:
 
         grid = neocolor.build_oklab_grid()[index]
 
-        direct = neocolor.srgb_to_oklab(neocolor.color_index_to_rgb(index))
+        direct = colour.srgb_to_oklab(neocolor.color_index_to_rgb(index) / colour.BYTE_MAX)
         assert np.allclose(grid, direct, atol=1e-6)

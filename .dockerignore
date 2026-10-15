@@ -1,0 +1,7 @@
+.git
+.work
+build
+specs
+media
+tools/.venv
+*.mp4

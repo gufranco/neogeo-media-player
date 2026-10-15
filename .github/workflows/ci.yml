@@ -99,26 +99,17 @@ jobs:
           cache-dependency-glob: tools/uv.lock
           cache-suffix: cartridge
 
-      - name: Install the m68k toolchain and ffmpeg
+      - name: Install ffmpeg
         run: |
           set -euo pipefail
-          retry() {
-            local n=0
-            until "$@"; do
-              n=$((n + 1))
-              [ "$n" -ge 5 ] && return 1
-              echo "retry $n/5: $*" >&2
-              sleep 5
-            done
-          }
-          export DEBIAN_FRONTEND=noninteractive
-          retry sudo apt-get update -q
-          retry sudo apt-get install -y --no-install-recommends \
-            software-properties-common ffmpeg make pkg-config rsync zip binutils
-          retry sudo add-apt-repository -y ppa:dciabrin/ngdevkit
-          retry sudo apt-get update -q
-          retry sudo apt-get install -y --no-install-recommends ngdevkit ngdevkit-gngeo
-          m68k-neogeo-elf-gcc --version | head -1
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Build the pinned toolchain image
+        run: make image
+
+      - name: Static analysis
+        run: make analyse
 
       - name: Sync
         run: uv --project tools sync --all-groups

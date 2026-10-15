@@ -246,7 +246,7 @@ brew install --force-bottle dciabrin/ngdevkit/ngdevkit-toolchain \
 > [!TIP]
 > `--force-bottle` pours the arm64 bottle on a macOS release the tap has not tagged yet. Without it Homebrew builds GCC from source.
 
-[`build-in-docker.sh`](toolchain/build-in-docker.sh) compiles directly when a toolchain is on the path and re-executes itself in a container only when one is not.
+[`build-in-docker.sh`](toolchain/build-in-docker.sh) compiles directly when a toolchain is on the path and otherwise runs itself inside the toolchain image, as the calling user. The [`Dockerfile`](Dockerfile) pins that image: Ubuntu by digest, its packages from a dated snapshot, and the three ngdevkit packages by exact version and SHA-256, listed in [`toolchain/ngdevkit.sha256`](toolchain/ngdevkit.sha256). A build today and a build next year produce the same ROM.
 
 ## A movie inside your own game
 
@@ -395,7 +395,10 @@ A five minute source with grain added at the cartridge's own resolution was buil
 | `uv --project tools run ruff format --check tools/` | Format gate |
 | `uv --project tools run ruff check tools/` | Lint gate |
 | `uv --project tools run mypy tools/aesmovie tools/scripts` | Type gate |
-| `bash toolchain/build-in-docker.sh` | Build the ROM from whatever is already baked |
+| `make rom` | Build the ROM from whatever is already baked, in the pinned toolchain image |
+| `make analyse` | Static analysis of the player with cppcheck, which must exit 0 |
+| `make timing` | VRAM write spacing in the compiled objects, after `make rom` |
+| `make shell` | A shell inside the toolchain image |
 | `bash tools/scripts/verify_mame.sh` | Compare a finished cartridge against MAME |
 
 Coverage is gated at 95% in [CI](.github/workflows/ci.yml), which also builds a cartridge end to end and builds the cutscene example twice, once video-only and once with the movie's own sound driver.

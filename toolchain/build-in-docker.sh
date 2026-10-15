@@ -1,26 +1,19 @@
 #!/bin/bash
 set -euo pipefail
 
+IMAGE="${AESMOVIE_TOOLCHAIN_IMAGE:-aes-movie-player-toolchain}"
+
 if ! command -v m68k-neogeo-elf-gcc >/dev/null; then
     if ! command -v docker >/dev/null; then
         echo "No m68k-neogeo-elf toolchain and no Docker to supply one." >&2
         exit 1
     fi
-    exec docker run --rm --platform linux/amd64 \
+    if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+        docker build --platform linux/amd64 --provenance=false --target toolchain -t "$IMAGE" .
+    fi
+    exec docker run --rm --platform linux/amd64 --user "$(id -u):$(id -g)" \
         -e "BUILD=${BUILD:-build}" \
-        -v "$PWD:/work" -w /work ubuntu:24.04 bash -c '
-        set -e
-        export DEBIAN_FRONTEND=noninteractive
-        retry() { local n=0; until "$@"; do n=$((n+1)); [ "$n" -ge 5 ] && return 1; echo "retry $n/5: $*" >&2; sleep 5; done; }
-        retry apt-get update -q >/dev/null
-        retry apt-get install -y --no-install-recommends \
-          software-properties-common ca-certificates make pkg-config rsync zip \
-          binutils python3 >/dev/null
-        retry add-apt-repository -y ppa:dciabrin/ngdevkit >/dev/null
-        retry apt-get update -q >/dev/null
-        retry apt-get install -y --no-install-recommends ngdevkit ngdevkit-gngeo >/dev/null
-        bash toolchain/build-in-docker.sh
-    '
+        -v "$PWD:/work" -w /work "$IMAGE" bash toolchain/build-in-docker.sh
 fi
 
 retry_build() {

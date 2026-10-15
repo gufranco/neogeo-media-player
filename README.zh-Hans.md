@@ -194,8 +194,11 @@ ffmpeg 能读取的任何视频文件都可以。文件不需要放在特定文�
 
 ### 获取代码
 
+烘焙器通过 [fmv-core-python](https://github.com/gufranco/fmv-core-python) 子模块与 Master System 播放器共享解码、色彩、影片与捕获代码，因此请连同子模块一起克隆。下载按钮提供的源码压缩包无法包含子模块，因此无法运行。
+
 ```bash
-git clone https://github.com/gufranco/neogeo-media-player.git
+git clone --recurse-submodules https://github.com/gufranco/neogeo-media-player.git
+git submodule update --init   # in a clone made without the flag
 ```
 
 ### 制作卡带

@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import verify_capture as vc
 
 from neogeomedia import neocolor
+from tests.geolith_model import GeolithTileReader, StreamPlayer
 
 # The menu owns the first sixteen palettes, so video starts above them.
 VIDEO_BASE_BANK = 16
@@ -77,12 +78,12 @@ def measure(
     stream = (baked / "stream.bin").read_bytes()
     index = (baked / "index.bin").read_bytes()
     offsets = struct.unpack(f">{len(index) // 4}I", index)
-    reader = vc.GeolithTileReader((baked / "c1.bin").read_bytes(), (baked / "c2.bin").read_bytes())
+    reader = GeolithTileReader((baked / "c1.bin").read_bytes(), (baked / "c2.bin").read_bytes())
     base = vc._palette_colors((baked / "palettes.bin").read_bytes())
 
     low = max(0, expected - window)
     high = min(len(offsets) - 1, expected + window)
-    player = vc.StreamPlayer()
+    player = StreamPlayer()
     best_error, best_frame = float("inf"), None
     scored: dict[int, float] = {}
 

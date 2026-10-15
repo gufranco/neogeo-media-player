@@ -263,8 +263,8 @@ neogeo-media-player is the base the family grew from. Its tile dictionary is
 resident in character ROM, so its encoder settles a rung on a 35-rung quality
 ladder by real bakes rather than paging patterns, and it carries what the other
 player does not: ADPCM-B sound, the library and its drop-in bundle, subtitles
-and seeking. It does not consume `fmv-core-python` yet; moving its shared
-concerns there is in progress.
+and seeking. It carries `fmv-core-python` as a submodule and is moving its
+shared concerns onto it.
 
 Gaps against "What every player does" (as of 2026-10-15):
 

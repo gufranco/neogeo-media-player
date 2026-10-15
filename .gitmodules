@@ -1,0 +1,3 @@
+[submodule "fmv-core-python"]
+	path = fmv-core-python
+	url = https://github.com/gufranco/fmv-core-python.git

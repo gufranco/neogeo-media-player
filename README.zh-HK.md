@@ -194,8 +194,11 @@ flowchart LR
 
 ### 取得程式碼
 
+烘焙器透過 [fmv-core-python](https://github.com/gufranco/fmv-core-python) 子模組與 Master System 播放器共用解碼、色彩、影片及擷取程式碼，因此請連同子模組一併複製。下載按鈕提供的原始碼壓縮檔無法包含子模組，因此無法執行。
+
 ```bash
-git clone https://github.com/gufranco/neogeo-media-player.git
+git clone --recurse-submodules https://github.com/gufranco/neogeo-media-player.git
+git submodule update --init   # in a clone made without the flag
 ```
 
 ### 製作卡帶

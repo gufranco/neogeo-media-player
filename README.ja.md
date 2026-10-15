@@ -194,8 +194,11 @@ ffmpegで読み込める動画ファイルなら何でも使えます。特定�
 
 ### コードの取得
 
+ベイカーはデコード、色、映像、キャプチャのコードを[fmv-core-python](https://github.com/gufranco/fmv-core-python)サブモジュールを通じてMaster Systemプレイヤーと共有しているため、サブモジュールごとクローンしてください。ダウンロードボタンのソースアーカイブにはサブモジュールが含まれないため、動作しません。
+
 ```bash
-git clone https://github.com/gufranco/neogeo-media-player.git
+git clone --recurse-submodules https://github.com/gufranco/neogeo-media-player.git
+git submodule update --init   # in a clone made without the flag
 ```
 
 ### カートリッジの作成

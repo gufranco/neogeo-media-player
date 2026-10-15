@@ -91,7 +91,7 @@ def _read(store: Path) -> dict[str, dict[str, object]]:
     """Every entry in the file, or nothing if it is absent or foreign."""
     try:
         loaded = json.loads(Path(store).read_text())
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return {}
     if not isinstance(loaded, dict) or loaded.get("version") != CACHE_VERSION:
         return {}

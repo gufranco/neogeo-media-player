@@ -24,6 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
         with:
+          submodules: true
           fetch-depth: 0
 
       - name: Every subject is a conventional commit
@@ -53,6 +54,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          submodules: true
 
       - name: Install uv
         uses: astral-sh/setup-uv@v9.0.0
@@ -91,6 +94,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          submodules: true
 
       - name: Install uv
         uses: astral-sh/setup-uv@v9.0.0

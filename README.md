@@ -195,8 +195,14 @@ Any video file ffmpeg can read works. Nothing has to live in a particular folder
 
 ### Get the code
 
+The baker shares its decode, colour, film and capture code with the Master
+System player through the [fmv-core-python](https://github.com/gufranco/fmv-core-python)
+submodule, so clone with submodules. A source archive from the download button
+cannot carry a submodule and does not run.
+
 ```bash
-git clone https://github.com/gufranco/neogeo-media-player.git
+git clone --recurse-submodules https://github.com/gufranco/neogeo-media-player.git
+git submodule update --init   # in a clone made without the flag
 ```
 
 ### Make a cartridge

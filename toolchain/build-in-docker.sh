@@ -88,6 +88,8 @@ retry_build m68k-neogeo-elf-gcc "${CFLAGS[@]}" -c "$GENERATED/movie_data.S" -o "
 FIXED_ROM_BYTES=1048576
 BANK_WINDOW=2097152
 BANK_LIMIT=8
+EYE_CATCHER_NONE=2
+EYE_CATCHER_OFFSET=$((0x114))
 STREAM_FIRST_BANK=0
 STREAM_SIZE=$(file_size "$BAKED/stream.bin")
 STREAM_BANKS=$((STREAM_SIZE / FIXED_ROM_BYTES))
@@ -118,6 +120,7 @@ for ((bank = 0; bank < STREAM_BANKS; bank++)); do
     echo "LD $elf"
     retry_build m68k-neogeo-elf-gcc -o "$elf" "${COMMON_OBJECTS[@]}" "$object" \
         -Wl,--defsym="fmv_stream_base=$((STREAM_FIRST_BANK * FIXED_ROM_BYTES))" \
+        -Wl,--defsym="rom_eye_catcher_mode=$EYE_CATCHER_NONE" \
         -Wl,-Map="$BUILD/rom-bank$bank.map" "${NGDEVKIT_LIBS[@]}"
 
     placed=$(m68k-neogeo-elf-nm "$elf" | awk -v want="fmv_stream_bank$bank" '$3 == want {print $1}')
@@ -144,6 +147,11 @@ m68k-neogeo-elf-size -A "$BUILD/rom.elf" | awk '$1 !~ /^\.debug/' || true
 m68k-neogeo-elf-objcopy -O binary -S -R .text2 --gap-fill 0xff \
     "$BUILD/rom.elf" "$ROM/p1.raw"
 RAW_SIZE=$(file_size "$ROM/p1.raw")
+EYE_CATCHER=$(od -An -tu1 -j "$EYE_CATCHER_OFFSET" -N1 "$ROM/p1.raw" | tr -d ' ')
+if [[ "$EYE_CATCHER" != "$EYE_CATCHER_NONE" ]]; then
+    echo "header eye-catcher mode is ${EYE_CATCHER:-?}, not $EYE_CATCHER_NONE: the BIOS would draw its logo from film tiles" >&2
+    exit 1
+fi
 echo "[prom] code and tables $RAW_SIZE bytes of $FIXED_ROM_BYTES fixed"
 echo "[prom] stream $STREAM_SIZE bytes in $STREAM_BANKS switchable bank(s) from bank $STREAM_FIRST_BANK"
 if [[ "$RAW_SIZE" -gt "$FIXED_ROM_BYTES" ]]; then

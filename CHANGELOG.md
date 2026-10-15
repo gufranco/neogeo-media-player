@@ -8,6 +8,7 @@ was paid for once and does not need paying for again.
 
 ## Contents
 
+- [The BIOS drew its logo from film tiles](#the-bios-drew-its-logo-from-film-tiles)
 - [Blanking was 40 lines, not 24](#blanking-was-40-lines-not-24)
 - [A blank screen that was not the library's fault](#a-blank-screen-that-was-not-the-librarys-fault)
 - [Three registers that cannot be read](#three-registers-that-cannot-be-read)
@@ -19,6 +20,26 @@ was paid for once and does not need paying for again.
 - [It plays on a board](#it-plays-on-a-board)
 - [What is left](#what-is-left)
 - [Standing rules for this project](#standing-rules-for-this-project)
+
+## The BIOS drew its logo from film tiles
+
+The cartridge header asked the BIOS to draw its own boot logo. ngdevkit's
+link script sets the eye-catcher byte at 0x114 to 0, "done by BIOS", unless
+the project overrides it, and this one never did. That mode draws the logo
+from fixed sprite tiles in the cartridge's C-ROM, and here every one of those
+slots holds a film tile. Before the film, the screen showed a band of
+noise and a scrambled text line.
+
+No earlier check saw it. The MAME captures started the clip after boot, and
+the demo window starts twenty seconds in. A headless geolith run through
+`fmvcore.libretro` sampled the whole boot and showed it at once.
+
+The link now sets the mode to 2, none, and the build fails if the header byte
+reads anything else. Before the change, frames 360 and 720 showed the
+noise and frame 1,200 the film; after it, frame 360 already shows the film.
+Captured in geolith with the Universe BIOS. Not yet run on
+a board, and a board run with the stock AES BIOS is the check that settles
+it.
 
 ## Blanking was 40 lines, not 24
 

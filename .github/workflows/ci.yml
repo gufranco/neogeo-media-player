@@ -58,7 +58,7 @@ jobs:
           submodules: true
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
@@ -98,7 +98,7 @@ jobs:
           submodules: true
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
@@ -165,7 +165,7 @@ jobs:
           docker run --rm --platform linux/amd64 --user "$(id -u):$(id -g)" \
             -v "$PWD:/work" -w /work neogeo-media-player-toolchain \
             bash examples/cutscene/check_audio.sh build/example-audio
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: cartridge
           path: |

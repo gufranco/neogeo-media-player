@@ -67,8 +67,10 @@ cartridge's own bytes matches what it draws pixel for pixel. MAME is a
 cross-check only. Its BIOS and configuration defaults have produced failures
 and false positives, and it starts full screen on macOS.
 
-- **geolith**: [`tools/scripts/capture_rom.sh`](tools/scripts/capture_rom.sh)
-  launches RetroArch hidden in the background through `open -g -j`.
+- **geolith**: [`tools/scripts/capture_rom.py`](tools/scripts/capture_rom.py)
+  loads the geolith libretro core in-process through `fmvcore.libretro`, with
+  no window and no RetroArch, and saves the last frame of the run as a PNG.
+  It boots the Universe BIOS from `~/Documents/RetroArch/system`.
 - **MAME**: every scripted run sets `SDL_VIDEODRIVER=dummy` and passes
   `-window -video none -sound none`, as
   [`tools/scripts/verify_mame.sh`](tools/scripts/verify_mame.sh) and the

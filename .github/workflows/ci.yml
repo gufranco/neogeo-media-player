@@ -15,6 +15,7 @@ permissions:
 
 env:
   UV_FROZEN: "1"
+  NEOGEOMEDIA_CC_REQUIRED: "1"
 
 jobs:
   commits:

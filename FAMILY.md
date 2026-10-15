@@ -51,6 +51,15 @@ player that does not meet one yet lists the gap in its own state section below
 the closing line, and closing the gap is planned work, never a reason to drop
 the requirement.
 
+- **The same features in every player.** A feature one player has, every
+  player has, and the READMEs describe them in the same words under the same
+  headings. A feature a console cannot carry for a technical reason stays in
+  that player's README feature table, marked as not possible, with the reason
+  in one sentence: the hardware limit, its figure and its source. Not built yet
+  is never written as not possible.
+  The table is kept once, per language, in `fmv-core-python/features/`, and
+  each player's suite fails when its README's copy differs from it.
+
 - **The picture fills the screen.** A source of any shape is scaled until it
   covers the console's raster and then cropped, so a wide film loses its sides.
   Black bars baked into a source file are detected and cropped before scaling.

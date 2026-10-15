@@ -1,38 +1,35 @@
+English | [日本語](README.ja.md) | [简体中文](README.zh-Hans.md) | [繁體中文（香港）](README.zh-HK.md)
+
 <div align="center">
 
 # Neo Geo Media Player
 
-<strong>A full-screen movie with sound on a stock Neo Geo AES,<br>
+<strong>A full-screen film with sound on a stock Neo Geo AES,<br>
 and a library that puts one inside your own game.</strong>
 
 <br>
 
 [![Tests](https://img.shields.io/badge/tests-944%20passing-brightgreen?style=flat-square)](tools/tests)
 [![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)](RELEASES.md)
-[![Licence](https://img.shields.io/badge/licence-GPL--3.0-blue?style=flat-square)](LICENSE)
+[![Licence](https://img.shields.io/badge/licence-MIT-blue?style=flat-square)](LICENSE)
 [![Hardware](https://img.shields.io/badge/runs%20on-real%20AES%20and%20MVS-success?style=flat-square)](#verification)
 [![Verified](https://img.shields.io/badge/verified-geolith%20%2B%20MAME-blueviolet?style=flat-square)](#verification)
 
 </div>
 
 <p align="center">
-  <a href="#quick-start"><strong>Make a cartridge</strong></a> &nbsp;|&nbsp;
-  <a href="#a-movie-inside-your-own-game"><strong>Use it in your game</strong></a> &nbsp;|&nbsp;
+  <a href="#quick-start"><strong>Quick start</strong></a> &nbsp;|&nbsp;
   <a href="#how-it-works"><strong>How it works</strong></a> &nbsp;|&nbsp;
-  <a href="#choosing-a-quality-rung"><strong>Quality</strong></a> &nbsp;|&nbsp;
+  <a href="#quality"><strong>Quality</strong></a> &nbsp;|&nbsp;
   <a href="#verification"><strong>Verification</strong></a> &nbsp;|&nbsp;
-  <a href="#stability">Stability</a>
+  <a href="#the-family"><strong>The family</strong></a>
 </p>
 
 <div align="center">
 
-**320x224** at **59.2 fps** | **35,274** frames on one cartridge | **846,784** tiles | **944** tests | builds from **one command**
+<img src="readme/demo.gif" alt="Six seconds of the Sintel trailer playing from the built Neo Geo cartridge, captured from MAME" width="640">
 
-<br>
-
-<img src="docs/screenshot.png" alt="Big Buck Bunny playing from the built cartridge at 320x224, captured from MAME" width="640">
-
-<sub>Captured from MAME running the built cartridge, upscaled 2x with nearest neighbour. The same cartridge has played through on a real AES and MVS.</sub>
+<sub>Six seconds of the Sintel trailer, captured from MAME running the built cartridge at the console's own 320x224, with the position bar showing as the film starts. The same film opens the Master System player's README. Sintel is by the Blender Foundation, CC BY 3.0.</sub>
 
 </div>
 
@@ -43,21 +40,21 @@ uv --project tools run python -m neogeomedia.cartridge ~/Movies/my-film.mkv
 
 ---
 
-## Two things live here
+## What it is
 
 **A cartridge maker.** Point it at a video file and it builds a Neo Geo cartridge that plays it, with a transport, subtitles and sound. Start at [Quick start](#quick-start).
 
-**A library for your own game.** The same renderer, packaged so a homebrew developer can drop a cutscene into a game they are already building. One blocking call owns the screen while the movie plays and hands every register back afterwards. Start at [A movie inside your own game](#a-movie-inside-your-own-game).
+**A library for your own game.** The same renderer, packaged so a homebrew developer can drop a cutscene into a game they are already building. One blocking call owns the screen while the movie plays and hands every register back afterwards. Start at [A movie inside your own game](#a-film-inside-your-own-game).
 
 The cartridge is built on the library rather than beside it, so anything that breaks one breaks the other.
 
-## The problem
+### The problem
 
 The Neo Geo has no video decoder, no framebuffer, and no scaler. It draws hardware sprites and that is all. There is nowhere to put a decoded picture and nothing to decode it with: the 68000 runs at 12 MHz and has to hold 59.2 frames a second while the sound chip streams underneath it.
 
 There are also no residuals. A codec normally fixes a bad prediction by adding a difference to what is already on screen. With no framebuffer there is nothing to add to. A correction can only point a slot at some tile that already exists.
 
-## The solution
+### The solution
 
 Nothing decodes on the console. An offline baker turns the video into cartridge ROM images, and the on-cart player pushes pre-computed tile numbers into sprite control blocks once per vblank.
 
@@ -67,14 +64,14 @@ The screen is a fixed grid of 20 by 14 sprite tiles, 280 slots of 16x16 pixels c
 <tr>
 <td width="50%" valign="top">
 
-### Zero runtime decoding
+#### Zero runtime decoding
 
 The player writes tile numbers into SCB1 and nothing else. A frame that changes nothing costs two bytes.
 
 </td>
 <td width="50%" valign="top">
 
-### A measured quality ladder
+#### A measured quality ladder
 
 35 rungs. The rung is settled by baking the source rather than by pricing it against a table.
 
@@ -83,14 +80,14 @@ The player writes tile numbers into SCB1 and nothing else. A frame that changes 
 <tr>
 <td width="50%" valign="top">
 
-### Palettes refit per scene
+#### Palettes refit per scene
 
 240 CRAM banks refit per epoch and double-buffered across the hundreds of frames an epoch lasts, for about 6% less error at 1.5% more tiles.
 
 </td>
 <td width="50%" valign="top">
 
-### Bit-exact against geolith
+#### Bit-exact against geolith
 
 A frame reconstructed from the cartridge's own bytes matches what the emulator drew, pixel for pixel, at 0.0000 error.
 
@@ -99,20 +96,35 @@ A frame reconstructed from the cartridge's own bytes matches what the emulator d
 <tr>
 <td width="50%" valign="top">
 
-### Timing checked per instruction
+#### Timing checked per instruction
 
 Every build disassembles the player and fails on any VRAM write pair under the documented cycle minimum.
 
 </td>
 <td width="50%" valign="top">
 
-### A working transport
+#### A working transport
 
 Play, pause, fast forward at 2x, 5x and 10x, rewind and seek, with audio re-pointed to the matching ADPCM page on every jump.
 
 </td>
 </tr>
 </table>
+
+## What every player does
+
+The family sets one list of requirements for every player in
+[FAMILY.md](FAMILY.md). Where this one stands:
+
+| Requirement | Here |
+|---|---|
+| The picture fills the screen | Yes, by default. 320x224, scaled to cover and cropped, and bars baked into a source are detected and cropped first. `--fit letterbox` still exists and is due to go |
+| Picture quality before frame rate | Yes. Every frame plays at the 59.2 Hz vblank rate and the quality ladder spends the room on the picture |
+| Sound with no added hardware | Yes. ADPCM-B on the stock YM2610, from V-ROM |
+| A silent build | Partly. A library bundle can leave sound out with `FMV_AUDIO=no`; the cartridge command has no silent flag yet. Sound lives in its own V-ROM, so leaving it out frees no character ROM for the picture |
+| The whole cartridge | Yes. Up to the 128 MiB of character ROM a 20-bit tile number addresses, with no bankswitching |
+| Quality follows length | Yes. `--quality search` settles the best rung that fits the film into the cartridge |
+| A media-player menu | Mostly. Play, pause, fast forward, rewind, seek, and a position bar with elapsed and total time. Sound on and off is not checked yet |
 
 ## How it works
 
@@ -181,7 +193,13 @@ Any video file ffmpeg can read works. Nothing has to live in a particular folder
 | m68k toolchain | ngdevkit | [Toolchain](#toolchain) |
 | Neo Geo BIOS | any | Only to run the emulators, not to build |
 
-### One command
+### Get the code
+
+```bash
+git clone https://github.com/gufranco/neogeo-media-player.git
+```
+
+### Make a cartridge
 
 ```bash
 uv --project tools run python -m neogeomedia.cartridge ~/Movies/my-film.mkv
@@ -196,7 +214,7 @@ That measures the source, settles the highest quality rung that fits a cartridge
 | Bake | Quantizes, fits palettes, interns every tile, encodes audio | About 8 minutes for a ten minute source |
 | Build | Compiles the player and packs the ROM images | A couple of minutes |
 
-### What you get
+#### What you get
 
 | Path | What it is |
 |:-----|:-----------|
@@ -206,7 +224,7 @@ That measures the source, settles the highest quality rung that fits a cartridge
 | `build/baked/` | Intermediate ROM images, kept so the ROM can be rebuilt without re-baking |
 | `build/preview.mp4` | Only when `--preview` was asked for |
 
-### Common flags
+#### Common flags
 
 | Flag | Use |
 |:-----|:----|
@@ -248,7 +266,7 @@ brew install --force-bottle dciabrin/ngdevkit/ngdevkit-toolchain \
 
 [`build-in-docker.sh`](toolchain/build-in-docker.sh) compiles directly when a toolchain is on the path and otherwise runs itself inside the toolchain image, as the calling user. The [`Dockerfile`](Dockerfile) pins that image: Ubuntu by digest, its packages from a dated snapshot, and the three ngdevkit packages by exact version and SHA-256, listed in [`toolchain/ngdevkit.sha256`](toolchain/ngdevkit.sha256). A build today and a build next year produce the same ROM.
 
-## A movie inside your own game
+### A film inside your own game
 
 The renderer is a library, and the baker emits it as a folder you drop into an ngdevkit project. Everything ships as source.
 
@@ -276,7 +294,7 @@ game_redraw();
 
 `fmv_play` blocks until the movie ends or the player skips it. Underneath it are `fmv_open`, `fmv_start`, `fmv_tick`, `fmv_seek` and `fmv_close` for a caller that wants to drive its own loop.
 
-### What it takes, and what it leaves you
+#### What it takes, and what it leaves you
 
 | Resource | The movie takes | Yours |
 |---|---|---|
@@ -296,7 +314,7 @@ game_redraw();
 
 [`examples/cutscene/`](examples/cutscene) is a game that plays a cutscene and carries on, built from an emitted folder in a stock ngdevkit project at a pinned commit. Its title screen is drawn after the movie returns, writing fix tiles and nothing else, so a register left in the wrong place would show.
 
-## Choosing a quality rung
+## Quality
 
 Tile cost is a property of the content rather than of the running time. Dense animation can cost several times what a dialogue scene costs, so a ladder indexed by duration alone would over-compress easy sources and under-compress hard ones. The baker measures the source instead.
 
@@ -324,6 +342,24 @@ uv --project tools run python -m neogeomedia.plan --source film.mkv
 ```
 
 [`docs/quality-ladder.md`](docs/quality-ladder.md) lists all 35 rungs with their settings, and covers per-scene palettes, rate control and the colour model.
+
+### The reference cartridge
+
+Big Buck Bunny is the test subject rather than the product: freely licensed, long enough to stress the dictionary, and unchanging between runs, so numbers taken from it are comparable.
+
+| Quantity | Value |
+|---|---|
+| Rung | `q17`, colour at 37% |
+| Frames | 35,274 at 59.2 fps, no holds |
+| C-ROM | 846,784 tiles, 81% of 128 MiB |
+| Palette epochs | 120, cadence from 6.0 measured cuts per minute |
+| Audio | 55,555 Hz, the chip's ceiling |
+| Displayed error | 0.0010116 |
+| Cartridge | 158 MB |
+
+Audio and video stay locked. Read off the player's own diagnostics counters, the player runs 8 to 9 frames behind the vblank count at 1,800 frames and at 12,000, so the offset is the cost of booting before the movie starts rather than drift. Audio starts immediately after frame 0 is applied and the YM2610 then streams from the same crystal as the raster. Residual error is 3 ms from the ADPCM rate grid across ten minutes, 3 ms from the frame-to-page mapping, and up to 4.6 ms rounding on each seek.
+
+A five minute source with grain added at the cartridge's own resolution was built to sit at the edge of the C-ROM deliberately. `--quality search` settled it at `q01` in a single bake at 209,667 tiles per minute, so five minutes came to 1,048,338 tiles against a ceiling of 1,048,576. The 150 MB cartridge boots in MAME and draws the picture with the grain intact.
 
 ## Verification
 
@@ -353,24 +389,6 @@ The cartridge has run on a real AES and on a real MVS from a NeoSD flash cart. B
 A clean run is not a cycle measurement, so the write-spacing minimums stay sourced from documentation and enforced by the build gate rather than confirmed by observation. [`docs/hardware.md`](docs/hardware.md) carries the bit layouts read out of both decoders and what the timing gate checks on every build.
 
 The [cutscene example](examples/cutscene) has run on a board too and came back to its own title screen normally after the movie. That screen writes fix tiles and nothing else, so the fix source, the palette bank and the LSPC mode all have to be where the caller left them for it to appear. No emulator can settle that, because those registers cannot be read back on the machine either.
-
-## The reference cartridge
-
-Big Buck Bunny is the test subject rather than the product: freely licensed, long enough to stress the dictionary, and unchanging between runs, so numbers taken from it are comparable.
-
-| Quantity | Value |
-|---|---|
-| Rung | `q17`, colour at 37% |
-| Frames | 35,274 at 59.2 fps, no holds |
-| C-ROM | 846,784 tiles, 81% of 128 MiB |
-| Palette epochs | 120, cadence from 6.0 measured cuts per minute |
-| Audio | 55,555 Hz, the chip's ceiling |
-| Displayed error | 0.0010116 |
-| Cartridge | 158 MB |
-
-Audio and video stay locked. Read off the player's own diagnostics counters, the player runs 8 to 9 frames behind the vblank count at 1,800 frames and at 12,000, so the offset is the cost of booting before the movie starts rather than drift. Audio starts immediately after frame 0 is applied and the YM2610 then streams from the same crystal as the raster. Residual error is 3 ms from the ADPCM rate grid across ten minutes, 3 ms from the frame-to-page mapping, and up to 4.6 ms rounding on each seek.
-
-A five minute source with grain added at the cartridge's own resolution was built to sit at the edge of the C-ROM deliberately. `--quality search` settled it at `q01` in a single bake at 209,667 tiles per minute, so five minutes came to 1,048,338 tiles against a ceiling of 1,048,576. The 150 MB cartridge boots in MAME and draws the picture with the grain intact.
 
 ## Repository layout
 
@@ -414,7 +432,7 @@ Coverage is gated at 95% in [CI](.github/workflows/ci.yml), which also builds a 
 | Types | [mypy](https://mypy-lang.org/) in strict mode |
 | Dependency updates | [Dependabot](.github/dependabot.yml), weekly |
 
-## Stability
+### Stability
 
 From 2.0 these are a promise. Anything that would break them is a major version.
 
@@ -422,7 +440,7 @@ From 2.0 these are a promise. Anything that would break them is a major version.
 |:--------|:--------|
 | `python -m neogeomedia.cartridge <source>` | The one command. Its flags keep their names and meanings |
 | `python -m neogeomedia.plan --source <file>` | Prints the ladder as an estimate and bakes nothing |
-| `python -m neogeomedia.bake --bundle DIR` | Emits a drop-in folder. Its shape keeps its names: `src/`, `movie/`, `package/`, `fmv.mk`, `README.md` |
+| `python -m neogeomedia.bake --bundle DIR` | Emits a drop-in folder. Its shape keeps its names: `DIR/src/`, `DIR/movie/`, `DIR/package/`, `DIR/fmv.mk`, `DIR/README.md` |
 | Rung names `q01` to `q35` | A name always means the same settings. Rungs are never renumbered |
 | [`neogeomedia-tiers.json`](neogeomedia-tiers.json) | Readable, diffable, and safe to commit. Its `version` field guards the shape |
 | `build/neogeomedia.neo` and `build/neogeomedia.zip` | Where the cartridge lands, and what it is called |
@@ -442,7 +460,7 @@ An emitted folder carries the library source it was baked against, and compiling
 
 `python -m neogeomedia.bake` carries knobs that exist to be experimented with, so its surface can move apart from `--bundle`. The numbers a bake reports in `report.json` are measurements rather than an interface.
 
-## Versioning
+### Versioning
 
 This project follows [Semantic Versioning](https://semver.org/). Every release is tagged and the version is derived from commit subjects. See [releases](https://github.com/gufranco/neogeo-media-player/releases) and [`RELEASES.md`](RELEASES.md).
 
@@ -490,12 +508,23 @@ Because narrowing it costs tiles instead of saving them. Blanking 16 pixels on e
 
 </details>
 
-## Licence
+## The family
 
-[GPL-3.0](LICENSE).
+This player is one of a family that plays full-motion video on consoles that
+were never meant to show it. The members share one standard,
+[FAMILY.md](FAMILY.md), and every piece of baker code the hardware does not
+force lives once in the core.
 
-## Credits
+| Member | What it is |
+|:--|:--|
+| [neogeo-media-player](https://github.com/gufranco/neogeo-media-player) | This repository |
+| [sms-media-player](https://github.com/gufranco/sms-media-player) | A full-screen film on a Sega Master System, its tiles paged through VRAM as it plays |
+| [fmv-core-python](https://github.com/gufranco/fmv-core-python) | The baker and measurement code the players share |
 
-Built with [ngdevkit](https://github.com/dciabrin/ngdevkit). Verified against [geolith](https://github.com/libretro/geolith-libretro) and [MAME](https://github.com/mamedev/mame). Test footage is Big Buck Bunny and Tears of Steel, both by the Blender Foundation under CC BY.
+## Licence and credits
 
-ngdevkit is LGPL-3.0 and this project is GPL-3.0. Two conventions were followed rather than invented: that an object whose file name contains `__bank` belongs in switchable program ROM, and that a cartridge is declared through a `rom.mk` and built through a `Makefile` that includes it. Both are interface rather than implementation. No file from ngdevkit or from `ngdevkit-examples` is copied into this repository, and the [cutscene example](examples/cutscene) fetches a stock project at build time instead of vendoring one. The cartridges built here link ngdevkit's libraries, which is the use LGPL-3.0 is written for. No binary is distributed from this repository; everything ships as source.
+[MIT](LICENSE).
+
+Built with [ngdevkit](https://github.com/dciabrin/ngdevkit). Verified against [geolith](https://github.com/libretro/geolith-libretro) and [MAME](https://github.com/mamedev/mame). The demo film is the Sintel trailer, and the test footage is Big Buck Bunny and Tears of Steel, all by the Blender Foundation under CC BY.
+
+ngdevkit is LGPL-3.0 and this project is MIT. Two conventions were followed rather than invented: that an object whose file name contains `__bank` belongs in switchable program ROM, and that a cartridge is declared through a `rom.mk` and built through a `Makefile` that includes it. Both are interface rather than implementation. No file from ngdevkit or from `ngdevkit-examples` is copied into this repository, and the [cutscene example](examples/cutscene) fetches a stock project at build time instead of vendoring one. The cartridges built here link ngdevkit's libraries, which is the use LGPL-3.0 is written for. No binary is distributed from this repository; everything ships as source.

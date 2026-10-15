@@ -17,9 +17,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from fmvcore import ffmpeg
+from fmvcore import arguments, ffmpeg
 
-from neogeomedia import bake, frames, probe, quality, tiercache
+from neogeomedia import bake, frames, limits, probe, quality, tiercache
 
 BUILD_SCRIPT = Path(__file__).resolve().parents[2] / "toolchain" / "build-in-docker.sh"
 CARTRIDGE_NAME = "neogeomedia.neo"
@@ -49,9 +49,19 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         default=None,
         help=f"where measured tier costs are kept; defaults to {tiercache.STORE_NAME}",
     )
-    parser.add_argument("--start", type=float, default=0.0, help="seconds to skip at the front")
     parser.add_argument(
-        "--duration", type=float, default=None, help="seconds to take; defaults to the whole film"
+        "--start",
+        type=arguments.number(low=0.0, high=limits.MAX_SOURCE_SECONDS, name="--start"),
+        default=0.0,
+        help="seconds to skip at the front",
+    )
+    parser.add_argument(
+        "--duration",
+        type=arguments.number(
+            low=limits.MIN_SECONDS, high=limits.MAX_SOURCE_SECONDS, name="--duration"
+        ),
+        default=None,
+        help="seconds to take; defaults to the whole film",
     )
     parser.add_argument("--build-dir", type=Path, default=Path("build"))
     parser.add_argument("--preview", type=Path, default=None)

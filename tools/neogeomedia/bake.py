@@ -38,7 +38,7 @@ from typing import Any, Final
 
 import numpy as np
 import numpy.typing as npt
-from fmvcore import ffmpeg
+from fmvcore import arguments, ffmpeg
 
 from neogeomedia import (
     adpcmb,
@@ -48,6 +48,7 @@ from neogeomedia import (
     encode,
     fixtiles,
     frames,
+    limits,
     neocolor,
     palettes,
     quality,
@@ -962,40 +963,128 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Bake a video clip into Neo Geo cart data.")
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--quality", default=None)
-    parser.add_argument("--audio-rate", type=float, default=None)
-    parser.add_argument("--start", type=float, default=0.0)
-    parser.add_argument("--duration", type=float, default=None)
+    parser.add_argument(
+        "--audio-rate",
+        type=arguments.number(
+            low=limits.MIN_AUDIO_RATE_HZ, high=limits.MAX_AUDIO_RATE_HZ, name="--audio-rate"
+        ),
+        default=None,
+    )
+    parser.add_argument(
+        "--start",
+        type=arguments.number(low=0.0, high=limits.MAX_SOURCE_SECONDS, name="--start"),
+        default=0.0,
+    )
+    parser.add_argument(
+        "--duration",
+        type=arguments.number(
+            low=limits.MIN_SECONDS, high=limits.MAX_SOURCE_SECONDS, name="--duration"
+        ),
+        default=None,
+    )
     parser.add_argument("--subtitles", type=Path, default=None)
     parser.add_argument("--build-dir", type=Path, default=Path("build"))
     parser.add_argument("--fit", choices=("fill", "letterbox"), default="fill")
-    parser.add_argument("--denoise", type=float, default=None)
-    parser.add_argument("--frame-hold", type=int, default=None)
-    parser.add_argument("--motion-blur", type=int, default=0)
-    parser.add_argument("--target-fps", type=float, default=None)
-    parser.add_argument("--motion-masking", type=float, default=0.0)
+    parser.add_argument(
+        "--denoise",
+        type=arguments.number(low=0.0, high=limits.MAX_DENOISE, name="--denoise"),
+        default=None,
+    )
+    parser.add_argument(
+        "--frame-hold",
+        type=arguments.count(low=1, high=limits.MAX_FRAME_HOLD, name="--frame-hold"),
+        default=None,
+    )
+    parser.add_argument(
+        "--motion-blur",
+        type=arguments.count(low=0, high=limits.MAX_MOTION_BLUR, name="--motion-blur"),
+        default=0,
+    )
+    parser.add_argument(
+        "--target-fps",
+        type=arguments.number(
+            low=limits.MIN_TARGET_FPS, high=float(frames.VBLANK_FPS), name="--target-fps"
+        ),
+        default=None,
+    )
+    parser.add_argument(
+        "--motion-masking",
+        type=arguments.number(low=0.0, high=limits.MAX_MOTION_MASKING, name="--motion-masking"),
+        default=0.0,
+    )
     parser.add_argument(
         "--dither",
         action="store_true",
         help="ordered threshold across palette entries, to break up banding",
     )
-    parser.add_argument("--chroma-weight", type=float, default=None)
-    parser.add_argument("--scene-cut-floor", type=float, default=None)
-    parser.add_argument("--palette-epoch-seconds", type=float, default=None)
-    parser.add_argument("--tile-budget", type=int, default=None)
+    parser.add_argument(
+        "--chroma-weight",
+        type=arguments.number(
+            low=limits.MIN_CHROMA_WEIGHT, high=limits.MAX_CHROMA_WEIGHT, name="--chroma-weight"
+        ),
+        default=None,
+    )
+    parser.add_argument(
+        "--scene-cut-floor",
+        type=arguments.number(low=0.0, high=limits.MAX_FRACTION, name="--scene-cut-floor"),
+        default=None,
+    )
+    parser.add_argument(
+        "--palette-epoch-seconds",
+        type=arguments.number(
+            low=0.0, high=limits.MAX_SOURCE_SECONDS, name="--palette-epoch-seconds"
+        ),
+        default=None,
+    )
+    parser.add_argument(
+        "--tile-budget",
+        type=arguments.count(low=1, high=limits.MAX_TILES, name="--tile-budget"),
+        default=None,
+    )
     parser.add_argument(
         "--stop-when-over-budget",
         action="store_true",
         help="abandon the bake once it cannot finish, instead of encoding the rest",
     )
-    parser.add_argument("--palette-count", type=int, default=240)
-    parser.add_argument("--base-bank", type=int, default=16)
-    parser.add_argument("--keyframe-interval", type=int, default=90)
-    parser.add_argument("--tolerance", type=float, default=None)
-    parser.add_argument("--scene-cut-ratio", type=float, default=0.90)
-    parser.add_argument("--candidates", type=int, default=None)
+    parser.add_argument(
+        "--palette-count",
+        type=arguments.count(low=1, high=limits.MAX_PALETTES, name="--palette-count"),
+        default=240,
+    )
+    parser.add_argument(
+        "--base-bank",
+        type=arguments.count(low=0, high=limits.MAX_PALETTES - 1, name="--base-bank"),
+        default=16,
+    )
+    parser.add_argument(
+        "--keyframe-interval",
+        type=arguments.count(low=1, high=limits.MAX_FRAMES, name="--keyframe-interval"),
+        default=90,
+    )
+    parser.add_argument(
+        "--tolerance",
+        type=arguments.number(low=0.0, high=limits.MAX_FRACTION, name="--tolerance"),
+        default=None,
+    )
+    parser.add_argument(
+        "--scene-cut-ratio",
+        type=arguments.number(low=0.0, high=limits.MAX_FRACTION, name="--scene-cut-ratio"),
+        default=0.90,
+    )
+    parser.add_argument(
+        "--candidates",
+        type=arguments.count(low=0, high=limits.MAX_PALETTES, name="--candidates"),
+        default=None,
+    )
     parser.add_argument("--flip", action="store_true")
-    parser.add_argument("--sample-stride", type=int, default=None)
-    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--sample-stride",
+        type=arguments.count(low=1, high=limits.MAX_FRAMES, name="--sample-stride"),
+        default=None,
+    )
+    parser.add_argument(
+        "--seed", type=arguments.count(low=0, high=limits.MAX_SEED, name="--seed"), default=0
+    )
     parser.add_argument("--preview", type=Path, default=None)
     parser.add_argument("--report-json", type=Path, default=None)
     parser.add_argument("--bundle", type=Path, default=None)

@@ -10,8 +10,8 @@ the hardware forces.
 
 | Member | What it is | Kind |
 |:--|:--|:--|
-| [aes-movie-player](https://github.com/gufranco/aes-movie-player) | A full-screen movie with sound on a Neo Geo AES or MVS, and a library that plays one inside another game | Player |
-| [sms-movie-player](https://github.com/gufranco/sms-movie-player) | A full-screen game opening on a Sega Master System, paged through VRAM as it plays | Player |
+| [neogeo-media-player](https://github.com/gufranco/neogeo-media-player) | A full-screen movie with sound on a Neo Geo AES or MVS, and a library that plays one inside another game | Player |
+| [sms-media-player](https://github.com/gufranco/sms-media-player) | A full-screen film on a Sega Master System, its tiles paged through VRAM as it plays | Player |
 | [fmv-core-python](https://github.com/gufranco/fmv-core-python) | The baker and measurement code both players share: decoding, colour, dither, the regression set, capture comparison, the write-timing walk, the test helpers | Core |
 
 ## How a repository joins
@@ -43,6 +43,53 @@ hardware wins and the cost is reported rather than negotiated.
   run.
 - **A documented figure binds over a looser measured one.** Looser is never a
   reason.
+
+## What every player does
+
+These are the owner's requirements for every player, present and future. A
+player that does not meet one yet lists the gap in its own state section below
+the closing line, and closing the gap is planned work, never a reason to drop
+the requirement.
+
+- **The picture fills the screen.** A source of any shape is scaled until it
+  covers the console's raster and then cropped, so a wide film loses its sides.
+  Black bars baked into a source file are detected and cropped before scaling.
+  No player adds letterboxing or padding, because bars cost tiles and transfer
+  like any other picture.
+- **Perceived picture quality comes before frame rate.** When the two compete
+  for bytes, slots or cycles, the picture wins.
+- **Sound, the way the console can play it, with no added hardware.** Every
+  player carries the film's sound using only what the stock console and a
+  standard cartridge provide.
+- **A silent build.** The baker can leave sound out, and every byte and cycle
+  sound would have used goes to a longer or better picture.
+- **The whole cartridge.** A player can fill the largest cartridge its
+  console's standard mapper or board addresses, with no extra hardware on the
+  cartridge beyond that standard. The ceiling is the documented one.
+- **Quality follows length.** The baker fits the film into the cartridge it is
+  given: a short film gets more bytes per second of picture and sound, a long
+  one fewer, settled by measurement rather than a fixed setting.
+- **A menu in the style of a media player.** Before and during playback the
+  viewer has play and pause, seek backward and forward, restart and stop, a
+  position bar with elapsed and total time, and sound on and off where there
+  is sound. The controls show on input and get out of the picture's way while
+  it plays.
+
+## How a new port starts
+
+1. Read this file, then the newest player end to end, before writing anything.
+2. Name it `<console>-media-player`, its baker package `<console>media`, and
+   its environment variables `<CONSOLE>MEDIA_*`.
+3. Collect the console's binding numbers from the manufacturer's documents
+   into its `AGENTS.md`, each with its source, before the first write to a
+   port.
+4. Take the core as a submodule on day one, and add to the core rather than
+   to the player whatever the hardware does not force.
+5. Build in a pinned Docker image, with the same Makefile targets, hooks, CI
+   and release as the other players.
+6. Meet every requirement in "What every player does", or list each gap in the
+   state section.
+7. Add the repository to the member table in every member in the same task.
 
 ## The authority ladder
 
@@ -109,7 +156,8 @@ That choice has a price, paid deliberately:
 
 | File | Holds |
 |:--|:--|
-| [`README.md`](README.md) | The document for a person: what it is, how to build and run it, and why it can be trusted |
+| [`README.md`](README.md) | The document for a person: what it is, how to build and run it, and why it can be trusted. Every player's README has the same sections in the same order, opens with an animated GIF of at least five seconds of the shared demo film playing from that player's cartridge in an emulator, and has translations |
+| `README.ja.md`, `README.zh-Hans.md`, `README.zh-HK.md` | Japanese, Simplified Chinese and Hong Kong Traditional Chinese translations of the README, each translated from the English file, keeping its headings, code blocks and links, with a language switcher on the first line of every version |
 | `AGENTS.md` | The engineering contract: the hardware's binding numbers with their sources, the gates, the things that bite, what is not done |
 | `FAMILY.md` | This file, identical in every member |
 | `DESIGN.md` | Why each part of the code is shaped as it is, with the measurements behind it. Source files carry none of this |
@@ -130,11 +178,34 @@ That choice has a price, paid deliberately:
   purpose, so a per-pixel error always scores it as loss. It is judged by the
   error after the same blur on both sides and by a rendered sheet looked at
   beside the source, and both must agree.
+- **Nothing aimed at a CRT.** A dither is allowed when it raises the picture's
+  quality on a sharp screen. No composite model and no technique that needs a
+  display to blend colours the console cannot show.
 - **On more than one film.** A parameter fitted to one clip is a fit, not a
   setting. Every encoder change is measured on the regression set: films of
   different kinds, fetched by manifest and verified by SHA-256, never committed.
 - **Render before reasoning about a screen.** A capture settles in one look what
   an argument about which write reaches which table can get wrong for weeks.
+
+## How the work is done
+
+- **Every requirement the owner states is written into this file in the same
+  task**, in every member, so no port has to be told twice.
+- **Capture before asking.** When something is wrong on screen, record the
+  emulator, cut the recording into frames and read them. Ask only when that
+  loop has run and cannot settle the question, and say what it showed.
+- **A measurement answers what happened, never on its own what is better.**
+  Render it and look before quoting a number for a change.
+- **Emulators run windowed**, never fullscreen, and minimised when a run only
+  produces a capture.
+- **Private projects are never named** in a public member: not their name, path,
+  remote or functions. A figure taken from one is cited by its documented
+  source or by a run on hardware.
+- **Every member is a solo repository** and lands on `main` directly, after
+  every gate passes.
+- **The demo film is the Sintel trailer** by the Blender Foundation, CC BY 3.0,
+  credited wherever it appears. A demo GIF is a capture from the emulator
+  running the cartridge, never a render of the baker's own preview.
 
 ## Verification
 
@@ -167,6 +238,9 @@ That choice has a price, paid deliberately:
 | Actions | Pinned by full commit SHA |
 | Films | Fetched and verified by manifest, never committed |
 | ROMs | Never committed, and never published when built from someone else's work |
+| Names | Players are `<console>-media-player` with a `<console>media` package; the core is `fmv-core-python` with the `fmvcore` package |
+| Language | Everything committed is English, except the README translations |
+| Builds | Docker for every player build, in an image pinned by digest, run as the calling user; no host toolchain path |
 
 ---
 
@@ -176,9 +250,16 @@ the others do not also get.*
 
 ## The state of this repository
 
-aes-movie-player is the base the family grew from. Its tile dictionary is
+neogeo-media-player is the base the family grew from. Its tile dictionary is
 resident in character ROM, so its encoder settles a rung on a 35-rung quality
 ladder by real bakes rather than paging patterns, and it carries what the other
 player does not: ADPCM-B sound, the library and its drop-in bundle, subtitles
 and seeking. It does not consume `fmv-core-python` yet; moving its shared
 concerns there is in progress.
+
+Gaps against "What every player does" (as of 2026-10-15):
+
+- Its transport has play, pause, fast forward, rewind and seek. Whether its
+  menu shows a position bar with elapsed and total time is still to be
+  checked against the requirement.
+- It uses no shared demo GIF yet; its README shows a still of Big Buck Bunny.

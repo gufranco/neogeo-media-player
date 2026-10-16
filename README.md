@@ -256,6 +256,7 @@ That measures the source, settles the highest quality rung that fits a cartridge
 | `--subtitles PATH` | A SubRip `.srt`. Defaults to one beside the source |
 | `--quality search` | The default. Bake down from `q01` until one fits, and remember it |
 | `--quality q17` | Name a rung and skip the measuring |
+| `--denoise 1` | A denoise strength. With the default search it is measured on the film, and `auto` measures it for a named rung too |
 | `--start 90 --duration 300` | Take five minutes starting at 1:30 rather than the whole file |
 | `--fit letterbox` | Letterbox instead of filling the 320x224 raster |
 | `--preview out.mp4` | Also render what the cartridge will show, for checking by eye |

@@ -8,6 +8,7 @@ was paid for once and does not need paying for again.
 
 ## Contents
 
+- [Denoise and dither, measured on six films](#denoise-and-dither-measured-on-six-films)
 - [Six films on every test run](#six-films-on-every-test-run)
 - [A corrupt stream stops on red](#a-corrupt-stream-stops-on-red)
 - [The timing gate reads the whole player](#the-timing-gate-reads-the-whole-player)
@@ -23,6 +24,22 @@ was paid for once and does not need paying for again.
 - [It plays on a board](#it-plays-on-a-board)
 - [What is left](#what-is-left)
 - [Standing rules for this project](#standing-rules-for-this-project)
+
+## Denoise and dither, measured on six films
+
+Every rung of the ladder ran with no denoise. The quality search now
+measures the strength on the film: it encodes a two-second window from the
+middle of the film at 0, 1, 2 and 4, scores each against the undenoised
+source with the family's blurred error, and takes the best, a near tie going
+to the setting that spends fewer tiles. On the regression set it picks 1 for
+the Popeye cartoon, 1.7% lower error with fewer tiles, and 0 for the other
+five, where every strength above 0 loses. One fixed strength would have been
+wrong for five films out of six.
+
+Every bake now also reports the blurred error. With it, dither loses on all
+six films: displayed error 5% to 33% higher, blurred error 0.2% to 5% higher,
+and more tiles on every one. It stays off by default, and the owner's verdict
+on the rendered sheets decides it.
 
 ## Six films on every test run
 

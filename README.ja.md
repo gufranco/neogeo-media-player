@@ -250,6 +250,7 @@ uv --project tools run python -m neogeomedia.cartridge ~/Movies/my-film.mkv
 | `--subtitles PATH` | SubRipの`.srt`です。デフォルトはソースの隣にあるものです |
 | `--quality search` | デフォルトです。`q01`から下へ順にベイクして収まるものを探し、結果を記憶します |
 | `--quality q17` | 段を指定し、計測を省きます |
+| `--denoise 1` | ノイズ除去の強さです。既定の探索では映像で計測し、段を指定した場合も`auto`で計測します |
 | `--start 90 --duration 300` | ファイル全体ではなく、1:30から5分間を使います |
 | `--fit letterbox` | 320x224のラスターを埋める代わりにレターボックスにします |
 | `--preview out.mp4` | カートリッジの表示内容も描画し、目視で確認できるようにします |

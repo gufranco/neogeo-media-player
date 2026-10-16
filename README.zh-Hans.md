@@ -250,6 +250,7 @@ uv --project tools run python -m neogeomedia.cartridge ~/Movies/my-film.mkv
 | `--subtitles PATH` | 一个 SubRip `.srt`。默认使用源视频旁边的那个 |
 | `--quality search` | 默认值。从 `q01` 向下烘焙，直到有一个能放下，并记住结果 |
 | `--quality q17` | 指定一个档位，跳过测量 |
+| `--denoise 1` | 降噪强度。默认的搜索会在影片上测量它，指定档位时用 `auto` 也会测量 |
 | `--start 90 --duration 300` | 从 1:30 开始截取五分钟，而不是整个文件 |
 | `--fit letterbox` | 使用信箱模式，而不是填满 320x224 光栅 |
 | `--preview out.mp4` | 同时渲染卡带将显示的画面，供肉眼检查 |

@@ -9,6 +9,8 @@ from fmvcore import ffmpeg
 
 from neogeomedia import cartridge, frames, tiercache
 
+ROOT = Path(__file__).resolve().parents[2]
+
 
 @pytest.fixture
 def movie(tmp_path):
@@ -149,7 +151,7 @@ class TestSearchingForTheTier:
         )
         monkeypatch.setattr(cartridge.ffmpeg, "probe", lambda *_a, **_k: _stub_info())
 
-        cartridge.main([str(movie), "--quality", "search"])
+        cartridge.main([str(movie), "--quality", "search", "--denoise", "0"])
 
         argv = recorded["bake"]
 
@@ -212,6 +214,8 @@ class TestMeasuringARung:
                 str(movie),
                 "--quality",
                 "search",
+                "--denoise",
+                "0",
                 "--tier-cache",
                 str(store),
                 "--build-dir",
@@ -321,6 +325,8 @@ class TestMeasuringARung:
                 str(movie),
                 "--quality",
                 "search",
+                "--denoise",
+                "0",
                 "--tier-cache",
                 str(store),
                 "--build-dir",
@@ -373,7 +379,56 @@ class TestTheSearchKnowsTheSource:
         monkeypatch.setattr(cartridge.bake, "main", lambda _argv: 0)
         monkeypatch.setattr(cartridge.subprocess, "run", lambda *_a, **_k: None)
 
-        cartridge.main([str(movie), "--tier-cache", str(tmp_path / "t.json"), "--bake-only"])
+        argv = [str(movie), "--tier-cache", str(tmp_path / "t.json"), "--denoise", "0"]
+        cartridge.main([*argv, "--bake-only"])
 
         assert seen["source_fps"] == pytest.approx(24.0)
         assert seen["vblank_fps"] == pytest.approx(float(frames.VBLANK_FPS))
+
+
+class TestDenoise:
+    def test_a_number_is_forwarded_to_the_bake(self, movie, recorded):
+        # Arrange
+        argv = [str(movie), "--quality", "q17", "--denoise", "2"]
+
+        # Act
+        cartridge.main(argv)
+
+        # Assert
+        baked = recorded["bake"]
+        assert baked[baked.index("--denoise") + 1] == "2"
+
+    def test_a_named_rung_measures_nothing_unless_asked(self, movie, recorded):
+        # Arrange
+        argv = [str(movie), "--quality", "q17"]
+
+        # Act
+        cartridge.main(argv)
+
+        # Assert
+        assert "--denoise" not in recorded["bake"]
+
+    def test_a_negative_strength_is_refused(self, movie):
+        # Arrange
+        argv = [str(movie), "--denoise", "-1"]
+
+        # Act
+        with pytest.raises(SystemExit) as refused:
+            cartridge.main(argv)
+
+        # Assert
+        assert refused.value.code == 2
+
+    def test_auto_measures_the_strength_on_the_film(self, monkeypatch, tmp_path):
+        # Arrange
+        calls: list[list[str]] = []
+        monkeypatch.setattr(cartridge.bake, "main", lambda argv: calls.append(list(argv)) or 0)
+        source = ROOT / "fmv-core-python" / "fixtures" / "synthetic.mp4"
+        argv = [str(source), "--quality", "q17", "--denoise", "auto", "--bake-only"]
+
+        # Act
+        cartridge.main([*argv, "--build-dir", str(tmp_path)])
+
+        # Assert
+        baked = calls[0]
+        assert float(baked[baked.index("--denoise") + 1]) == 0.0

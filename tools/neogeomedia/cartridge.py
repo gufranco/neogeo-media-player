@@ -19,7 +19,7 @@ from pathlib import Path
 
 from fmvcore import arguments, ffmpeg
 
-from neogeomedia import bake, frames, limits, probe, quality, tiercache
+from neogeomedia import bake, denoise, frames, limits, probe, quality, tiercache
 
 BUILD_SCRIPT = Path(__file__).resolve().parents[2] / "toolchain" / "build-in-docker.sh"
 CARTRIDGE_NAME = "neogeomedia.neo"
@@ -72,6 +72,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="ordered threshold across palette entries, to break up banding",
     )
     parser.add_argument(
+        "--denoise",
+        type=arguments.number_or_auto(low=0.0, high=limits.MAX_DENOISE, name="--denoise"),
+        default=None,
+        help="a strength, or auto to measure it on the film. Default: auto with search",
+    )
+    parser.add_argument(
         "--bake-only", action="store_true", help="stop after the bake, before the ROM build"
     )
     return parser.parse_args(argv)
@@ -113,7 +119,22 @@ def bake_argv(args: argparse.Namespace) -> list[str]:
         argv += ["--preview", str(args.preview)]
     if args.dither:
         argv += ["--dither"]
+    if args.denoise not in (None, arguments.AUTO):
+        argv += ["--denoise", str(args.denoise)]
     return argv
+
+
+def _settle_denoise(args: argparse.Namespace) -> None:
+    info = ffmpeg.probe(args.source)
+    span = args.duration if args.duration is not None else max(0.0, info.duration - args.start)
+    window = min(denoise.WINDOW_SECONDS, span)
+    start = args.start + max(0.0, (span - window) / 2.0)
+    tier = quality.tier_by_name(args.quality)
+    scores = denoise.measure(args.source, tier, start=start, window=window)
+    chosen = denoise.choose(scores)
+    measured = ", ".join(f"{score.strength:g}: {score.error:.5f}" for score in scores)
+    print(f"denoise {chosen.strength:g}, blurred error by strength {measured}", file=sys.stderr)
+    args.denoise = str(chosen.strength)
 
 
 def _measured_tier(args: argparse.Namespace) -> quality.Tier | None:
@@ -194,6 +215,10 @@ def main(argv: list[str] | None = None) -> int:
             return 3
         print(f"measured choice: {tier.name}", file=sys.stderr)
         args.quality = tier.name
+        args.denoise = arguments.AUTO if args.denoise is None else args.denoise
+
+    if args.denoise == arguments.AUTO:
+        _settle_denoise(args)
 
     print(f"baking {args.source}", file=sys.stderr)
     status = bake.main(bake_argv(args))

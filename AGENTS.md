@@ -81,7 +81,8 @@ error and the tiles a second the bake may spend. The ceilings sit 15% above
 what the films measured on 2026-10-15, so a change has to make the picture
 or the dictionary measurably worse to fail, and ffmpeg differing slightly
 between this Mac and the runner does not. Only the synthetic film is
-committed; the rest are fetched and verified by SHA-256.
+committed, in the core submodule as `fixtures/synthetic.mp4`; the rest are
+fetched and verified by SHA-256.
 
 [`tools/tests/test_golden.py`](tools/tests/test_golden.py) pins the encoder
 on a synthetic clip built in memory, so it does not depend on ffmpeg at all:

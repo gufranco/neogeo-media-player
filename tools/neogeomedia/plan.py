@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fmvcore import ffmpeg
 
-from neogeomedia import bake, calibrate, frames, quality
+from neogeomedia import calibrate, frames, quality, soundtrack
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
@@ -48,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
             width=info.width,
             height=info.height,
             source_fps=float(info.fps),
-            has_audio=bake.has_audio_stream(args.source),
+            has_audio=soundtrack.has_audio_stream(args.source),
             reference_rate=rate,
             vblank_fps=float(frames.VBLANK_FPS),
             anchors=anchors,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from neogeomedia import bake, cartridge, limits
+from neogeomedia import bakeargs, cartridge, limits
 
 SOURCE = ["--source", "clip.mp4"]
 
@@ -50,7 +50,7 @@ class TestTheBakeRefusesValuesOutsideTheirRange:
         argv = [*SOURCE, flag, value]
 
         # Act
-        complaint = refusal(bake._parse_args, argv, capsys)
+        complaint = refusal(bakeargs.parse_args, argv, capsys)
 
         # Assert
         assert message in complaint
@@ -60,7 +60,7 @@ class TestTheBakeRefusesValuesOutsideTheirRange:
         argv = [*SOURCE, "--start", "1.5", "--duration", "5", "--audio-rate", "22050"]
 
         # Act
-        args = bake._parse_args(argv)
+        args = bakeargs.parse_args(argv)
 
         # Assert
         assert (args.start, args.duration, args.audio_rate) == (1.5, 5.0, 22050.0)

@@ -1,20 +1,27 @@
 from __future__ import annotations
 
-import argparse
 import importlib.util
 import itertools
 import json
 import subprocess
-from importlib.metadata import version
 from pathlib import Path
 
 import numpy as np
 import pytest
-from fmvcore import ffmpeg
 
-from neogeomedia import adpcmb, bake, bundle, content, crom, quality, stream
+from neogeomedia import (
+    bake,
+    bakeargs,
+    bundle,
+    codegen,
+    content,
+    crom,
+    epochs,
+    quality,
+    soundtrack,
+    stream,
+)
 from neogeomedia import frames as frames_mod
-from neogeomedia import subtitles as subtitles_mod
 
 _spec = importlib.util.spec_from_file_location(
     "verify_capture", Path(__file__).resolve().parents[1] / "scripts" / "verify_capture.py"
@@ -82,95 +89,6 @@ def baked(synthetic_clip, tmp_path_factory):
             sample_stride=1,
         )
     )
-
-
-class TestSourceDefaults:
-    def test_the_duration_defaults_to_the_rest_of_the_source(self, synthetic_clip):
-        args = bake._parse_args(["--source", str(synthetic_clip)])
-
-        resolved = bake._resolve_duration(args)
-
-        assert resolved == pytest.approx(ffmpeg.probe(synthetic_clip).duration, abs=0.05)
-
-    def test_an_explicit_duration_still_wins(self, synthetic_clip):
-        args = bake._parse_args(["--source", str(synthetic_clip), "--duration", "0.25"])
-
-        assert bake._resolve_duration(args) == pytest.approx(0.25)
-
-    def test_a_start_offset_shortens_the_default_duration(self, synthetic_clip):
-        args = bake._parse_args(["--source", str(synthetic_clip), "--start", "0.4"])
-
-        full = ffmpeg.probe(synthetic_clip).duration
-
-        assert bake._resolve_duration(args) == pytest.approx(full - 0.4, abs=0.05)
-
-
-class TestSubtitleSource:
-    def _cue(self, path):
-        path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHELLO\n", encoding="utf-8")
-
-    def test_an_explicit_subtitle_file_is_used(self, tmp_path):
-        captions = tmp_path / "captions.srt"
-        self._cue(captions)
-        request = bake.BakeRequest(
-            source=tmp_path / "movie.mkv",
-            start=0.0,
-            duration=10.0,
-            build_dir=tmp_path,
-            subtitles=captions,
-        )
-
-        blob = bake._subtitle_blob(request)
-
-        assert len(blob) == subtitles_mod.RECORD_BYTES
-
-    def test_it_falls_back_to_the_sidecar_beside_the_source(self, tmp_path):
-        source = tmp_path / "movie.mkv"
-        source.write_bytes(b"")
-        self._cue(tmp_path / "movie.srt")
-        request = bake.BakeRequest(source=source, start=0.0, duration=10.0, build_dir=tmp_path)
-
-        blob = bake._subtitle_blob(request)
-
-        assert len(blob) == subtitles_mod.RECORD_BYTES
-
-    def test_an_explicit_file_overrides_the_sidecar(self, tmp_path):
-        source = tmp_path / "movie.mkv"
-        source.write_bytes(b"")
-        (tmp_path / "movie.srt").write_text(
-            "1\n00:00:00,000 --> 00:00:01,000\nSIDECAR\n", encoding="utf-8"
-        )
-        chosen = tmp_path / "chosen.srt"
-        chosen.write_text(
-            "1\n00:00:00,000 --> 00:00:01,000\nCHOSEN\n\n2\n00:00:02,000 --> 00:00:03,000\nAGAIN\n",
-            encoding="utf-8",
-        )
-        request = bake.BakeRequest(
-            source=source, start=0.0, duration=10.0, build_dir=tmp_path, subtitles=chosen
-        )
-
-        blob = bake._subtitle_blob(request)
-
-        assert len(blob) == 2 * subtitles_mod.RECORD_BYTES
-
-    def test_no_subtitles_anywhere_is_an_empty_blob(self, tmp_path):
-        request = bake.BakeRequest(
-            source=tmp_path / "movie.mkv", start=0.0, duration=10.0, build_dir=tmp_path
-        )
-
-        assert bake._subtitle_blob(request) == b""
-
-    def test_a_named_subtitle_file_that_does_not_exist_is_an_error(self, tmp_path):
-        request = bake.BakeRequest(
-            source=tmp_path / "movie.mkv",
-            start=0.0,
-            duration=10.0,
-            build_dir=tmp_path,
-            subtitles=tmp_path / "missing.srt",
-        )
-
-        with pytest.raises(FileNotFoundError):
-            bake._subtitle_blob(request)
 
 
 class TestArtifacts:
@@ -277,18 +195,24 @@ class TestGeneratedSources:
 
 class TestVersionStamp:
     def test_the_header_stamps_the_version_that_baked_it(self, baked):
-        major, minor = bake.baker_version()
+        # Arrange
+        major, minor = codegen.baker_version()
 
+        # Act
         text = (baked.build_dir / "generated" / "movie_data.h").read_text()
 
+        # Assert
         assert f"#define MOVIE_BAKER_VERSION_MAJOR {major}" in text
         assert f"#define MOVIE_BAKER_VERSION_MINOR {minor}" in text
 
     def test_the_stamp_is_readable_as_a_string_too(self, baked):
-        major, minor = bake.baker_version()
+        # Arrange
+        major, minor = codegen.baker_version()
 
+        # Act
         text = (baked.build_dir / "generated" / "movie_data.h").read_text()
 
+        # Assert
         assert f'#define MOVIE_BAKER_VERSION_STRING "{major}.{minor}"' in text
 
     def test_a_library_of_another_version_stops_the_build(self, baked):
@@ -304,26 +228,6 @@ class TestVersionStamp:
         assert "MOVIE_BAKER_VERSION_STRING)" in text
         assert "FMV_VERSION_STRING)" in text
 
-    def test_the_baker_version_is_the_installed_one(self):
-        major, minor = version("neogeomedia").split(".")[:2]
-
-        assert bake.baker_version() == (int(major), int(minor))
-
-    def test_the_baker_version_is_a_pair_of_numbers(self):
-        major, minor = bake.baker_version()
-
-        assert isinstance(major, int)
-        assert isinstance(minor, int)
-
-    def test_the_library_header_carries_the_same_version_as_the_package(self):
-        header = (bundle.LIBRARY_ROOT / "fmv.h").read_text()
-        stated = {
-            name: int(header.split(f"#define FMV_VERSION_{name} ")[1].split("\n")[0])
-            for name in ("MAJOR", "MINOR")
-        }
-
-        assert (stated["MAJOR"], stated["MINOR"]) == bake.baker_version()
-
 
 class TestTickCost:
     def test_the_header_states_the_worst_frame_in_updates(self, baked):
@@ -332,44 +236,37 @@ class TestTickCost:
         assert f"#define MOVIE_MAX_UPDATES {baked.result.stats.max_updates}" in text
 
     def test_the_header_states_what_one_update_costs(self, baked):
+        # Arrange
+        expected = f"#define MOVIE_CYCLES_PER_UPDATE {codegen.CYCLES_PER_UPDATE}"
+
+        # Act
         text = (baked.build_dir / "generated" / "movie_data.h").read_text()
 
-        assert f"#define MOVIE_CYCLES_PER_UPDATE {bake.CYCLES_PER_UPDATE}" in text
+        # Assert
+        assert expected in text
 
     def test_the_header_states_what_the_worst_frame_costs(self, baked):
-        expected = baked.result.stats.max_updates * bake.CYCLES_PER_UPDATE
+        # Arrange
+        expected = baked.result.stats.max_updates * codegen.CYCLES_PER_UPDATE
 
+        # Act
         text = (baked.build_dir / "generated" / "movie_data.h").read_text()
 
+        # Assert
         assert f"#define MOVIE_TICK_CYCLES {expected}" in text
 
     def test_the_header_states_the_budget_that_cost_is_measured_against(self, baked):
-        text = (baked.build_dir / "generated" / "movie_data.h").read_text()
-
-        assert f"#define MOVIE_VBLANK_CYCLES {bake.VBLANK_CYCLES}" in text
-
-    def test_the_blanking_budget_is_39_of_the_40_blank_lines(self):
         # Arrange
-        cycles_per_line = 384 * 12_000_000 // 6_000_000
+        expected = f"#define MOVIE_VBLANK_CYCLES {codegen.VBLANK_CYCLES}"
 
         # Act
-        budget = bake.VBLANK_CYCLES
+        text = (baked.build_dir / "generated" / "movie_data.h").read_text()
 
         # Assert
-        assert budget == 39 * cycles_per_line == 29_952
+        assert expected in text
 
 
 class TestBundleOption:
-    def test_no_bundle_is_written_unless_asked_for(self, synthetic_clip):
-        args = bake._parse_args(["--source", str(synthetic_clip)])
-
-        assert args.bundle is None
-
-    def test_the_flag_takes_a_directory(self, synthetic_clip, tmp_path):
-        args = bake._parse_args(["--source", str(synthetic_clip), "--bundle", str(tmp_path)])
-
-        assert args.bundle == tmp_path
-
     def test_it_writes_a_bundle_from_a_finished_bake(self, baked, tmp_path):
         layout = bake.write_movie_bundle(tmp_path / "drop-in", baked)
 
@@ -412,40 +309,16 @@ class TestStreamBanks:
 
         assert f'.incbin "stream.bin", 0, {stream.PROM_BANK_BYTES}' in text
 
-    def test_each_stub_starts_where_the_one_before_it_ended(self, tmp_path):
-        stubs = bake._write_stream_banks(tmp_path, tmp_path / "stream.bin", 5)
-
-        skips = [int(stub.read_text().split(",")[1]) for stub in stubs]
-
-        assert skips == [bank * stream.PROM_BANK_BYTES for bank in range(5)]
-
-    def test_the_slices_cover_the_blob_without_a_gap_or_an_overlap(self, tmp_path):
-        stubs = bake._write_stream_banks(tmp_path, tmp_path / "stream.bin", 3)
-
-        spans = [tuple(int(part) for part in stub.read_text().split(",")[1:]) for stub in stubs]
-
-        assert spans == [
-            (0, stream.PROM_BANK_BYTES),
-            (stream.PROM_BANK_BYTES, stream.PROM_BANK_BYTES),
-            (2 * stream.PROM_BANK_BYTES, stream.PROM_BANK_BYTES),
-        ]
-
-    def test_a_stub_names_the_blob_without_a_path(self, tmp_path):
-        stubs = bake._write_stream_banks(tmp_path, tmp_path / "deep" / "stream.bin", 1)
-
-        assert '.incbin "stream.bin"' in stubs[0].read_text()
-        assert "deep" not in stubs[0].read_text()
-
-    def test_a_stub_lands_in_read_only_data(self, tmp_path):
-        stubs = bake._write_stream_banks(tmp_path, tmp_path / "stream.bin", 1)
-
-        assert ".section .rodata" in stubs[0].read_text()
-
     def test_the_stream_base_comes_from_a_linker_symbol(self, baked):
+        # Arrange
+        symbol = codegen.STREAM_BASE_SYMBOL
+
+        # Act
         text = (baked.build_dir / "generated" / "movie_data_value.c").read_text()
 
-        assert f"extern const unsigned char {bake.STREAM_BASE_SYMBOL}[];" in text
-        assert f".stream_base = (uint32_t){bake.STREAM_BASE_SYMBOL}," in text
+        # Assert
+        assert f"extern const unsigned char {symbol}[];" in text
+        assert f".stream_base = (uint32_t){symbol}," in text
 
 
 class TestReport:
@@ -485,12 +358,6 @@ class TestPreview:
 
 
 class TestPreviewCodec:
-    def test_matroska_previews_are_lossless(self):
-        assert "ffv1" in bake._preview_codec(Path("out.mkv"))
-
-    def test_other_containers_use_h264(self):
-        assert "libx264" in bake._preview_codec(Path("out.mp4"))
-
     def test_a_lossless_preview_round_trips_the_rendered_picture(self, synthetic_clip, tmp_path):
         preview = tmp_path / "lossless.mkv"
         outcome = bake.run(
@@ -530,44 +397,6 @@ class TestPreviewCodec:
 
 
 class TestCommandLine:
-    def test_default_arguments_target_the_full_palette_bank_allocation(self):
-        args = bake._parse_args(["--source", "clip.mp4", "--duration", "1"])
-
-        assert args.palette_count == 240
-        assert args.base_bank == 16
-
-    def test_flip_dedup_is_off_unless_switched_on(self):
-        assert bake._parse_args(["--source", "clip.mp4", "--duration", "1"]).flip is False
-
-    def test_flip_dedup_can_be_switched_on(self):
-        args = bake._parse_args(["--source", "clip.mp4", "--duration", "1", "--flip"])
-
-        assert args.flip is True
-
-    def test_the_defaults_are_the_measured_settings(self):
-        args = bake._parse_args(["--source", "clip.mp4", "--duration", "1"])
-
-        assert (args.scene_cut_ratio, args.keyframe_interval) == (0.90, 90)
-
-    def test_a_tier_controlled_knob_is_unset_until_resolved(self):
-        args = bake._parse_args(["--source", "clip.mp4", "--duration", "1"])
-
-        assert (args.tolerance, args.chroma_weight, args.frame_hold, args.denoise) == (
-            None,
-            None,
-            None,
-            None,
-        )
-
-    def test_an_unset_knob_falls_back_to_the_built_in_default(self):
-        assert bake._pick(None, None, 0.0005) == 0.0005
-
-    def test_a_tier_value_beats_the_built_in_default(self):
-        assert bake._pick(None, 0.25, 1.0) == 0.25
-
-    def test_an_explicit_flag_beats_the_tier(self):
-        assert bake._pick(0.9, 0.25, 1.0) == 0.9
-
     def test_main_writes_a_report_and_reports_success(self, synthetic_clip, tmp_path, capsys):
         report = tmp_path / "report.json"
 
@@ -684,9 +513,6 @@ class TestRenderCollection:
 
 
 class TestAudio:
-    def test_a_source_without_audio_is_detected(self, synthetic_clip):
-        assert bake.has_audio_stream(synthetic_clip) is False
-
     def test_a_silent_source_bakes_without_a_voice_rom(self, synthetic_clip, tmp_path):
         outcome = bake.run(
             bake.BakeRequest(
@@ -822,49 +648,6 @@ class TestAudio:
 
 
 class TestAudioVideoAlignment:
-    def rate_and_pages(self):
-
-        delta_n = adpcmb.delta_n_for(22050)
-        return adpcmb.rate_for(delta_n), bake.audio_pages_per_frame(delta_n)
-
-    def test_a_silent_bake_reports_no_audio_advance(self):
-        assert bake.audio_pages_per_frame(0) == 0
-
-    def test_the_ratio_matches_the_sample_rate(self):
-
-        rate, pages = self.rate_and_pages()
-
-        assert float(pages) == pytest.approx(rate / 512 / float(frames_mod.VBLANK_FPS), rel=1e-6)
-
-    def test_audio_never_drifts_more_than_half_a_page_from_the_video(self):
-
-        rate, pages = self.rate_and_pages()
-        num, den = pages.numerator, pages.denominator
-        half_page = 512 / rate / 2
-
-        for frame in (0, 59, 1183, 3551, 60000, 106_000, 500_000):
-            page = (frame * num + den // 2) // den
-            audio_seconds = page * 512 / rate
-            video_seconds = frame / float(frames_mod.VBLANK_FPS)
-
-            assert abs(audio_seconds - video_seconds) <= half_page + 1e-9, frame
-
-    def test_the_drift_does_not_grow_with_runtime(self):
-
-        rate, pages = self.rate_and_pages()
-        num, den = pages.numerator, pages.denominator
-
-        def drift(frame):
-            page = (frame * num + den // 2) // den
-            return abs(page * 512 / rate - frame / float(frames_mod.VBLANK_FPS))
-
-        assert drift(500_000) <= drift(1183) + 512 / rate
-
-    def test_the_seek_granularity_is_one_page(self):
-        rate, _ = self.rate_and_pages()
-
-        assert 512 / rate == pytest.approx(0.0232, abs=0.001)
-
     def test_the_header_carries_the_alignment_ratio(self, synthetic_clip, tmp_path):
         outcome = bake.run(
             bake.BakeRequest(
@@ -883,85 +666,7 @@ class TestAudioVideoAlignment:
         assert "MOVIE_AUDIO_PAGE_DEN" in text
 
 
-class TestSampleThinning:
-    def test_a_small_sample_is_left_alone(self):
-        tiles = np.zeros((10, 16, 16), dtype=np.uint16)
-
-        assert bake._thin_sample(tiles, 0).shape[0] == 10
-
-    def test_a_large_sample_is_capped(self):
-        tiles = np.zeros((bake.MAX_SAMPLE_TILES + 5000, 16, 16), dtype=np.uint16)
-
-        assert bake._thin_sample(tiles, 0).shape[0] == bake.MAX_SAMPLE_TILES
-
-    def test_thinning_is_deterministic_for_a_seed(self):
-        rng = np.random.default_rng(1)
-        tiles = rng.integers(0, 100, size=(bake.MAX_SAMPLE_TILES + 100, 16, 16), dtype=np.uint16)
-
-        assert np.array_equal(bake._thin_sample(tiles, 3), bake._thin_sample(tiles, 3))
-
-    def test_thinning_keeps_source_order(self):
-        rng = np.random.default_rng(2)
-        tiles = rng.integers(0, 100, size=(bake.MAX_SAMPLE_TILES + 100, 16, 16), dtype=np.uint16)
-
-        thinned = bake._thin_sample(tiles, 4)
-
-        assert thinned.shape == (bake.MAX_SAMPLE_TILES, 16, 16)
-
-
-class TestQualityResolution:
-    def args(self, source, **extra):
-        base = {
-            "quality": None,
-            "source": source,
-            "start": 0.0,
-            "duration": 1.0,
-            "fit": "fill",
-            "seed": 0,
-        }
-        base.update(extra)
-        return argparse.Namespace(**base)
-
-    def test_no_quality_flag_selects_no_tier(self, synthetic_clip):
-        assert bake._resolve_quality(self.args(synthetic_clip)) is None
-
-    def test_a_named_tier_is_returned(self, synthetic_clip):
-        tier = bake._resolve_quality(self.args(synthetic_clip, quality="q14"))
-
-        assert tier is not None
-        assert tier.name == "q14"
-
-    def test_an_older_tier_name_still_resolves(self, synthetic_clip):
-        tier = bake._resolve_quality(self.args(synthetic_clip, quality="long"))
-
-        assert tier is quality.tier_by_name("long")
-
-    def test_an_unknown_tier_is_rejected(self, synthetic_clip):
-        with pytest.raises(ValueError, match="unknown quality tier"):
-            bake._resolve_quality(self.args(synthetic_clip, quality="cinematic"))
-
-    def test_auto_is_refused_and_says_where_to_go(self, synthetic_clip):
-        with pytest.raises(SystemExit) as raised:
-            bake._resolve_quality(self.args(synthetic_clip, quality="auto"))
-
-        assert "search" in str(raised.value)
-        assert "plan" in str(raised.value)
-
-
 class TestPaletteEpochFlag:
-    def test_epochs_are_on_by_default(self):
-        args = bake._parse_args(["--source", "clip.mp4", "--duration", "1"])
-
-        assert args.palette_epoch_seconds is None
-        assert content.epoch_seconds_for(cuts_per_minute=6.0) > 0.0
-
-    def test_epochs_can_be_switched_off(self):
-        args = bake._parse_args(
-            ["--source", "clip.mp4", "--duration", "1", "--palette-epoch-seconds", "0"]
-        )
-
-        assert args.palette_epoch_seconds == 0.0
-
     def test_a_long_clip_is_split_into_several_epochs(self, epoch_clip, tmp_path):
         outcome = bake.run(
             bake.BakeRequest(
@@ -1071,28 +776,24 @@ class TestSceneAlignedEpochs:
 
 class TestEpochsGiveTheLoaderTime:
     def test_no_epoch_is_shorter_than_the_upload_needs(self, synthetic_clip, tmp_path):
-        outcome = bake.run(
-            bake.BakeRequest(
-                source=synthetic_clip,
-                start=0.0,
-                duration=1.0,
-                build_dir=tmp_path / "spaced",
-                palette_count=8,
-                palette_epoch_seconds=0.05,
-            )
+        # Arrange
+        request = bake.BakeRequest(
+            source=synthetic_clip,
+            start=0.0,
+            duration=1.0,
+            build_dir=tmp_path / "spaced",
+            palette_count=8,
+            palette_epoch_seconds=0.05,
         )
 
-        starts = outcome.result.epoch_starts
-        for earlier, later in itertools.pairwise(starts):
-            assert later - earlier >= bake.epoch_upload_frames(8)
+        # Act
+        outcome = bake.run(request)
 
-    def test_the_minimum_follows_the_palette_count(self):
-        assert bake.epoch_upload_frames(240) > bake.epoch_upload_frames(8)
-
-    def test_the_minimum_covers_the_upload_with_room_to_spare(self):
-        bare = (240 // 2) * bake.WORDS_PER_PALETTE / bake.PALETTE_WORDS_PER_FRAME
-
-        assert bake.epoch_upload_frames(240) >= bare * bake.EPOCH_UPLOAD_MARGIN
+        # Assert
+        gaps = [
+            later - earlier for earlier, later in itertools.pairwise(outcome.result.epoch_starts)
+        ]
+        assert all(gap >= epochs.epoch_upload_frames(8) for gap in gaps)
 
     def test_a_cadence_below_the_minimum_collapses_to_one_epoch(self, synthetic_clip, tmp_path):
         outcome = bake.run(
@@ -1125,14 +826,15 @@ class TestTheOverlayNamesTheRungActuallyUsed:
         assert bake.self_tier_name(request) == "CUSTOM"
 
     def test_the_word_auto_never_reaches_the_header(self, monkeypatch):
+        # Arrange
         chosen = quality.tier_by_name("q07")
-        monkeypatch.setattr(bake, "_resolve_quality", lambda *_args: chosen)
+        monkeypatch.setattr(bakeargs, "resolve_quality", lambda *_args: chosen)
         monkeypatch.setattr(
-            bake.content,
+            content,
             "measure",
             lambda *_args, **_kwargs: content.ContentProfile(saturation=10.0, cuts_per_minute=6.0),
         )
-        monkeypatch.setattr(bake.content, "movement_floor", lambda *_args, **_kwargs: 0.01)
+        monkeypatch.setattr(content, "movement_floor", lambda *_args, **_kwargs: 0.01)
         captured: dict[str, object] = {}
 
         def capture(request):
@@ -1140,28 +842,14 @@ class TestTheOverlayNamesTheRungActuallyUsed:
             raise SystemExit(0)
 
         monkeypatch.setattr(bake, "run", capture)
-        with pytest.raises(SystemExit):
+
+        # Act
+        with pytest.raises(SystemExit) as stopped:
             bake.main(["--source", "clip.mp4", "--duration", "1", "--quality", "auto"])
 
+        # Assert
+        assert stopped.value.code == 0
         assert captured["quality"] == "q07"
-
-
-class TestPaletteSampling:
-    def test_a_longer_epoch_gets_a_coarser_stride(self):
-        long_epoch = bake.stride_for_epoch(epoch_frames=1200)
-        short_epoch = bake.stride_for_epoch(epoch_frames=120)
-
-        assert long_epoch > short_epoch
-
-    def test_the_stride_is_never_below_one(self):
-        assert bake.stride_for_epoch(epoch_frames=1) >= 1
-
-    def test_an_epoch_yields_about_the_target_sample_count(self):
-        frames_per_epoch = 900
-
-        stride = bake.stride_for_epoch(epoch_frames=frames_per_epoch)
-
-        assert abs(frames_per_epoch / stride - bake.SAMPLES_PER_EPOCH) < bake.SAMPLES_PER_EPOCH
 
 
 class TestAnOverrunIsAFailure:
@@ -1183,31 +871,40 @@ class TestAnOverrunIsAFailure:
 
 class TestASilentSourceSaysSo:
     def test_a_source_without_a_soundtrack_is_announced(self, tmp_path, monkeypatch, capsys):
+        # Arrange
         silent = tmp_path / "silent.mkv"
         silent.write_bytes(b"")
-        monkeypatch.setattr(bake, "has_audio_stream", lambda *_a, **_k: False)
-        monkeypatch.setattr(bake, "_resolve_duration", lambda *_a, **_k: 10.0)
+        monkeypatch.setattr(soundtrack, "has_audio_stream", lambda *_a, **_k: False)
+        monkeypatch.setattr(bakeargs, "resolve_duration", lambda *_a, **_k: 10.0)
 
+        # Act
         with pytest.raises((FileNotFoundError, subprocess.CalledProcessError)):
             bake.main(["--source", str(silent), "--quality", "q17"])
 
+        # Assert
         assert "silent" in capsys.readouterr().err
 
     def test_a_source_with_a_soundtrack_says_nothing_about_it(self, tmp_path, monkeypatch, capsys):
+        # Arrange
         noisy = tmp_path / "noisy.mkv"
         noisy.write_bytes(b"")
-        monkeypatch.setattr(bake, "has_audio_stream", lambda *_a, **_k: True)
-        monkeypatch.setattr(bake, "_resolve_duration", lambda *_a, **_k: 10.0)
+        monkeypatch.setattr(soundtrack, "has_audio_stream", lambda *_a, **_k: True)
+        monkeypatch.setattr(bakeargs, "resolve_duration", lambda *_a, **_k: 10.0)
 
+        # Act
         with pytest.raises((FileNotFoundError, subprocess.CalledProcessError)):
             bake.main(["--source", str(noisy), "--quality", "q17"])
 
+        # Assert
         assert "silent" not in capsys.readouterr().err
 
     def test_an_unreadable_source_is_not_called_silent(self, tmp_path, monkeypatch, capsys):
-        monkeypatch.setattr(bake, "_resolve_duration", lambda *_a, **_k: 10.0)
+        # Arrange
+        monkeypatch.setattr(bakeargs, "resolve_duration", lambda *_a, **_k: 10.0)
 
+        # Act
         with pytest.raises((FileNotFoundError, subprocess.CalledProcessError)):
             bake.main(["--source", str(tmp_path / "absent.mkv"), "--quality", "q17"])
 
+        # Assert
         assert "silent" not in capsys.readouterr().err

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from neogeomedia import bake, stamp
+from neogeomedia import codegen, stamp
 
 HEADER = """#ifndef FMV_H
 #define FMV_H
@@ -71,7 +71,11 @@ class TestTheShippedHeader:
         assert stamp.restamp(text) == text
 
     def test_it_states_the_version_the_package_states(self):
-        text = stamp.HEADER.read_text()
-        major, minor = bake.baker_version()
+        # Arrange
+        major, minor = codegen.baker_version()
 
+        # Act
+        text = stamp.HEADER.read_text()
+
+        # Assert
         assert f'#define FMV_VERSION "{major}.{minor}.' in text

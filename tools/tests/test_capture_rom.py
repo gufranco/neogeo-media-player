@@ -138,3 +138,71 @@ class TestCapture:
 
         # Assert
         assert refused.value.code == 2
+
+
+class TestHeldButtons:
+    def test_a_hold_maps_neo_geo_buttons_to_geolith_bindings(self, capture_rom):
+        # Arrange
+        text = "40:a+start"
+
+        # Act
+        held = capture_rom.parse_hold(text)
+
+        # Assert
+        assert held == (40, frozenset({capture_rom.Joypad.B, capture_rom.Joypad.START}))
+
+    def test_an_unknown_button_is_refused(self, capture_rom):
+        # Arrange
+        text = "40:z"
+
+        # Act
+        with pytest.raises(capture_rom.argparse.ArgumentTypeError) as refused:
+            capture_rom.parse_hold(text)
+
+        # Assert
+        assert str(refused.value) == (
+            "unknown button 'z'; use a, b, c, d, down, left, right, select, start, up"
+        )
+
+    def test_a_hold_without_a_frame_is_refused(self, capture_rom):
+        # Arrange
+        text = "start"
+
+        # Act
+        with pytest.raises(capture_rom.argparse.ArgumentTypeError) as refused:
+            capture_rom.parse_hold(text)
+
+        # Assert
+        assert str(refused.value) == "a hold reads FRAME:BUTTON[+BUTTON], got 'start'"
+
+    def test_held_buttons_reach_the_core(self, capture_rom, core, cartridge, tmp_path):
+        # Arrange
+        out = tmp_path / "held.png"
+        argv = ["--frames", "2", "--rom", str(cartridge), "--core", str(core)]
+
+        # Act
+        capture_rom.main([*argv, "--system-dir", str(tmp_path), "--out", str(out), "--hold", "1:c"])
+
+        # Assert
+        assert decoded(out)[1] == 1 << capture_rom.Joypad.Y
+
+
+class TestSavedFrames:
+    def test_each_saved_frame_is_written_beside_the_output(
+        self, capture_rom, core, cartridge, tmp_path
+    ):
+        # Arrange
+        out = tmp_path / "shot.png"
+        argv = ["--frames", "3", "--rom", str(cartridge), "--core", str(core)]
+
+        # Act
+        capture_rom.main(
+            [*argv, "--system-dir", str(tmp_path), "--out", str(out), "--save", "0", "--save", "1"]
+        )
+
+        # Assert
+        assert sorted(p.name for p in tmp_path.glob("shot*.png")) == [
+            "shot-00000.png",
+            "shot-00001.png",
+            "shot.png",
+        ]

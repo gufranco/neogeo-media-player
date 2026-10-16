@@ -133,12 +133,12 @@ none does today.
 | Play and pause | Yes | Planned |
 | Fast forward and rewind | Yes, forward at 2x, 5x and 10x | Planned |
 | Seek | Yes, 10 seconds back or forward | Planned |
-| A position bar with elapsed and total time | Yes. The total reads one second short | Planned |
-| Restart and stop | Planned | Yes |
-| Sound on and off | Planned | Planned |
+| A position bar with elapsed and total time | Yes | Planned |
+| Restart and stop | Yes | Yes |
+| Sound on and off | Yes | Planned |
 | The film loops at the end | Yes | Yes |
 | A diagnostics overlay | Yes | Planned |
-| A fault screen for a corrupt stream | Planned | Yes |
+| A fault screen for a corrupt stream | Yes | Yes |
 | A film inside your own game | Yes, `--bundle` emits a drop-in library | Partly. `--rows` and `--columns` build a smaller picture; there is no drop-in bundle yet |
 | A preview of what the console will draw | Yes, a video | Yes, four frames beside their source |
 | A write-timing gate on every build | Yes | Yes |
@@ -265,6 +265,22 @@ That measures the source, settles the highest quality rung that fits a cartridge
 ### Running it
 
 On hardware, copy `build/neogeomedia.neo` to a NeoSD flash cart and load it like any other title.
+
+The film starts playing on its own. The controls show on any press and step out of the picture a few seconds later:
+
+| Button | What it does |
+|:-------|:-------------|
+| A | Pause and play |
+| B | Play at normal speed |
+| Right | Fast forward, 2x, then 5x, then 10x |
+| Left | Rewind |
+| C, D | Seek 10 seconds back, or forward |
+| Up | Sound on and off |
+| Down | Subtitles on and off |
+| Start | Stop on a black screen. Start, A or B then plays from the beginning |
+| Select | The diagnostics overlay |
+
+A corrupt stream stops the film on a red screen rather than drawing garbage.
 
 Under MAME, point it at the archive and the hash file the build wrote, with the BIOS directory on the ROM path:
 
@@ -495,8 +511,8 @@ The C library surface is [`fmv.h`](src/fmv/fmv.h):
 | Promised | Not promised |
 |:---------|:-------------|
 | `fmv_defaults`, `fmv_play` | The layout of `fmv_movie` and `fmv_player`. They are declared so a caller can allocate them, not so it can read them |
-| `fmv_open`, `fmv_start`, `fmv_tick`, `fmv_hold`, `fmv_pause`, `fmv_resume`, `fmv_seek`, `fmv_close` | Anything under [`src/fmv/`](src/fmv) other than `fmv.h`. `hw.h` is internal and moves without notice |
-| `fmv_ended`, `fmv_position`, `fmv_last_updates`, `fmv_epoch`, `fmv_stream_bank` | The `MOVIE_` defines in the generated header, which describe one bake rather than an interface |
+| `fmv_open`, `fmv_start`, `fmv_tick`, `fmv_prepare`, `fmv_hold`, `fmv_pause`, `fmv_resume`, `fmv_seek`, `fmv_set_audio`, `fmv_close` | Anything under [`src/fmv/`](src/fmv) other than `fmv.h`. `hw.h` is internal and moves without notice |
+| `fmv_ended`, `fmv_faulted`, `fmv_position`, `fmv_last_updates`, `fmv_epoch`, `fmv_stream_bank` | The `MOVIE_` defines in the generated header, which describe one bake rather than an interface |
 | The fields of `fmv_options`, and their defaults | |
 | The `fmv.mk` variables a project reads: `FMV_OBJS`, `FMV_CFLAGS`, `FMV_LDFLAGS`, `FMV_CROM_BYTES`, `FMV_PROM2_BYTES`, `FMV_VROM_BYTES`, `FMV_FIRST_FREE_TILE`, `FMV_FIRST_BANK`, `FMV_AUDIO` | |
 

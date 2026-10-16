@@ -24,7 +24,8 @@
 
 typedef enum {
     FMV_FINISHED = 0,
-    FMV_SKIPPED = 1
+    FMV_SKIPPED = 1,
+    FMV_CORRUPT = 2
 } fmv_result;
 
 typedef struct {
@@ -84,8 +85,10 @@ typedef struct {
     uint16_t sprite_offset;
     uint16_t stream_bank;
     uint16_t updates;
+    uint32_t checked_frame;
     uint8_t audio_running;
     uint8_t open;
+    uint8_t faulted;
 } fmv_player;
 
 fmv_options fmv_defaults(void);
@@ -99,9 +102,12 @@ void fmv_hold(fmv_player *player);
 void fmv_pause(fmv_player *player);
 void fmv_resume(fmv_player *player);
 void fmv_seek(fmv_player *player, uint32_t frame);
+void fmv_prepare(fmv_player *player);
+void fmv_set_audio(fmv_player *player, int on);
 void fmv_close(fmv_player *player);
 
 int fmv_ended(const fmv_player *player);
+int fmv_faulted(const fmv_player *player);
 uint32_t fmv_position(const fmv_player *player);
 uint16_t fmv_last_updates(const fmv_player *player);
 uint16_t fmv_epoch(const fmv_player *player);

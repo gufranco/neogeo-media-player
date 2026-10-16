@@ -69,7 +69,7 @@ CFLAGS=(
     -Wall -Wextra -Werror
 )
 
-for unit in fmv/fmv fmv/fmv_audio fmv/timeline player/main player/menu; do
+for unit in fmv/fmv fmv/fmv_audio fmv/guard fmv/timeline player/main player/menu; do
     name="$(basename "$unit")"
     echo "CC src/$unit.c"
     retry_build m68k-neogeo-elf-gcc "${CFLAGS[@]}" -c "src/$unit.c" -o "$BUILD/$name.o"
@@ -80,7 +80,7 @@ retry_build m68k-neogeo-elf-gcc "${CFLAGS[@]}" -c "$GENERATED/movie_data_value.c
 
 echo "CHECK VRAM write spacing"
 DISASSEMBLIES=()
-for name in main menu fmv timeline fmv_audio; do
+for name in main menu fmv guard timeline fmv_audio; do
     m68k-neogeo-elf-objdump -dr "$BUILD/$name.o" > "$BUILD/$name.o.dis"
     DISASSEMBLIES+=("$BUILD/$name.o.dis")
 done
@@ -107,7 +107,7 @@ if [[ $((STREAM_FIRST_BANK + STREAM_BANKS)) -gt "$BANK_LIMIT" ]]; then
 fi
 
 COMMON_OBJECTS=(
-    "$BUILD/main.o" "$BUILD/menu.o" "$BUILD/fmv.o" "$BUILD/fmv_audio.o"
+    "$BUILD/main.o" "$BUILD/menu.o" "$BUILD/fmv.o" "$BUILD/fmv_audio.o" "$BUILD/guard.o"
     "$BUILD/timeline.o" "$BUILD/movie_data_value.o" "$BUILD/movie_data.o"
 )
 BANK_IMAGES=()

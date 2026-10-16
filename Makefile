@@ -8,7 +8,7 @@ BUILD        := build
 EXAMPLE      := $(BUILD)/example
 FMV_AUDIO    := no
 OBJECTS      := $(BUILD)/main.o $(BUILD)/menu.o $(BUILD)/fmv.o $(BUILD)/timeline.o \
-                $(BUILD)/fmv_audio.o
+                $(BUILD)/fmv_audio.o $(BUILD)/guard.o
 
 .PHONY: all image rom analyse timing cutscene hooks shell clean distclean
 all: rom

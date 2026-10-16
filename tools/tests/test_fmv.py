@@ -50,6 +50,7 @@ FMV_FIX_CART = 0
 FMV_FIX_BOARD = 1
 FMV_FINISHED = 0
 FMV_SKIPPED = 1
+FMV_CORRUPT = 2
 FMV_PAD_A = 0x10
 FMV_START = 0x01
 SOUND_PLAY = 0x50
@@ -132,7 +133,7 @@ def _build(tmp_path_factory, *, audio: bool):
     root = tmp_path_factory.mktemp(f"fmv-{name}")
     staged = _stage(root)
     library = root / f"libfmv-{name}.so"
-    sources = [staged / "fmv.c", staged / "timeline.c", staged / "probe.c"]
+    sources = [staged / "fmv.c", staged / "guard.c", staged / "timeline.c", staged / "probe.c"]
     if audio:
         sources.append(staged / "fmv_audio.c")
     command = [
@@ -157,6 +158,7 @@ def _build(tmp_path_factory, *, audio: bool):
     loaded.fmv_ended.restype = ctypes.c_int
     loaded.fmv_last_updates.restype = ctypes.c_uint16
     loaded.fmv_play.restype = ctypes.c_int
+    loaded.fmv_faulted.restype = ctypes.c_int
     for name in (
         "fmv_epoch",
         "fmv_stream_bank",
@@ -643,3 +645,113 @@ class TestTheAudioSwitch:
         silent_fmv.fmv_close(player)
 
         assert silent_fmv.fmv_test_prom_bank() == 4
+
+
+def _corrupt(movie, frame: int, *, runs: int | None = None, address: int | None = None) -> None:
+    stream = movie._keepalive[5]
+    offset = frame * len(_keyframe_record())
+    if runs is not None:
+        struct.pack_into("=H", stream, offset, runs)
+    if address is not None:
+        struct.pack_into("=H", stream, offset + 2, address)
+
+
+class TestACorruptStream:
+    def test_a_frame_claiming_more_runs_than_the_movie_allows_stops_play(self, fmv, movie):
+        # Arrange
+        _corrupt(movie, 1, runs=GRID_ROWS + 1)
+        options = fmv.fmv_defaults()
+        options.skip_pad = 0
+        options.skip_start = 0
+
+        # Act
+        outcome = fmv.fmv_play(ctypes.byref(movie), ctypes.byref(options))
+
+        # Assert
+        assert outcome == FMV_CORRUPT
+
+    def test_a_run_below_the_grid_writes_nothing(self, fmv, movie):
+        # Arrange
+        _corrupt(movie, 0, address=0)
+        options = fmv.fmv_defaults()
+        player = _player()
+        fmv.fmv_open(player, ctypes.byref(movie), ctypes.byref(options))
+
+        # Act
+        fmv.fmv_start(player)
+
+        # Assert
+        grid_start = FIRST_SPRITE * SCB1_WORDS_PER_SPRITE
+        assert (fmv.fmv_faulted(player), fmv.fmv_test_vram(0), fmv.fmv_test_vram(grid_start)) == (
+            1,
+            0,
+            0,
+        )
+
+    def test_a_layout_the_board_cannot_hold_fails_before_any_register(self, fmv, movie):
+        # Arrange
+        movie.grid_cols = 400
+        options = fmv.fmv_defaults()
+        player = _player()
+
+        # Act
+        fmv.fmv_open(player, ctypes.byref(movie), ctypes.byref(options))
+
+        # Assert
+        assert (fmv.fmv_faulted(player), fmv.fmv_test_lspc_mode()) == (1, 0)
+
+    def test_prepare_finds_a_bad_frame_before_the_tick_draws_it(self, fmv, movie):
+        # Arrange
+        _corrupt(movie, 1, runs=GRID_ROWS + 1)
+        options = fmv.fmv_defaults()
+        player = _player()
+        fmv.fmv_open(player, ctypes.byref(movie), ctypes.byref(options))
+        fmv.fmv_start(player)
+
+        # Act
+        fmv.fmv_prepare(player)
+
+        # Assert
+        assert (fmv.fmv_faulted(player), fmv.fmv_ended(player)) == (1, 1)
+
+    def test_a_clean_stream_never_faults(self, fmv, movie):
+        # Arrange
+        options = fmv.fmv_defaults()
+        player = _player()
+        fmv.fmv_open(player, ctypes.byref(movie), ctypes.byref(options))
+        fmv.fmv_start(player)
+
+        # Act
+        fmv.fmv_prepare(player)
+
+        # Assert
+        assert fmv.fmv_faulted(player) == 0
+
+
+class TestSoundOnAndOff:
+    def test_turning_sound_off_stops_the_soundtrack(self, fmv, movie):
+        # Arrange
+        options = fmv.fmv_defaults()
+        player = _player()
+        fmv.fmv_open(player, ctypes.byref(movie), ctypes.byref(options))
+        fmv.fmv_start(player)
+
+        # Act
+        fmv.fmv_set_audio(player, 0)
+
+        # Assert
+        assert fmv.fmv_test_last_sound_command() == SOUND_STOP
+
+    def test_with_sound_off_a_resume_sends_no_play_command(self, fmv, movie):
+        # Arrange
+        options = fmv.fmv_defaults()
+        player = _player()
+        fmv.fmv_open(player, ctypes.byref(movie), ctypes.byref(options))
+        fmv.fmv_start(player)
+        fmv.fmv_set_audio(player, 0)
+
+        # Act
+        fmv.fmv_resume(player)
+
+        # Assert
+        assert fmv.fmv_test_last_sound_command() == SOUND_STOP

@@ -1,17 +1,18 @@
 #include "fmv.h"
 
 #include "fmv_audio.h"
+#include "guard.h"
 #include "hw.h"
 #include "timeline.h"
 
-#define VRAM_LOWER_WORDS   0x8000
-#define VRAM_UPPER_WORDS   0x0600
-#define PALETTE_WORDS      16u
 #define SPRITE_DISABLED    0
 #define DEFAULT_FIRST_SPRITE 1
 #define DEFAULT_SKIP_PAD   (FMV_PAD_A)
 #define DEFAULT_SKIP_START 1
 #define DEFAULT_LSPC_MODE  0
+#define NO_FRAME           0xFFFFFFFFu
+#define NO_BANK            0xFFFFu
+#define RUN_HEADER_WORDS   2u
 
 static uint16_t epoch_words(const fmv_player *player)
 {
@@ -134,19 +135,78 @@ static void blank_owned_palettes(const fmv_player *player)
     }
 }
 
-static void apply_frame(fmv_player *player, uint32_t frame)
+static const uint16_t *frame_cursor(fmv_player *player, uint32_t frame)
 {
     const uint32_t *index = (const uint32_t *)player->movie->index;
     uint32_t offset = player->movie->stream_base + index[frame];
     uint16_t wanted = (uint16_t)(offset / PROM_BANK_BYTES);
-    const uint16_t *cursor;
-    uint16_t runs;
 
     if (wanted != player->stream_bank) {
         PROM_BANK_SELECT = wanted;
         player->stream_bank = wanted;
     }
-    cursor = (const uint16_t *)(PROM_BANK_WINDOW + (offset % PROM_BANK_BYTES));
+    return (const uint16_t *)(PROM_BANK_WINDOW + (offset % PROM_BANK_BYTES));
+}
+
+static fmv_stream_limits stream_limits(const fmv_movie *movie)
+{
+    fmv_stream_limits limits;
+
+    limits.first = (uint16_t)(movie->first_sprite * SCB1_WORDS_PER_SPRITE);
+    limits.end = ((uint32_t)movie->first_sprite + movie->grid_cols) * SCB1_WORDS_PER_SPRITE;
+    limits.max_tiles = movie->max_updates;
+    return limits;
+}
+
+static int frame_valid(fmv_player *player, uint32_t frame)
+{
+    fmv_stream_limits limits = stream_limits(player->movie);
+    const uint16_t *cursor;
+    uint16_t runs;
+    uint16_t written = 0;
+
+    if (frame >= player->movie->frames) {
+        return 0;
+    }
+    cursor = frame_cursor(player, frame);
+    runs = *cursor++;
+    if (runs > limits.max_tiles) {
+        return 0;
+    }
+    while (runs--) {
+        uint16_t tiles = cursor[1];
+
+        if (!fmv_run_fits(&limits, cursor[0], tiles, written)) {
+            return 0;
+        }
+        written = (uint16_t)(written + tiles);
+        cursor += RUN_HEADER_WORDS + (uint32_t)tiles * FMV_SCB1_WORDS_PER_TILE;
+    }
+    return 1;
+}
+
+static void check_frame(fmv_player *player, uint32_t frame)
+{
+    if (player->faulted || player->checked_frame == frame) {
+        return;
+    }
+    if (!frame_valid(player, frame)) {
+        player->faulted = 1;
+        return;
+    }
+    player->checked_frame = frame;
+}
+
+static void apply_frame(fmv_player *player, uint32_t frame)
+{
+    const uint16_t *cursor;
+    uint16_t runs;
+
+    check_frame(player, frame);
+    if (player->faulted) {
+        return;
+    }
+    cursor = frame_cursor(player, frame);
     runs = *cursor++;
     player->updates = 0;
 
@@ -162,6 +222,20 @@ static void apply_frame(fmv_player *player, uint32_t frame)
             REG_VRAMRW = *cursor++;
         }
     }
+}
+
+static fmv_layout movie_layout(const fmv_movie *movie, const fmv_options *options)
+{
+    fmv_layout layout;
+
+    layout.first_sprite = movie->first_sprite;
+    layout.grid_cols = movie->grid_cols;
+    layout.grid_rows = movie->grid_rows;
+    layout.palette_base = movie->palette_base;
+    layout.epoch_palettes = movie->epoch_palettes;
+    layout.epoch_count = movie->epoch_count;
+    layout.caller_first_sprite = options->first_sprite;
+    return layout;
 }
 
 fmv_options fmv_defaults(void)
@@ -201,8 +275,17 @@ static void restore_machine(const fmv_options *options)
 
 void fmv_open(fmv_player *player, const fmv_movie *movie, const fmv_options *options)
 {
+    fmv_layout layout = movie_layout(movie, options);
+
     player->movie = movie;
     player->options = *options;
+    player->checked_frame = NO_FRAME;
+    player->faulted = 0;
+    player->open = 0;
+    if (!fmv_layout_fits(&layout)) {
+        player->faulted = 1;
+        return;
+    }
     player->epoch_words = (uint16_t)(movie->epoch_palettes * PALETTE_WORDS);
     player->sprite_offset = (uint16_t)((player->options.first_sprite - movie->first_sprite)
                                        * SCB1_WORDS_PER_SPRITE);
@@ -210,7 +293,7 @@ void fmv_open(fmv_player *player, const fmv_movie *movie, const fmv_options *opt
     player->resident_epoch = 0;
     player->loading_epoch = 0;
     player->loading_word = 0;
-    player->stream_bank = 0xFFFF;
+    player->stream_bank = NO_BANK;
     player->updates = 0;
     player->audio_running = 0;
     player->open = 1;
@@ -226,6 +309,9 @@ void fmv_open(fmv_player *player, const fmv_movie *movie, const fmv_options *opt
 
 void fmv_start(fmv_player *player)
 {
+    if (player->faulted) {
+        return;
+    }
     wait_vblank();
     watchdog_kick();
     apply_frame(player, 0);
@@ -245,6 +331,9 @@ void fmv_tick(fmv_player *player)
 
 void fmv_hold(fmv_player *player)
 {
+    if (player->faulted) {
+        return;
+    }
     follow_epoch(player, player->frame);
 }
 
@@ -264,10 +353,28 @@ void fmv_seek(fmv_player *player, uint32_t frame)
     uint32_t landing = timeline_keyframe_at_or_before(
         (const uint32_t *)player->movie->keyframes, player->movie->keyframe_count, target);
 
+    if (player->faulted) {
+        return;
+    }
     palettes_for_frame(player, landing);
     apply_frame(player, landing);
     player->frame = landing + 1u;
     fmv_audio_cue(player, landing);
+}
+
+void fmv_prepare(fmv_player *player)
+{
+    if (!fmv_ended(player)) {
+        check_frame(player, player->frame);
+    }
+}
+
+void fmv_set_audio(fmv_player *player, int on)
+{
+    player->options.audio = (uint8_t)(on != 0);
+    if (!on) {
+        fmv_audio_halt(player);
+    }
 }
 
 void fmv_close(fmv_player *player)
@@ -279,13 +386,18 @@ void fmv_close(fmv_player *player)
     retire_sprite_grid(player);
     blank_owned_palettes(player);
     restore_machine(&player->options);
-    player->stream_bank = 0xFFFF;
+    player->stream_bank = NO_BANK;
     player->open = 0;
 }
 
 int fmv_ended(const fmv_player *player)
 {
-    return player->frame >= player->movie->frames;
+    return player->faulted || player->frame >= player->movie->frames;
+}
+
+int fmv_faulted(const fmv_player *player)
+{
+    return player->faulted;
 }
 
 uint32_t fmv_position(const fmv_player *player)
@@ -336,6 +448,10 @@ fmv_result fmv_play(const fmv_movie *movie, const fmv_options *options)
         wait_vblank();
         watchdog_kick();
         fmv_tick(&player);
+        fmv_prepare(&player);
+    }
+    if (fmv_faulted(&player)) {
+        outcome = FMV_CORRUPT;
     }
     fmv_close(&player);
     return outcome;

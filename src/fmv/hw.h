@@ -27,6 +27,12 @@
 #define PALRAM       ((volatile uint16_t *)0x400000)
 #define PALRAM_WORDS 4096
 #define PALRAM_BACKDROP 4095
+#define PALETTE_WORDS 16u
+
+#define VRAM_LOWER_WORDS 0x8000
+#define VRAM_UPPER_WORDS 0x0600
+
+#define STATUS_SELECT 0x02
 
 #define VRAM_SCB1 0x0000
 #define VRAM_FIX  0x7000

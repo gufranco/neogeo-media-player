@@ -47,6 +47,7 @@ FMV_LDFLAGS = -Wl,--defsym=fmv_stream_base=$(shell expr $(FMV_FIRST_BANK) \* 104
 
 FMV_OBJS = \
 	$(BUILDDIR)/$(FMV_SRC)/fmv.o \
+	$(BUILDDIR)/$(FMV_SRC)/guard.o \
 	$(BUILDDIR)/$(FMV_SRC)/timeline.o \
 	$(BUILDDIR)/$(FMV_MOVIE)/movie_data_value.o \
 	$(BUILDDIR)/$(FMV_MOVIE)/movie_data.o

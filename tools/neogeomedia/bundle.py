@@ -31,6 +31,8 @@ LIBRARY_SOURCES: Final = (
     "fmv.c",
     "fmv_audio.h",
     "fmv_audio.c",
+    "guard.h",
+    "guard.c",
     "hw.h",
     "timeline.h",
     "timeline.c",

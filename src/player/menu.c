@@ -33,6 +33,8 @@
 #define MENU_TOTAL_COL  (MENU_COLS - MENU_MARGIN - MENU_CLOCK_CELLS)
 #define MENU_SLASH_COL  (MENU_TOTAL_COL - 2)
 #define MENU_ELAPSED_COL (MENU_SLASH_COL - 1 - MENU_CLOCK_CELLS)
+#define MENU_MUTE_COL    (MENU_SPEED_COL + 3)
+#define MENU_MUTE_TEXT   "MUTE"
 
 #define SECONDS_PER_MINUTE 60u
 
@@ -63,6 +65,38 @@ static void draw_clock(uint16_t col, uint16_t row, uint32_t seconds)
     fix_poke((uint16_t)(col + 4), row, (uint16_t)(FIX_TILE_DIGIT0 + rest % 10u));
 }
 
+static uint16_t glyph_for(char code)
+{
+    if (code >= '0' && code <= '9') {
+        return (uint16_t)(FIX_TILE_DIGIT0 + (code - '0'));
+    }
+    if (code >= 'A' && code <= 'Z') {
+        return (uint16_t)(FIX_TILE_A + (code - 'A'));
+    }
+    switch (code) {
+    case '%':
+        return FIX_TILE_PERCENT;
+    case '.':
+        return FIX_TILE_DOT;
+    case '-':
+        return FIX_TILE_DASH;
+    case '/':
+        return FIX_TILE_SLASH;
+    case ':':
+        return FIX_TILE_COLON;
+    default:
+        return FIX_TILE_PANEL;
+    }
+}
+
+static uint16_t draw_text(uint16_t col, uint16_t row, const char *text)
+{
+    while (*text != '\0') {
+        fix_poke(col++, row, glyph_for(*text++));
+    }
+    return col;
+}
+
 static uint16_t state_glyph(transport_state state)
 {
     switch (state) {
@@ -72,6 +106,7 @@ static uint16_t state_glyph(transport_state state)
         return FIX_TILE_FORWARD;
     case TRANSPORT_REWIND:
         return FIX_TILE_REWIND;
+    case TRANSPORT_STOP:
     case TRANSPORT_PLAY:
     default:
         return FIX_TILE_PLAY;
@@ -81,9 +116,9 @@ static uint16_t state_glyph(transport_state state)
 void menu_init(void)
 {
     const uint16_t *source = (const uint16_t *)movie_fix_palette;
-    volatile uint16_t *target = PALRAM + FIX_PALETTE * 16;
+    volatile uint16_t *target = PALRAM + FIX_PALETTE * PALETTE_WORDS;
 
-    for (uint16_t i = 0; i < 16; i++) {
+    for (uint16_t i = 0; i < PALETTE_WORDS; i++) {
         target[i] = source[i];
     }
 }
@@ -121,7 +156,8 @@ static void draw_seek_bar(uint32_t frame, uint32_t total)
     }
 }
 
-void menu_draw(transport_state state, uint16_t speed, uint32_t frame, uint32_t total)
+void menu_draw(transport_state state, uint16_t speed, uint8_t sound_on, uint32_t frame,
+               uint32_t total)
 {
     uint16_t col;
     uint16_t row;
@@ -143,46 +179,19 @@ void menu_draw(transport_state state, uint16_t speed, uint32_t frame, uint32_t t
                  (uint16_t)(FIX_TILE_DIGIT0 + speed % 10u));
     }
 
+    if (!sound_on) {
+        draw_text(MENU_MUTE_COL, MENU_TEXT_ROW, MENU_MUTE_TEXT);
+    }
+
     draw_clock(MENU_ELAPSED_COL, MENU_TEXT_ROW, frame_to_seconds(frame));
     fix_poke(MENU_SLASH_COL, MENU_TEXT_ROW, FIX_TILE_SLASH);
-    draw_clock(MENU_TOTAL_COL, MENU_TEXT_ROW, frame_to_seconds(total));
+    draw_clock(MENU_TOTAL_COL, MENU_TEXT_ROW,
+               timeline_frame_to_nearest_second(total, MOVIE_FPS_NUM, MOVIE_FPS_DEN));
 }
 
 #define DEBUG_TOP_ROW   2
 #define DEBUG_ROWS      9
 #define DEBUG_LEFT      1
-
-static uint16_t glyph_for(char code)
-{
-    if (code >= '0' && code <= '9') {
-        return (uint16_t)(FIX_TILE_DIGIT0 + (code - '0'));
-    }
-    if (code >= 'A' && code <= 'Z') {
-        return (uint16_t)(FIX_TILE_A + (code - 'A'));
-    }
-    switch (code) {
-    case '%':
-        return FIX_TILE_PERCENT;
-    case '.':
-        return FIX_TILE_DOT;
-    case '-':
-        return FIX_TILE_DASH;
-    case '/':
-        return FIX_TILE_SLASH;
-    case ':':
-        return FIX_TILE_COLON;
-    default:
-        return FIX_TILE_PANEL;
-    }
-}
-
-static uint16_t draw_text(uint16_t col, uint16_t row, const char *text)
-{
-    while (*text != '\0') {
-        fix_poke(col++, row, glyph_for(*text++));
-    }
-    return col;
-}
 
 /* Right-aligned so a value that grows a digit does not shift the label
  * beside it, which matters when reading these while the movie runs. */
@@ -281,7 +290,9 @@ void menu_subtitle_show(const unsigned char *rows)
         const unsigned char *cells = rows + line * MOVIE_SUBTITLE_COLUMNS;
 
         for (uint16_t col = 0; col < MENU_COLS; col++) {
-            fix_poke(col, (uint16_t)(SUBTITLE_TOP_ROW + line), cells[col]);
+            uint16_t tile = col < MOVIE_SUBTITLE_COLUMNS ? cells[col] : FIX_TILE_BLANK;
+
+            fix_poke(col, (uint16_t)(SUBTITLE_TOP_ROW + line), tile);
         }
     }
 }

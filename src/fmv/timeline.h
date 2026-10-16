@@ -13,6 +13,7 @@ uint16_t timeline_subtitle_at(const unsigned char *table, uint16_t count, uint16
 uint32_t timeline_seconds_to_frames(uint32_t seconds, uint32_t num, uint32_t den);
 
 uint32_t timeline_frame_to_seconds(uint32_t frame, uint32_t num, uint32_t den);
+uint32_t timeline_frame_to_nearest_second(uint32_t frame, uint32_t num, uint32_t den);
 
 uint16_t timeline_audio_page(uint32_t frame, uint32_t num, uint32_t den);
 

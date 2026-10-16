@@ -276,11 +276,10 @@ the others do not also get.*
 
 ## The state of this repository
 
-neogeo-media-player is the base the family grew from. Its tile dictionary is
-resident in character ROM, so its encoder settles a rung on a 35-rung quality
-ladder by real bakes rather than paging patterns, and it carries what the other
-player does not: ADPCM-B sound, the library and its drop-in bundle, subtitles
-and seeking. It carries `fmv-core-python` as a submodule and is moving its
+In neogeo-media-player the tile dictionary is resident in character ROM, so
+its encoder settles a rung on a 35-rung quality ladder by real bakes rather
+than paging patterns, and it carries what the other player does not yet:
+ADPCM-B sound, the library and its drop-in bundle, subtitles and seeking. It carries `fmv-core-python` as a submodule and is moving its
 shared concerns onto it.
 
 Gaps against "What every player does" (as of 2026-10-15):
@@ -291,7 +290,3 @@ Gaps against "What every player does" (as of 2026-10-15):
 - `--fit letterbox` still adds bars, which the picture rule forbids.
 - The build script compiles with a host toolchain when one is on the path,
   where the conventions require Docker for every build.
-- The menu has play, pause, fast forward, rewind, seek and a position bar with
-  elapsed and total time. Sound on and off is not checked, and a 5.0-second
-  film shows a total of 00:04 on the bar in MAME, which reads as a rounding
-  defect.

@@ -130,12 +130,12 @@ Neo Geo 沒有影片解碼器、沒有影格緩衝區，也沒有縮放器。它
 | 播放及暫停 | 是 | 已計劃 |
 | 快進及倒帶 | 是，快進速度為 2x、5x 及 10x | 已計劃 |
 | 跳轉 | 是，後退或前進 10 秒 | 已計劃 |
-| 顯示已播放時間及總時間的位置列 | 是。總時間會少顯示一秒 | 已計劃 |
-| 重新開始及停止 | 已計劃 | 是 |
-| 聲音開關 | 已計劃 | 已計劃 |
+| 顯示已播放時間及總時間的位置列 | 是 | 已計劃 |
+| 重新開始及停止 | 是 | 是 |
+| 聲音開關 | 是 | 已計劃 |
 | 影片播放完畢後循環播放 | 是 | 是 |
 | 診斷資訊疊加層 | 是 | 已計劃 |
-| 串流損毀時的錯誤畫面 | 已計劃 | 是 |
+| 串流損毀時的錯誤畫面 | 是 | 是 |
 | 在你自己的遊戲中播放影片 | 是，`--bundle` 會產生可直接嵌入的程式庫 | 部分做到。`--rows` 及 `--columns` 可建置較小的畫面；目前還沒有可直接嵌入的套件 |
 | 預覽主機將會繪製的畫面 | 是，一段影片 | 是，四幀畫面並列於其來源旁 |
 | 每次建置都檢查寫入時序 | 是 | 是 |
@@ -259,6 +259,22 @@ uv --project tools run python -m neogeomedia.cartridge ~/Movies/my-film.mkv
 ### 運行
 
 在硬件上，把 `build/neogeomedia.neo` 複製到 NeoSD 快閃卡帶，像其他遊戲一樣載入。
+
+影片會自動開始播放。按下任何按鍵時會顯示控制面板，幾秒後自動從畫面上消失。
+
+| 按鍵 | 作用 |
+|:-------|:-------------|
+| A | 暫停及播放 |
+| B | 以正常速度播放 |
+| 右 | 快進，依次為 2 倍、5 倍、10 倍 |
+| 左 | 倒帶 |
+| C、D | 後退或前進 10 秒 |
+| 上 | 開關聲音 |
+| 下 | 開關字幕 |
+| Start | 停止並顯示黑畫面。之後按 Start、A 或 B 由頭播放 |
+| Select | 診斷疊加層 |
+
+數據流損壞時，影片會停在紅色畫面上，而不是畫出亂碼。
 
 在 MAME 中，指向建置產生的封存檔和雜湊檔，並把 BIOS 目錄加入 ROM 路徑：
 
@@ -489,8 +505,8 @@ C 程式庫介面是 [`fmv.h`](src/fmv/fmv.h)：
 | 承諾 | 不承諾 |
 |:---------|:-------------|
 | `fmv_defaults`、`fmv_play` | `fmv_movie` 和 `fmv_player` 的佈局。宣告它們是為了讓呼叫者可以配置，而不是讓它讀取 |
-| `fmv_open`、`fmv_start`、`fmv_tick`、`fmv_hold`、`fmv_pause`、`fmv_resume`、`fmv_seek`、`fmv_close` | [`src/fmv/`](src/fmv) 之下除 `fmv.h` 以外的任何內容。`hw.h` 屬內部檔案，可隨時變動而不另行通知 |
-| `fmv_ended`、`fmv_position`、`fmv_last_updates`、`fmv_epoch`、`fmv_stream_bank` | 產生的標頭檔中的 `MOVIE_` 定義，它們描述的是一次烘焙，而不是介面 |
+| `fmv_open`、`fmv_start`、`fmv_tick`、`fmv_prepare`、`fmv_hold`、`fmv_pause`、`fmv_resume`、`fmv_seek`、`fmv_set_audio`、`fmv_close` | [`src/fmv/`](src/fmv) 之下除 `fmv.h` 以外的任何內容。`hw.h` 屬內部檔案，可隨時變動而不另行通知 |
+| `fmv_ended`、`fmv_faulted`、`fmv_position`、`fmv_last_updates`、`fmv_epoch`、`fmv_stream_bank` | 產生的標頭檔中的 `MOVIE_` 定義，它們描述的是一次烘焙，而不是介面 |
 | `fmv_options` 的欄位及其預設值 | |
 | 專案讀取的 `fmv.mk` 變數：`FMV_OBJS`、`FMV_CFLAGS`、`FMV_LDFLAGS`、`FMV_CROM_BYTES`、`FMV_PROM2_BYTES`、`FMV_VROM_BYTES`、`FMV_FIRST_FREE_TILE`、`FMV_FIRST_BANK`、`FMV_AUDIO` | |
 

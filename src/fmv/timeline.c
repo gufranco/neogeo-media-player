@@ -84,6 +84,14 @@ uint32_t timeline_frame_to_seconds(uint32_t frame, uint32_t num, uint32_t den)
     return (uint32_t)(((uint64_t)frame * den) / num);
 }
 
+uint32_t timeline_frame_to_nearest_second(uint32_t frame, uint32_t num, uint32_t den)
+{
+    if (num == 0u) {
+        return 0u;
+    }
+    return (uint32_t)(((uint64_t)frame * den + num / 2u) / num);
+}
+
 uint16_t timeline_audio_page(uint32_t frame, uint32_t num, uint32_t den)
 {
     uint64_t scaled;

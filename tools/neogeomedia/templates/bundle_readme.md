@@ -88,8 +88,9 @@ void play_intro(void)
 }}
 ```
 
-`fmv_play` returns `FMV_FINISHED` when the movie reached its last frame
-and `FMV_SKIPPED` when the viewer cut it short. Both give the machine
+`fmv_play` returns `FMV_FINISHED` when the movie reached its last frame,
+`FMV_SKIPPED` when the viewer cut it short, and `FMV_CORRUPT` when a frame
+failed its check against the movie's limits. All three give the machine
 back the same way, so a caller that treats them alike is correct.
 
 ## The calls
@@ -101,10 +102,13 @@ back the same way, so a caller that treats them alike is correct.
 | `fmv_open(player, movie, options)` | Takes the screen and readies frame zero, for a caller driving its own loop |
 | `fmv_start(player)` | Draws frame zero and starts the soundtrack |
 | `fmv_tick(player)` | Advances one frame. Call once per vblank |
+| `fmv_prepare(player)` | Checks the next frame against the movie's limits. Call it after your own VRAM writes, outside vblank, so the check costs no blanking time; a frame nobody prepared is checked inside the next tick instead |
 | `fmv_hold(player)` | Keeps the picture still and the palette upload running. This is what pause looks like |
 | `fmv_seek(player, frame)` | Jumps to the nearest keyframe at or before a frame, audio with it |
+| `fmv_set_audio(player, on)` | Turns the soundtrack on or off. Turning it on takes effect at the next resume or seek |
 | `fmv_close(player)` | Gives everything back. Every path out of a movie ends here |
-| `fmv_ended(player)` | Non-zero once the last frame has been shown |
+| `fmv_ended(player)` | Non-zero once the last frame has been shown, or once the stream proved corrupt |
+| `fmv_faulted(player)` | Non-zero once a frame failed its check. The player then draws nothing more |
 | `fmv_position(player)` | The frame the player is about to show |
 | `fmv_last_updates(player)` | Slot updates the last tick wrote, for a caller measuring its own budget |
 | `fmv_epoch(player)` | Which palette epoch is resident |

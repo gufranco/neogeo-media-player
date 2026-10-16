@@ -44,6 +44,9 @@ static inline uint16_t *fmv_test_next_slot(void)
 
 #define PALRAM       (fmv_test_hw.palram)
 #define PALRAM_WORDS FMV_TEST_PALRAM_WORDS
+#define PALRAM_BACKDROP 4095
+#define PALETTE_WORDS 16u
+#define STATUS_SELECT 0x02
 
 #define VRAM_SCB1 0x0000
 #define VRAM_FIX  0x7000

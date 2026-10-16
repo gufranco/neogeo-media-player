@@ -8,6 +8,7 @@ was paid for once and does not need paying for again.
 
 ## Contents
 
+- [A corrupt stream stops on red](#a-corrupt-stream-stops-on-red)
 - [The timing gate reads the whole player](#the-timing-gate-reads-the-whole-player)
 - [The BIOS drew its logo from film tiles](#the-bios-drew-its-logo-from-film-tiles)
 - [Blanking was 40 lines, not 24](#blanking-was-40-lines-not-24)
@@ -21,6 +22,29 @@ was paid for once and does not need paying for again.
 - [It plays on a board](#it-plays-on-a-board)
 - [What is left](#what-is-left)
 - [Standing rules for this project](#standing-rules-for-this-project)
+
+## A corrupt stream stops on red
+
+The player trusted every frame's run count and run lengths, so a corrupt
+stream wrote wherever its bytes pointed and looped as long as they said. Each
+frame is now checked against the movie's grid and its largest frame before it
+is drawn. The reference bake peaks at 61 runs in a frame and nothing in the
+encoder caps runs below 280, so a check inside the write loop could have cost
+blanking time the budget does not have. The check reads only ROM, and it runs
+for the next frame after the frame's VRAM writes. A cartridge whose first
+frame claims 65,535 runs turns red in geolith; the good cartridge plays as
+before.
+
+The cartridge also gained the controls the family requires: Start stops on a
+black screen and plays again from the beginning, Up turns sound on and off
+with a MUTE marker on the panel, and diagnostics move to Select. A pauses, as
+before. The panel's total time is rounded to the nearest second, so a
+295-frame film at the vblank rate reads 00:05 rather than 00:04, and a subtitle row narrower than
+the screen no longer reads past its end.
+
+geolith kept its NVRAM between captures, so one cartridge could reach its
+first frame at different times on different runs. Captures now start from a
+fresh save directory. None of this has run on a board.
 
 ## The timing gate reads the whole player
 

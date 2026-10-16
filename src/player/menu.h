@@ -7,7 +7,8 @@ typedef enum {
     TRANSPORT_PLAY,
     TRANSPORT_PAUSE,
     TRANSPORT_FORWARD,
-    TRANSPORT_REWIND
+    TRANSPORT_REWIND,
+    TRANSPORT_STOP
 } transport_state;
 
 /* What the debug page reports. Everything here is either a fact of the
@@ -28,7 +29,8 @@ typedef struct {
 void menu_init(void);
 void menu_debug_row(const debug_stats *stats, uint16_t slot);
 void menu_debug_hide(void);
-void menu_draw(transport_state state, uint16_t speed, uint32_t frame, uint32_t total);
+void menu_draw(transport_state state, uint16_t speed, uint8_t sound_on, uint32_t frame,
+               uint32_t total);
 void menu_hide(void);
 
 void menu_subtitle_show(const unsigned char *rows);

@@ -130,12 +130,12 @@ Neo Geo 没有视频解码器，没有帧缓冲，也没有缩放器。它只绘
 | 播放和暂停 | 是 | 计划中 |
 | 快进和倒退 | 是，快进可选 2x、5x 和 10x | 计划中 |
 | 跳转 | 是，后退或前进 10 秒 | 计划中 |
-| 显示已播放时间和总时长的进度条 | 是。总时长少显示一秒 | 计划中 |
-| 重新开始和停止 | 计划中 | 是 |
-| 声音开关 | 计划中 | 计划中 |
+| 显示已播放时间和总时长的进度条 | 是 | 计划中 |
+| 重新开始和停止 | 是 | 是 |
+| 声音开关 | 是 | 计划中 |
 | 影片播完后循环播放 | 是 | 是 |
 | 诊断信息叠加层 | 是 | 计划中 |
-| 数据流损坏时显示故障画面 | 计划中 | 是 |
+| 数据流损坏时显示故障画面 | 是 | 是 |
 | 在你自己的游戏中播放影片 | 是，`--bundle` 生成可直接接入的库 | 部分支持。`--rows` 和 `--columns` 可构建较小的画面；目前还没有可直接接入的库包 |
 | 预览主机将要绘制的画面 | 是，一段视频 | 是，四帧画面与其源帧并排 |
 | 每次构建都检查写入时序 | 是 | 是 |
@@ -259,6 +259,22 @@ uv --project tools run python -m neogeomedia.cartridge ~/Movies/my-film.mkv
 ### 运行
 
 在硬件上，把 `build/neogeomedia.neo` 复制到 NeoSD 烧录卡，像其他游戏一样加载即可。
+
+影片会自动开始播放。按下任意按键时显示控制面板，几秒后自动从画面上消失。
+
+| 按键 | 作用 |
+|:-------|:-------------|
+| A | 暂停和播放 |
+| B | 以正常速度播放 |
+| 右 | 快进，依次为 2 倍、5 倍、10 倍 |
+| 左 | 倒退 |
+| C、D | 后退或前进 10 秒 |
+| 上 | 开关声音 |
+| 下 | 开关字幕 |
+| Start | 停止并显示黑屏。之后按 Start、A 或 B 从头播放 |
+| Select | 诊断叠加层 |
+
+数据流损坏时，影片会停在红色画面上，而不是画出乱码。
 
 在 MAME 下，让它指向构建生成的归档和哈希文件，并把 BIOS 目录放在 ROM 路径上：
 
@@ -489,8 +505,8 @@ C 库接口是 [`fmv.h`](src/fmv/fmv.h)：
 | 承诺 | 不承诺 |
 |:---------|:-------------|
 | `fmv_defaults`、`fmv_play` | `fmv_movie` 和 `fmv_player` 的布局。声明它们是为了让调用者能够分配，而不是为了让调用者读取 |
-| `fmv_open`、`fmv_start`、`fmv_tick`、`fmv_hold`、`fmv_pause`、`fmv_resume`、`fmv_seek`、`fmv_close` | [`src/fmv/`](src/fmv) 下除 `fmv.h` 以外的任何内容。`hw.h` 是内部文件，可能随时变动，不另行通知 |
-| `fmv_ended`、`fmv_position`、`fmv_last_updates`、`fmv_epoch`、`fmv_stream_bank` | 生成的头文件中的 `MOVIE_` 定义，它们描述的是一次烘焙，而不是一个接口 |
+| `fmv_open`、`fmv_start`、`fmv_tick`、`fmv_prepare`、`fmv_hold`、`fmv_pause`、`fmv_resume`、`fmv_seek`、`fmv_set_audio`、`fmv_close` | [`src/fmv/`](src/fmv) 下除 `fmv.h` 以外的任何内容。`hw.h` 是内部文件，可能随时变动，不另行通知 |
+| `fmv_ended`、`fmv_faulted`、`fmv_position`、`fmv_last_updates`、`fmv_epoch`、`fmv_stream_bank` | 生成的头文件中的 `MOVIE_` 定义，它们描述的是一次烘焙，而不是一个接口 |
 | `fmv_options` 的字段及其默认值 | |
 | 项目会读取的 `fmv.mk` 变量：`FMV_OBJS`、`FMV_CFLAGS`、`FMV_LDFLAGS`、`FMV_CROM_BYTES`、`FMV_PROM2_BYTES`、`FMV_VROM_BYTES`、`FMV_FIRST_FREE_TILE`、`FMV_FIRST_BANK`、`FMV_AUDIO` | |
 

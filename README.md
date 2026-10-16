@@ -130,12 +130,12 @@ none does today.
 | Sound with no added hardware | Yes, ADPCM-B on the YM2610 | Yes, tone synthesis on the PSG |
 | A silent build that gives sound's room to the picture | Partly. A library bundle can leave sound out; sound has its own ROM, so leaving it out frees no picture room | Yes, `--silent` |
 | Subtitles from a SubRip file | Yes | Planned |
-| Play and pause | Yes | Planned |
+| Play and pause | Yes | Yes. Pause on the console, Start on a Game Gear |
 | Fast forward and rewind | Yes, forward at 2x, 5x and 10x | Planned |
 | Seek | Yes, 10 seconds back or forward | Planned |
 | A position bar with elapsed and total time | Yes | Planned |
 | Restart and stop | Yes | Yes |
-| Sound on and off | Yes | Planned |
+| Sound on and off | Yes | Yes, Up |
 | The film loops at the end | Yes | Yes |
 | A diagnostics overlay | Yes | Planned |
 | A fault screen for a corrupt stream | Yes | Yes |

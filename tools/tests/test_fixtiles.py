@@ -183,3 +183,48 @@ class TestOverlayStyling:
 
         for slot in (fixtiles.INK, fixtiles.PANEL, fixtiles.ACCENT, fixtiles.DIM, fixtiles.EDGE):
             assert words[slot] != 0
+
+
+class TestGlyphArtResource:
+    def test_every_glyph_in_the_rom_order_has_art(self):
+        # Arrange
+        expected = set(fixtiles.GLYPH_ORDER)
+
+        # Act
+        art = fixtiles.glyph_art()
+
+        # Assert
+        assert set(art) == expected
+
+    def test_every_glyph_is_drawn_on_an_eight_by_eight_grid(self):
+        # Arrange
+        side = fixtiles.TILE_PX
+
+        # Act
+        art = fixtiles.glyph_art()
+
+        # Assert
+        assert all(len(rows) == side for rows in art.values())
+        assert all(len(row) == side for rows in art.values() for row in rows)
+
+    def test_the_rom_holds_one_tile_per_glyph_in_order(self):
+        # Arrange
+        count = len(fixtiles.GLYPH_ORDER)
+
+        # Act
+        rom = fixtiles.build_rom()
+
+        # Assert
+        assert len(rom) == count * fixtiles.TILE_BYTES
+        assert decode(rom[: fixtiles.TILE_BYTES]) == [[fixtiles.TRANSPARENT] * 8] * 8
+
+    def test_art_that_is_not_a_table_of_glyphs_is_refused(self):
+        # Arrange
+        text = "[]"
+
+        # Act
+        with pytest.raises(TypeError) as raised:
+            fixtiles.parse_art(text)
+
+        # Assert
+        assert fixtiles.ART_RESOURCE in str(raised.value)

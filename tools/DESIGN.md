@@ -862,6 +862,20 @@ editable in place. Index 0 of a fix palette is transparent, so the
 overlay paints its own opaque panel behind the text instead of relying
 on whatever video happens to be underneath.
 
+The art lives in [`neogeomedia/glyphs.json`](neogeomedia/glyphs.json), one
+string per pixel row, rather than in the module. It is data that nothing
+computes, so keeping it out of the source keeps the module to the code
+that packs it. JSON strings keep the spaces that mark transparent pixels,
+which a plain text file would lose to any editor that trims trailing
+whitespace.
+
+#### `glyph_art`
+
+Every glyph's rows, read from the packaged resource once and kept.
+
+It is read on first use rather than at import, so importing the module
+touches no file.
+
 #### `pack_tile`
 
 Pack one 8x8 nibble tile into its 32 S-ROM bytes.

@@ -122,7 +122,7 @@ none does today.
 |---|---|---|
 | One command from a video file to a cartridge | Yes | Yes |
 | The picture fills the screen, scaled to cover and cropped | Yes. `--fit letterbox` still exists and is due to go | Yes |
-| Black bars baked into a source are found and cropped | Yes | Planned |
+| Black bars baked into a source are found and cropped | Yes | Yes |
 | Picture and sound step down from the best until the film fits | Yes. `--quality search` bakes down a 35-rung ladder, and sound takes the highest rate that still fits | Planned. Rate, denoise and reuse are measured per bake, but nothing yet steps the film down to fit the cartridge |
 | The largest standard cartridge, no added hardware | Yes, 128 MiB of character ROM | Yes, 1 MB, the most any Sega mapper revision decodes |
 | Ordered dithering | Yes, `--dither` | Yes, on by default |

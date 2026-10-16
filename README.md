@@ -127,8 +127,8 @@ none does today.
 | The largest standard cartridge, no added hardware | Yes, 128 MiB of character ROM | Yes, 1 MB, the most any Sega mapper revision decodes |
 | Ordered dithering | Yes, `--dither` | Yes, on by default |
 | Palettes refit as the film changes | Yes, per scene | Yes, per frame, kept while they still fit |
-| Sound with no added hardware | Yes, ADPCM-B on the YM2610 | Planned, from the PSG |
-| A silent build that gives sound's room to the picture | Partly. A library bundle can leave sound out; sound has its own ROM, so leaving it out frees no picture room | Every build is silent today |
+| Sound with no added hardware | Yes, ADPCM-B on the YM2610 | Yes, tone synthesis on the PSG |
+| A silent build that gives sound's room to the picture | Partly. A library bundle can leave sound out; sound has its own ROM, so leaving it out frees no picture room | Yes, `--silent` |
 | Subtitles from a SubRip file | Yes | Planned |
 | Play and pause | Yes | Planned |
 | Fast forward and rewind | Yes, forward at 2x, 5x and 10x | Planned |

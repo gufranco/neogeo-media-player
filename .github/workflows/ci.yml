@@ -76,10 +76,17 @@ jobs:
           enable-cache: true
           cache-suffix: baker
 
-      - name: Install ffmpeg
+      - name: Install ffmpeg, which the decode path shells out to
         run: |
-          sudo apt-get update -q
+          set -euo pipefail
+          sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Cache the regression films
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: media/clips
+          key: clips-${{ hashFiles('tools/clips.manifest.json') }}
 
       - name: Sync
         run: uv --project tools sync --all-groups
@@ -93,7 +100,12 @@ jobs:
       - name: Types
         run: uv --project tools run mypy tools/neogeomedia tools/scripts
 
+      - name: Fetch the regression films
+        run: uv --project tools run python tools/scripts/fetch_clips.py
+
       - name: Tests and coverage
+        env:
+          NEOGEOMEDIA_CLIPS_REQUIRED: "1"
         run: |
           uv --project tools run python -m pytest tools/tests \
             --cov=neogeomedia \

@@ -142,7 +142,7 @@ none does today.
 | A film inside your own game | Yes, `--bundle` emits a drop-in library | Partly. `--rows` and `--columns` build a smaller picture; there is no drop-in bundle yet |
 | A preview of what the console will draw | Yes, a video | Yes, four frames beside their source |
 | A write-timing gate on every build | Yes | Yes |
-| A regression set of films baked on every test run | Planned | Yes, six films |
+| A regression set of films baked on every test run | Yes, six films | Yes, six films |
 | Run on the original hardware | Yes, AES and MVS | Not yet. A Game Gear run is pending |
 
 ## How it works
@@ -440,6 +440,7 @@ The [cutscene example](examples/cutscene) has run on a board too and came back t
 | [`examples/cutscene/`](examples/cutscene) | A game that plays a cutscene and carries on, built from an emitted bundle |
 | [`tools/neogeomedia/`](tools/neogeomedia) | The baker: decode, colour, palettes, dictionary, encoder, quality ladder, audio, ROM containers, bundle emission |
 | [`tools/tests/`](tools/tests) | 974 tests, including the emulator transcriptions used as oracles |
+| [`tools/clips.manifest.json`](tools/clips.manifest.json) | The regression films: identity, credit and licence, never the films |
 | [`tools/scripts/`](tools/scripts) | Capture, verification, timing and ladder-sweep helpers |
 | [`toolchain/`](toolchain) | The ngdevkit build, native or containerised |
 | [`FAMILY.md`](FAMILY.md) | The standard shared with sms-media-player and fmv-core-python, identical in each |
@@ -478,7 +479,16 @@ make shell
 
 # Compare a finished cartridge against MAME
 bash tools/scripts/verify_mame.sh
+
+# Fetch and verify the regression films
+uv --project tools run python tools/scripts/fetch_clips.py
 ```
+
+The regression set bakes six clips of deliberately different kinds. They are
+not in the repository and are not ours to redistribute, so the manifest holds
+their identity and the script above fetches and verifies them. Without them
+only the committed synthetic clip runs, and the gate is much weaker. Every
+credit and licence is in [`tools/clips.manifest.json`](tools/clips.manifest.json).
 
 Coverage is gated at 95% in [CI](.github/workflows/ci.yml), which also builds a cartridge end to end and builds the cutscene example twice, once video-only and once with the movie's own sound driver.
 

@@ -139,7 +139,7 @@ Neo Geo 沒有影片解碼器、沒有影格緩衝區，也沒有縮放器。它
 | 在你自己的遊戲中播放影片 | 是，`--bundle` 會產生可直接嵌入的程式庫 | 部分做到。`--rows` 及 `--columns` 可建置較小的畫面；目前還沒有可直接嵌入的套件 |
 | 預覽主機將會繪製的畫面 | 是，一段影片 | 是，四幀畫面並列於其來源旁 |
 | 每次建置都檢查寫入時序 | 是 | 是 |
-| 每次測試都會烘焙的回歸影片集 | 已計劃 | 是，六段影片 |
+| 每次測試都會烘焙的回歸影片集 | 是，六段影片 | 是，六段影片 |
 | 在原裝硬件上運行 | 是，AES 及 MVS | 尚未。Game Gear 實機測試仍待進行 |
 
 ## 運作原理
@@ -434,6 +434,7 @@ MAME 在全部 224 行中把第 0 欄傳回為黑色。排除這一欄後，剩�
 | [`examples/cutscene/`](examples/cutscene) | 一個播放過場動畫後繼續運行的遊戲，由輸出的套件建置 |
 | [`tools/neogeomedia/`](tools/neogeomedia) | 烘焙器：解碼、顏色、調色盤、字典、編碼器、質素階梯、音訊、ROM 容器、套件輸出 |
 | [`tools/tests/`](tools/tests) | 974 個測試，包括用作測試基準的模擬器轉寫 |
+| [`tools/clips.manifest.json`](tools/clips.manifest.json) | 回歸測試影片：身分、鳴謝及授權，從不包含影片本身 |
 | [`tools/scripts/`](tools/scripts) | 擷取、驗證、時序和階梯掃描的輔助工具 |
 | [`toolchain/`](toolchain) | ngdevkit 建置，原生或容器化 |
 | [`FAMILY.md`](FAMILY.md) | 與 sms-media-player 和 fmv-core-python 共用的標準，三者內容相同 |
@@ -472,7 +473,12 @@ make shell
 
 # 把完成的卡帶與 MAME 比較
 bash tools/scripts/verify_mame.sh
+
+# 下載並驗證回歸測試影片
+uv --project tools run python tools/scripts/fetch_clips.py
 ```
+
+回歸測試集刻意烘焙六段不同類型的片段。它們不在儲存庫內，我們亦無權再分發，所以清單只記錄其身分，由上述腳本下載並驗證。沒有它們時，只有已提交的合成片段會運行，閘門亦弱得多。所有鳴謝及授權均列於 [`tools/clips.manifest.json`](tools/clips.manifest.json)。
 
 覆蓋率在 [CI](.github/workflows/ci.yml) 中以 95% 為門檻，CI 也會端對端建置一個卡帶，並建置過場動畫範例兩次，一次只有影片，一次附帶影片自己的音效驅動程式。
 

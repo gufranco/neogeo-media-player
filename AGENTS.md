@@ -47,6 +47,7 @@ read out of both emulators' decoders.
 | The baker holds | `uv --project tools run ruff format --check tools/`, `ruff check tools/`, `mypy tools/neogeomedia tools/scripts` |
 | The behaviour holds | `NEOGEOMEDIA_CC_REQUIRED=1 uv --project tools run python -m pytest tools/tests --cov=neogeomedia --cov=tools/scripts --cov-config=tools/pyproject.toml --cov-fail-under=95` |
 | A commit is clean | `.githooks/pre-commit`, installed once by `make hooks` |
+| The regression set holds | `uv --project tools run python tools/scripts/fetch_clips.py`, then the behaviour gate with `NEOGEOMEDIA_CLIPS_REQUIRED=1` |
 | It builds | `make rom` |
 | The C holds | `make analyse` |
 | No VRAM write pair is under its floor | `make timing`, after `make rom` |
@@ -69,6 +70,23 @@ read out of both emulators' decoders.
 5. **An emulator never takes the screen.** A scripted run is headless and makes
    no sound; a run the owner asked to watch opens windowed and minimised, never
    full screen. See "Running an emulator" below.
+
+## The regression set
+
+Six films of different kinds, the same ones the Master System player bakes,
+are baked on every test run at rung q17 over a two-second window each. The
+manifest, [`tools/clips.manifest.json`](tools/clips.manifest.json), holds
+each film's identity, credit, licence, window and two ceilings: the displayed
+error and the tiles a second the bake may spend. The ceilings sit 15% above
+what the films measured on 2026-10-15, so a change has to make the picture
+or the dictionary measurably worse to fail, and ffmpeg differing slightly
+between this Mac and the runner does not. Only the synthetic film is
+committed; the rest are fetched and verified by SHA-256.
+
+[`tools/tests/test_golden.py`](tools/tests/test_golden.py) pins the encoder
+on a synthetic clip built in memory, so it does not depend on ffmpeg at all:
+stream size, tile count and displayed error, each within 0.5%. Raising the
+tolerance from 0.0005 to 0.0007 moves them by 7% to 17%.
 
 ## Running an emulator
 

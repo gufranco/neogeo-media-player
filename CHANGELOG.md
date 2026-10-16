@@ -8,6 +8,7 @@ was paid for once and does not need paying for again.
 
 ## Contents
 
+- [Six films on every test run](#six-films-on-every-test-run)
 - [A corrupt stream stops on red](#a-corrupt-stream-stops-on-red)
 - [The timing gate reads the whole player](#the-timing-gate-reads-the-whole-player)
 - [The BIOS drew its logo from film tiles](#the-bios-drew-its-logo-from-film-tiles)
@@ -22,6 +23,16 @@ was paid for once and does not need paying for again.
 - [It plays on a board](#it-plays-on-a-board)
 - [What is left](#what-is-left)
 - [Standing rules for this project](#standing-rules-for-this-project)
+
+## Six films on every test run
+
+Every encoder change here was judged on whatever clip was at hand. The
+regression set now bakes six films of different kinds on every test run: a
+synthetic picture, 3D animation, a hand-drawn cartoon, live action, animals
+and people, the same films the Master System player uses. Each holds a
+displayed-error ceiling and a tiles-a-second ceiling, set 15% above what it
+measured. A golden test pins the encoder on a clip built in memory, within
+0.5%, and fails on a tolerance change from 0.0005 to 0.0007.
 
 ## A corrupt stream stops on red
 

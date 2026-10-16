@@ -42,10 +42,19 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg
 
+      - name: Cache the regression films
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: media/clips
+          key: clips-${{ hashFiles('tools/clips.manifest.json') }}
+
       - name: The gate the baker job runs
+        env:
+          NEOGEOMEDIA_CLIPS_REQUIRED: "1"
         run: |
           set -euo pipefail
           uv --project tools sync --all-groups
+          uv --project tools run python tools/scripts/fetch_clips.py
           uv --project tools run ruff format --check tools/
           uv --project tools run ruff check tools/
           uv --project tools run mypy tools/neogeomedia tools/scripts

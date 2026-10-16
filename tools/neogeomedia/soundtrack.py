@@ -8,6 +8,7 @@ from typing import Final
 
 import numpy as np
 import numpy.typing as npt
+from fmvcore import ffmpeg
 
 from neogeomedia import adpcmb, frames
 
@@ -22,27 +23,6 @@ VOICE_FILE: Final = "v2.bin"
 class Voice:
     path: Path | None
     pages: Fraction
-
-
-def has_audio_stream(source: Path) -> bool:
-    result = subprocess.run(
-        [
-            "ffprobe",
-            "-v",
-            "error",
-            "-select_streams",
-            "a",
-            "-show_entries",
-            "stream=index",
-            "-of",
-            "csv=p=0",
-            str(source),
-        ],
-        capture_output=True,
-        check=True,
-        text=True,
-    )
-    return bool(result.stdout.strip())
 
 
 def _decode_command(source: Path, start: float, duration: float, rate_hz: float) -> list[str]:
@@ -72,7 +52,7 @@ def _decode_command(source: Path, start: float, duration: float, rate_hz: float)
 def decode_audio(
     source: Path, start: float, duration: float, rate_hz: float
 ) -> npt.NDArray[np.int16]:
-    if not has_audio_stream(source):
+    if not ffmpeg.has_audio(source):
         return np.zeros(0, dtype=np.int16)
     command = _decode_command(source, start, duration, rate_hz)
     result = subprocess.run(command, capture_output=True, check=True)

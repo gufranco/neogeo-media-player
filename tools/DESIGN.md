@@ -807,25 +807,11 @@ each frame about 2.47 times. Holding fewer refreshes than that skips
 nothing and only shifts which refresh carries the update, so it
 costs temporal accuracy and saves no tiles at all.
 
-#### `SourceAnalysis`
-
-What ffmpeg can tell us about a source before anything is baked.
-
-#### `_run_filter`
-
-Run an analysis filter and hand back what it wrote to stderr.
-
-#### `analyse`
-
-Detect the two things that ruin a bake if they go unnoticed.
-
-Interlaced fields woven into a progressive frame become permanent
-comb artifacts once they are quantised into character ROM, and black
-bars spend the raster on nothing. Both are cheap to detect up front
-and impossible to undo afterwards.
-
-A crop is only reported when it actually reduces the frame, since
-cropdetect names the full frame when it finds no bars at all.
+Interlacing and baked-in bars are detected by `fmvcore.source.analyse`,
+which both players share. Interlaced fields woven into a progressive frame
+become permanent comb artifacts once they are quantised into character ROM,
+and black bars spend the raster on nothing, so both are checked before the
+frames are decoded.
 
 #### `_analysed_size`
 
@@ -1692,9 +1678,7 @@ Write the chosen tiles into the model and list what must be sent.
 
 Turn the source soundtrack into the voice ROM and its register values.
 
-#### `has_audio_stream`
-
-True when the source carries at least one audio stream.
+Whether the source has a soundtrack at all comes from `fmvcore.ffmpeg.has_audio`.
 
 #### `decode_audio`
 

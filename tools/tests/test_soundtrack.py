@@ -41,28 +41,6 @@ def tone_clip(tmp_path_factory):
     return _make_clip(tmp_path_factory.mktemp("tone") / "tone.mp4", with_tone=True)
 
 
-class TestDetection:
-    def test_a_source_without_audio_is_detected(self, silent_clip):
-        # Arrange
-        source = silent_clip
-
-        # Act
-        found = soundtrack.has_audio_stream(source)
-
-        # Assert
-        assert found is False
-
-    def test_a_source_with_audio_is_detected(self, tone_clip):
-        # Arrange
-        source = tone_clip
-
-        # Act
-        found = soundtrack.has_audio_stream(source)
-
-        # Assert
-        assert found is True
-
-
 class TestDecode:
     def test_a_silent_source_decodes_to_an_empty_signal(self, silent_clip):
         # Arrange

@@ -348,72 +348,7 @@ class TestFrameHoldPlanning:
         )
 
 
-class TestSourceAnalysis:
-    def interlaced_clip(self, tmp_path):
-        path = tmp_path / "interlaced.mp4"
-        subprocess.run(
-            [
-                "ffmpeg",
-                "-v",
-                "error",
-                "-y",
-                "-f",
-                "lavfi",
-                "-i",
-                "testsrc=size=640x480:rate=25:duration=2",
-                "-vf",
-                "interlace",
-                "-flags",
-                "+ilme+ildct",
-                "-pix_fmt",
-                "yuv420p",
-                str(path),
-            ],
-            check=True,
-        )
-        return path
-
-    def letterboxed_clip(self, tmp_path):
-        path = tmp_path / "bars.mp4"
-        subprocess.run(
-            [
-                "ffmpeg",
-                "-v",
-                "error",
-                "-y",
-                "-f",
-                "lavfi",
-                "-i",
-                "testsrc=size=640x360:rate=25:duration=2",
-                "-vf",
-                "pad=640:480:0:60:black",
-                "-pix_fmt",
-                "yuv420p",
-                str(path),
-            ],
-            check=True,
-        )
-        return path
-
-    def test_a_progressive_source_is_not_flagged(self, synthetic_clip):
-        assert frames.analyse(synthetic_clip, duration=1.0).interlaced is False
-
-    def test_an_interlaced_source_is_flagged(self, tmp_path):
-        clip = self.interlaced_clip(tmp_path)
-
-        assert frames.analyse(clip, duration=1.5).interlaced is True
-
-    def test_a_full_frame_source_reports_no_bars(self, synthetic_clip):
-        assert frames.analyse(synthetic_clip, duration=1.0).crop is None
-
-    def test_black_bars_are_detected(self, tmp_path):
-        clip = self.letterboxed_clip(tmp_path)
-
-        crop = frames.analyse(clip, duration=1.5).crop
-
-        assert crop is not None
-        assert crop[1] < 480
-
+class TestDeinterlacing:
     def test_the_deinterlacer_is_only_added_when_needed(self):
         geometry = frames.plan_geometry(640, 480)
 

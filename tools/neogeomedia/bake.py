@@ -10,6 +10,7 @@ from typing import Any, Final, TypedDict
 
 import numpy as np
 import numpy.typing as npt
+from fmvcore import ffmpeg
 
 from neogeomedia import (
     bakeargs,
@@ -305,7 +306,7 @@ def _overran(report: dict[str, object]) -> bool:
 
 
 def _announce_silence(source: Path) -> None:
-    if source.is_file() and not soundtrack.has_audio_stream(source):
+    if source.is_file() and not ffmpeg.has_audio(source):
         print(
             f"{source} carries no audio track, so the cartridge will be silent. "
             "Nothing is wrong with the video; there is simply no soundtrack to encode.",

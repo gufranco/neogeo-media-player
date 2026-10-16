@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import re
-import subprocess
 from collections.abc import Iterator
 from dataclasses import dataclass
 from fractions import Fraction
@@ -11,11 +9,9 @@ from typing import Final, Literal
 
 import numpy as np
 import numpy.typing as npt
-from fmvcore import ffmpeg
+from fmvcore import ffmpeg, source
 
-_MULTI_FIELDS: Final = re.compile(r"(TFF|BFF|Progressive|Undetermined):(\d+)")
 _ANALYSIS_SECONDS: Final = 8.0
-_CROP: Final = re.compile(r"crop=(\d+):(\d+):(\d+):(\d+)")
 
 VBLANK_FPS: Final = Fraction(6_000_000, 384 * 264)
 DISPLAY_ASPECT: Final = 4 / 3
@@ -77,60 +73,7 @@ def source_frames_kept(hold: int, source_fps: float) -> float:
     return min(1.0, effective / float(source_fps))
 
 
-@dataclass(frozen=True, slots=True)
-class SourceAnalysis:
-    interlaced: bool
-    crop: tuple[int, int, int, int] | None
-
-
-def _run_filter(path: Path, filter_spec: str, *, start: float, duration: float) -> str:
-    result = subprocess.run(
-        [
-            ffmpeg.require_tool("ffmpeg"),
-            "-hide_banner",
-            "-ss",
-            f"{start:.6f}",
-            "-i",
-            str(path),
-            "-t",
-            f"{duration:.6f}",
-            "-vf",
-            filter_spec,
-            "-an",
-            "-f",
-            "null",
-            "-",
-        ],
-        capture_output=True,
-        check=True,
-        text=True,
-    )
-    return result.stderr
-
-
-def analyse(path: Path, *, start: float = 0.0, duration: float = 8.0) -> SourceAnalysis:
-    path = Path(path)
-    verdict = _run_filter(path, "idet", start=start, duration=duration)
-    interlaced = False
-    for line in verdict.splitlines():
-        if "Multi frame detection" in line:
-            fields = dict(_MULTI_FIELDS.findall(line.replace(" ", "")))
-            woven = int(fields.get("TFF", 0)) + int(fields.get("BFF", 0))
-            progressive = int(fields.get("Progressive", 0))
-            interlaced = woven > progressive
-
-    bars = _run_filter(path, "cropdetect=limit=24:round=2", start=start, duration=duration)
-    crop: tuple[int, int, int, int] | None = None
-    matches = _CROP.findall(bars)
-    if matches:
-        width, height, left, top = (int(value) for value in matches[-1])
-        info = ffmpeg.probe(path)
-        if width < info.width or height < info.height:
-            crop = (width, height, left, top)
-    return SourceAnalysis(interlaced=interlaced, crop=crop)
-
-
-def _analysed_size(info: ffmpeg.SourceInfo, analysis: SourceAnalysis) -> tuple[int, int]:
+def _analysed_size(info: ffmpeg.SourceInfo, analysis: source.SourceAnalysis) -> tuple[int, int]:
     if analysis.crop is None:
         return info.width, info.height
     return analysis.crop[0], analysis.crop[1]
@@ -287,7 +230,9 @@ def stream(
 
 def _frames(path: Path, window: Window, wanted: int) -> Iterator[npt.NDArray[np.uint8]]:
     info = ffmpeg.probe(path)
-    analysis = analyse(path, start=window.start, duration=min(window.duration, _ANALYSIS_SECONDS))
+    analysis = source.analyse(
+        path, start=window.start, duration=min(window.duration, _ANALYSIS_SECONDS)
+    )
     width, height = _analysed_size(info, analysis)
     target_width, target_height = window.size
     geometry = plan_geometry(width, height, target_width, target_height, fit=window.fit)

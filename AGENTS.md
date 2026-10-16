@@ -50,6 +50,7 @@ read out of both emulators' decoders.
 | It builds | `make rom` |
 | The C holds | `make analyse` |
 | No VRAM write pair is under its floor | `make timing`, after `make rom` |
+| The sound driver answers its commands | `NEOGEOMEDIA_ROM_REQUIRED=1 uv --project tools run python -m pytest tools/tests/test_sound_on_z80.py`, after `make rom` |
 | A cartridge comes out end to end | `uv --project tools run python -m neogeomedia.cartridge <source> --quality q17` |
 | It runs on a board | the owner's AES or MVS; nothing on this machine settles it |
 

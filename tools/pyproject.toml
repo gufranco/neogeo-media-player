@@ -19,6 +19,7 @@ dev = [
     "ruff==0.17.0",
     "mypy==2.4.0",
     "faker==40.43.0",
+    "z80 @ git+https://github.com/gufranco/zilog-z80-python.git@e2fedbd600640f1f5079a15668cda0662037133c",
 ]
 release = [
     "python-semantic-release==10.7.0",

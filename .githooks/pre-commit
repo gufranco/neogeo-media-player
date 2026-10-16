@@ -32,6 +32,7 @@ GATES = Gates(
         Check("rom", ("make", "rom")),
         Check("analyse", ("make", "analyse")),
         Check("timing", ("make", "timing")),
+        Check("sound", (*UV, "python", "-m", "pytest", "tools/tests/test_sound_on_z80.py")),
     ),
     player_paths=(
         "src/",
@@ -39,9 +40,10 @@ GATES = Gates(
         "Makefile",
         "Dockerfile",
         "tools/scripts/check_vram_timing.py",
+        "tools/tests/test_sound_on_z80.py",
     ),
     always_required={"NEOGEOMEDIA_CC_REQUIRED": "1"},
-    player_required={"NEOGEOMEDIA_CC_REQUIRED": "1"},
+    player_required={"NEOGEOMEDIA_CC_REQUIRED": "1", "NEOGEOMEDIA_ROM_REQUIRED": "1"},
 )
 
 if __name__ == "__main__":

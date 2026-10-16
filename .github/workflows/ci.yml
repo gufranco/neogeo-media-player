@@ -149,6 +149,13 @@ jobs:
       - name: VRAM write spacing across the whole player
         run: make timing
 
+      - name: The sound driver answers its commands on a Z80
+        env:
+          NEOGEOMEDIA_ROM_REQUIRED: "1"
+        run: >-
+          uv --project tools run python -m pytest
+          tools/tests/test_sound_on_z80.py
+
       - name: The cartridge is real
         run: |
           set -euo pipefail

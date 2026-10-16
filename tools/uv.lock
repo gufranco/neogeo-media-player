@@ -491,6 +491,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
+    { name = "z80" },
 ]
 release = [
     { name = "python-semantic-release" },
@@ -509,6 +510,7 @@ dev = [
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-cov", specifier = "==7.1.0" },
     { name = "ruff", specifier = "==0.17.0" },
+    { name = "z80", git = "https://github.com/gufranco/zilog-z80-python.git?rev=e2fedbd600640f1f5079a15668cda0662037133c" },
 ]
 release = [{ name = "python-semantic-release", specifier = "==10.7.0" }]
 
@@ -882,3 +884,8 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/55/b3/af176d79a8515a8a720eccdad9a96f6e31a30abf2865430c8c42adf2fd13/wrapt-2.3.0-cp314-cp314t-win_arm64.whl", hash = "sha256:b1e5aa486e269b00ed35e64771c7d0ab8096cfd2643405ca8cd60ebedc099a51", size = 81774, upload-time = "2026-07-28T06:05:53.902Z" },
     { url = "https://files.pythonhosted.org/packages/00/39/3daf9f47be208606586de4568ba6713db53ebc8fd7a575aea1fe57983b69/wrapt-2.3.0-py3-none-any.whl", hash = "sha256:d8c7ed08477429752b8c44991f40ad7838b18332a160698740a6bfbc10d998a2", size = 61866, upload-time = "2026-07-28T06:06:12.9Z" },
 ]
+
+[[package]]
+name = "z80"
+version = "6.12.0"
+source = { git = "https://github.com/gufranco/zilog-z80-python.git?rev=e2fedbd600640f1f5079a15668cda0662037133c#e2fedbd600640f1f5079a15668cda0662037133c" }

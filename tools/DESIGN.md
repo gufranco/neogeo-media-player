@@ -1287,13 +1287,8 @@ The richest rung that fits, settled by baking.
 Never shortens the source. A source that fits nowhere comes back with
 no tier, leaving the decision to trim where it belongs.
 
-#### `_bracket`
-
-Narrow the answer to a span, richest rung first, by doubling.
-
-Returns the half-open span the answer lies in. A span of
-`(count, count)` means nothing fits, which is the caller's cue to
-report that rather than to trim anything.
+The bracket and the binary search are `fmvcore.ladder.first_fit`, which the
+Master System player's step-down shares.
 
 #### `_fits`
 

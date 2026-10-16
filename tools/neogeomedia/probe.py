@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from fmvcore import ladder
+
 from neogeomedia import quality, tiercache
 
 
@@ -51,33 +53,10 @@ def search(
     def fits(index: int) -> bool:
         return _fits(rungs[index], outcome, measure=measure, minutes=minutes, budget=budget)
 
-    low, high = _bracket(len(rungs), fits)
-    while low < high:
-        middle = (low + high) // 2
-        if fits(middle):
-            high = middle
-        else:
-            low = middle + 1
-
-    if low < len(rungs):
-        outcome.tier = rungs[low]
+    found = ladder.first_fit(len(rungs), fits)
+    if found is not None:
+        outcome.tier = rungs[found]
     return outcome
-
-
-def _bracket(count: int, fits: Callable[[int], bool]) -> tuple[int, int]:
-    if count == 0:
-        return 0, 0
-    if fits(0):
-        return 0, 0
-    stride, previous = 1, 0
-    while stride < count:
-        if fits(stride):
-            return previous + 1, stride
-        previous = stride
-        stride *= 2
-    if previous + 1 >= count:
-        return count, count
-    return previous + 1, count
 
 
 def _fits(

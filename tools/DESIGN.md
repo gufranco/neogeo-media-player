@@ -557,70 +557,6 @@ Split frames of color indices into a (frame, row, col, y, x) grid.
 
 Reassemble one grid of tiles into a full frame.
 
-#### `_masked_threshold`
-
-Per-slot error budget, raised where the picture is moving.
-
-Vision is far less sensitive to spatial detail in a region that is
-changing quickly, and far more sensitive in one that is still, where
-an error sits on screen and stays visible. A single flat threshold
-spends the same precision on both. Scaling the budget by how much
-the source itself moved buys back tiles from exactly the places the
-eye cannot inspect them, which is the whole point of a lossy codec.
-
-A masking factor of zero reproduces the flat threshold.
-
-Masking is only safe because a skipped slot stays pending and is
-re-tested every frame. Once its motion stops the budget collapses
-back to the flat threshold and the slot is corrected, so an error
-hidden by movement never outlives the movement that hid it.
-
-#### `_movement`
-
-Mean squared Oklab distance the source itself moved, per slot.
-
-#### `_RateController`
-
-Keeps tile spending on pace so the movie fits the cartridge.
-
-A tier is chosen from a sample, and a sample cannot know that the
-third act is busier than the first. Left alone the dictionary runs
-out partway through and every remaining slot freezes, which wrecks
-the end of the film instead of costing a little quality across all
-of it.
-
-Correcting from cumulative overshoot proved far too slow. By the
-time the running total is visibly over, the only thresholds that
-would still recover the deficit are ones this controller would take
-hundreds of frames to reach, so it arrives after the dictionary has
-already hit its cap. This instead compares the recent rate of tile
-creation against the rate the remaining budget affords, and holds a
-multiplier that persists between frames so it keeps moving until it
-actually bites.
-
-The multiplier never falls below one, so the tier's threshold is a
-floor and the controller only ever tightens. Letting it relax was
-tried, in the hope of spending the capacity a discrete tier leaves
-behind, and it loses in both the forms attempted. Tile spending is
-heavily front-loaded, since an empty dictionary mints a tile for
-almost every slot and a full one reuses: over one clip the four
-quarters spent 7,030, 16,229, 11,572 and 22,704 updates against a
-flat expectation of 14,247. A controller pacing against a uniform
-budget therefore relaxes exactly when spending is naturally light
-and starves the passages that legitimately need the tiles. Filling
-the cartridge to 100% that way scored 26.63 where never relaxing
-scored 20.11.
-
-Spending the leftover capacity needs a budget curve shaped like the
-content rather than a straight line, which is a two-pass problem.
-
-The multiplier never falls below one, so the tier's own threshold is
-a floor and the controller can only tighten.
-
-#### `tolerance`
-
-The error budget for this frame.
-
 #### `_new_dictionary`
 
 The dictionary this encode may fill, capped by any tile budget.
@@ -628,36 +564,6 @@ The dictionary this encode may fill, capped by any tile budget.
 Capping here rather than in the controller is what makes the budget
 a guarantee: no threshold can be raised high enough to slow some
 content down, but a dictionary that refuses to grow always holds.
-
-#### `_is_scene_cut`
-
-Whether the picture jumped rather than moved.
-
-A cut earns a keyframe because a delta could not be cheaper when
-nearly every slot has to be rewritten anyway. Deciding that on the
-count of slots that differ at all does not work on photographed
-material: grain, dither, and any gentle camera move perturb almost
-every slot by a shade every frame, so a plain count reads a still
-scene as a cut. Measured on real footage that fired on 22% of all
-frames, and each false cut rewrote all 280 slots and interned the
-tiles a delta would have skipped.
-
-Magnitude separates the two cases cleanly. A slot counts toward a
-cut only once the source moved further than `scene_cut_floor`, which
-leaves gradual motion to the delta path where it belongs.
-
-#### `_select_targets`
-
-Which slots to redraw this frame, and which stay owed a redraw.
-
-A keyframe takes every slot and clears the backlog, which is what
-makes it a seek target. Otherwise a slot is a candidate when its
-source changed or when an earlier frame skipped it, and it is only
-redrawn when the picture on screen has drifted past the budget.
-
-A skipped slot stays pending rather than being forgotten, so an
-error the encoder chose to tolerate is re-tested on every later
-frame and repaired as soon as it stops being cheap to hide.
 
 #### `_tile_frames`
 
@@ -670,43 +576,6 @@ Running counters the encode loop accumulates across frames.
 #### `track_tolerance`
 
 Record the highest budget the controller had to reach.
-
-#### `_Screen`
-
-What the LSPC is currently showing, tracked slot by slot.
-
-#### `drift`
-
-Mean squared Oklab distance between the source and the picture on screen.
-
-#### `retarget`
-
-Point the model at a new epoch's colours.
-
-What is on screen does not change, so the model of it must not
-either. Only the palettes that later assignments are measured
-against move.
-
-#### `fidelity`
-
-Mean squared Oklab error of the whole displayed frame.
-
-Deliberately measured on the unweighted grid over every slot,
-including the ones the encoder chose not to redraw. `mean_error`
-averages the palette error of tiles that were written, so it
-improves when the encoder skips more work, which makes it
-useless for judging output quality. This is the number that
-answers whether the picture on screen still matches the source,
-and no encoder knob can flatter it.
-
-The comparison is against the true source frame for this refresh,
-never the frame the encoder chose to hold. Holding a frame across
-four refreshes is a real error the viewer sees, so measuring
-against the held copy would score a cheat as free.
-
-#### `commit`
-
-Write the chosen tiles into the model and list what must be sent.
 
 #### `encode`
 
@@ -763,6 +632,15 @@ A cart filled to the character-ROM ceiling is around 15,600 frames.
 Neither the source nor the rendered output fits in memory at that
 length, so the palette set is fitted from a strided sample taken in
 an earlier pass and the frames themselves stream past.
+
+#### `_Encoder`
+
+The state one encode carries from frame to frame, and the step that advances it.
+
+Each call to `step` takes one decoded frame through the same order every
+time: hold, epoch, keyframe decision, rate control, slot selection, palette
+assignment, interning and recording. Keeping that order in one place is what
+lets the stream, the dictionary and the statistics agree.
 
 
 ### [`neogeomedia/epochs.py`](neogeomedia/epochs.py)
@@ -1662,6 +1540,152 @@ after correction.
 #### `nearest_by_chroma`
 
 The rung whose colour weight is closest to a wanted one.
+
+
+### [`neogeomedia/ratecontrol.py`](neogeomedia/ratecontrol.py)
+
+Pace tile spending against the cartridge's budget.
+
+#### `RateController`
+
+Keeps tile spending on pace so the movie fits the cartridge.
+
+A tier is chosen from a sample, and a sample cannot know that the
+third act is busier than the first. Left alone the dictionary runs
+out partway through and every remaining slot freezes, which wrecks
+the end of the film instead of costing a little quality across all
+of it.
+
+Correcting from cumulative overshoot proved far too slow. By the
+time the running total is visibly over, the only thresholds that
+would still recover the deficit are ones this controller would take
+hundreds of frames to reach, so it arrives after the dictionary has
+already hit its cap. This instead compares the recent rate of tile
+creation against the rate the remaining budget affords, and holds a
+multiplier that persists between frames so it keeps moving until it
+actually bites.
+
+The multiplier never falls below one, so the tier's threshold is a
+floor and the controller only ever tightens. Letting it relax was
+tried, in the hope of spending the capacity a discrete tier leaves
+behind, and it loses in both the forms attempted. Tile spending is
+heavily front-loaded, since an empty dictionary mints a tile for
+almost every slot and a full one reuses: over one clip the four
+quarters spent 7,030, 16,229, 11,572 and 22,704 updates against a
+flat expectation of 14,247. A controller pacing against a uniform
+budget therefore relaxes exactly when spending is naturally light
+and starves the passages that legitimately need the tiles. Filling
+the cartridge to 100% that way scored 26.63 where never relaxing
+scored 20.11.
+
+Spending the leftover capacity needs a budget curve shaped like the
+content rather than a straight line, which is a two-pass problem.
+
+The multiplier never falls below one, so the tier's own threshold is
+a floor and the controller can only tighten.
+
+#### `tolerance`
+
+The error budget for this frame.
+
+
+### [`neogeomedia/redraw.py`](neogeomedia/redraw.py)
+
+Decide which slots a frame redraws and when a frame is a cut.
+
+#### `masked_threshold`
+
+Per-slot error budget, raised where the picture is moving.
+
+Vision is far less sensitive to spatial detail in a region that is
+changing quickly, and far more sensitive in one that is still, where
+an error sits on screen and stays visible. A single flat threshold
+spends the same precision on both. Scaling the budget by how much
+the source itself moved buys back tiles from exactly the places the
+eye cannot inspect them, which is the whole point of a lossy codec.
+
+A masking factor of zero reproduces the flat threshold.
+
+Masking is only safe because a skipped slot stays pending and is
+re-tested every frame. Once its motion stops the budget collapses
+back to the flat threshold and the slot is corrected, so an error
+hidden by movement never outlives the movement that hid it.
+
+#### `movement`
+
+Mean squared Oklab distance the source itself moved, per slot.
+
+#### `is_scene_cut`
+
+Whether the picture jumped rather than moved.
+
+A cut earns a keyframe because a delta could not be cheaper when
+nearly every slot has to be rewritten anyway. Deciding that on the
+count of slots that differ at all does not work on photographed
+material: grain, dither, and any gentle camera move perturb almost
+every slot by a shade every frame, so a plain count reads a still
+scene as a cut. Measured on real footage that fired on 22% of all
+frames, and each false cut rewrote all 280 slots and interned the
+tiles a delta would have skipped.
+
+Magnitude separates the two cases cleanly. A slot counts toward a
+cut only once the source moved further than `scene_cut_floor`, which
+leaves gradual motion to the delta path where it belongs.
+
+#### `select_targets`
+
+Which slots to redraw this frame, and which stay owed a redraw.
+
+A keyframe takes every slot and clears the backlog, which is what
+makes it a seek target. Otherwise a slot is a candidate when its
+source changed or when an earlier frame skipped it, and it is only
+redrawn when the picture on screen has drifted past the budget.
+
+A skipped slot stays pending rather than being forgotten, so an
+error the encoder chose to tolerate is re-tested on every later
+frame and repaired as soon as it stops being cheap to hide.
+
+
+### [`neogeomedia/screen.py`](neogeomedia/screen.py)
+
+Model the picture the LSPC is showing, slot by slot.
+
+#### `Screen`
+
+What the LSPC is currently showing, tracked slot by slot.
+
+#### `drift`
+
+Mean squared Oklab distance between the source and the picture on screen.
+
+#### `retarget`
+
+Point the model at a new epoch's colours.
+
+What is on screen does not change, so the model of it must not
+either. Only the palettes that later assignments are measured
+against move.
+
+#### `fidelity`
+
+Mean squared Oklab error of the whole displayed frame.
+
+Deliberately measured on the unweighted grid over every slot,
+including the ones the encoder chose not to redraw. `mean_error`
+averages the palette error of tiles that were written, so it
+improves when the encoder skips more work, which makes it
+useless for judging output quality. This is the number that
+answers whether the picture on screen still matches the source,
+and no encoder knob can flatter it.
+
+The comparison is against the true source frame for this refresh,
+never the frame the encoder chose to hold. Holding a frame across
+four refreshes is a real error the viewer sees, so measuring
+against the held copy would score a cheat as free.
+
+#### `commit`
+
+Write the chosen tiles into the model and list what must be sent.
 
 
 ### [`neogeomedia/soundtrack.py`](neogeomedia/soundtrack.py)

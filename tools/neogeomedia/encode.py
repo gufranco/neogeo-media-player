@@ -8,8 +8,10 @@ import numpy as np
 import numpy.typing as npt
 from fmvcore import colour
 
-from neogeomedia import crom, neocolor, palettes, stream
-from neogeomedia.dictionary import TileDictionary, TileRef
+from neogeomedia import crom, neocolor, palettes, redraw, stream
+from neogeomedia.dictionary import TileDictionary
+from neogeomedia.ratecontrol import RateController
+from neogeomedia.screen import Screen
 
 GRID_COLS: Final = stream.GRID_COLS
 GRID_ROWS: Final = stream.GRID_ROWS
@@ -91,115 +93,11 @@ def from_tiles(tiles: npt.NDArray[np.uint16]) -> npt.NDArray[np.uint16]:
     return tiles.transpose(0, 2, 1, 3).reshape(FRAME_HEIGHT, FRAME_WIDTH)
 
 
-def _masked_threshold(
-    current: npt.NDArray[np.uint16],
-    previous: npt.NDArray[np.uint16] | None,
-    targets: npt.NDArray[np.bool_],
-    options: EncodeOptions,
-    tolerance: float,
-) -> npt.NDArray[np.float32] | float:
-    if options.motion_masking <= 0.0 or previous is None:
-        return tolerance
-    moved = _movement(current, previous, targets, options.chroma_weight)
-    return tolerance + options.motion_masking * moved
-
-
-def _movement(
-    current: npt.NDArray[np.uint16],
-    previous: npt.NDArray[np.uint16],
-    targets: npt.NDArray[np.bool_],
-    chroma_weight: float,
-) -> npt.NDArray[np.float32]:
-    grid = palettes.oklab_grid(chroma_weight)
-    moved: npt.NDArray[np.float32] = (
-        ((grid[current[targets]] - grid[previous[targets]]) ** 2).sum(axis=3).mean(axis=(1, 2))
-    )
-    return moved
-
-
-class _RateController:
-    _SMOOTHING: Final = 0.05
-    _RAMP_LIMIT: Final = 1.25
-    _DECAY: Final = 0.90
-    _SLACK: Final = 0.95
-
-    def __init__(self, options: EncodeOptions) -> None:
-        self._budget = options.tile_budget
-        self._base = options.tolerance
-        self._max_scale = options.max_tolerance_scale
-        self._scale = 1.0
-        self._previous_tiles = 0
-        self._rate = 0.0
-
-    def tolerance(self, tiles_used: int, index: int, total_frames: int) -> float:
-        if self._budget <= 0 or total_frames <= 0:
-            return self._base
-        added = tiles_used - self._previous_tiles
-        self._previous_tiles = tiles_used
-        self._rate += (added - self._rate) * self._SMOOTHING
-
-        remaining_frames = total_frames - index
-        remaining_budget = self._budget - tiles_used
-        if remaining_frames <= 0:
-            return self._base * self._scale
-        affordable = max(0.0, remaining_budget) / remaining_frames
-
-        if affordable <= 0.0:
-            self._scale = self._max_scale
-        elif self._rate > affordable:
-            ramp = min(self._rate / affordable, self._RAMP_LIMIT)
-            self._scale = min(self._max_scale, self._scale * ramp)
-        elif self._rate < affordable * self._SLACK:
-            self._scale = max(1.0, self._scale * self._DECAY)
-        return self._base * self._scale
-
-
 def _new_dictionary(options: EncodeOptions) -> TileDictionary:
     capacity = options.dictionary_capacity
     if options.tile_budget > 0:
         capacity = min(capacity, options.tile_budget)
     return TileDictionary(allow_flip=options.allow_flip, capacity=capacity)
-
-
-def _is_scene_cut(
-    current: npt.NDArray[np.uint16],
-    previous: npt.NDArray[np.uint16] | None,
-    changed: npt.NDArray[np.bool_],
-    index: int,
-    options: EncodeOptions,
-) -> bool:
-    if index == 0 or previous is None:
-        return True
-    if not changed.any():
-        return False
-    moved = _movement(current, previous, changed, options.chroma_weight)
-    jumped = float((moved > options.scene_cut_floor).sum()) / float(changed.size)
-    return jumped >= options.scene_cut_ratio
-
-
-def _select_targets(
-    current: npt.NDArray[np.uint16],
-    previous: npt.NDArray[np.uint16] | None,
-    changed: npt.NDArray[np.bool_],
-    pending: npt.NDArray[np.bool_],
-    *,
-    screen: _Screen,
-    keyframe: bool,
-    options: EncodeOptions,
-    tolerance: float,
-) -> tuple[npt.NDArray[np.bool_], npt.NDArray[np.bool_]]:
-    if keyframe:
-        return (
-            np.ones((GRID_ROWS, GRID_COLS), dtype=bool),
-            np.zeros((GRID_ROWS, GRID_COLS), dtype=bool),
-        )
-    targets = changed | pending
-    if tolerance <= 0.0 or not targets.any():
-        return targets, np.zeros_like(targets)
-    threshold = _masked_threshold(current, previous, targets, options, tolerance)
-    keep = np.zeros_like(targets)
-    keep[targets] = screen.drift(current, targets) > threshold
-    return keep, targets & ~keep
 
 
 def _tile_frames(
@@ -237,116 +135,6 @@ class _Totals:
         return tolerance
 
 
-def _build_stats(
-    *,
-    movie: stream.MovieStream,
-    dictionary: TileDictionary,
-    updates_per_frame: npt.NDArray[np.int32],
-    totals: _Totals,
-    budget: int,
-    expected_frames: int,
-    tolerance_ceiling: float,
-) -> EncodeStats:
-    tile_count = len(dictionary)
-    return EncodeStats(
-        frames=len(movie),
-        tile_count=tile_count,
-        dictionary_full=dictionary.is_full(),
-        crom_payload_bytes=tile_count * crom.TILE_BYTES,
-        crom_rom_bytes=2 * crom.rom_size_for(tile_count),
-        stream_bytes=movie.payload_size(),
-        stream_rom_bytes=len(movie.blob()),
-        keyframe_bytes=totals.keyframe_bytes,
-        delta_bytes=totals.delta_bytes,
-        index_bytes=len(movie.index_blob()),
-        keyframe_count=len(movie.keyframes()),
-        max_updates=int(updates_per_frame.max()),
-        mean_updates=float(updates_per_frame.mean()),
-        mean_error=(totals.error_total / totals.error_pixels) if totals.error_pixels else 0.0,
-        displayed_error=(
-            (totals.displayed_error_total / totals.displayed_frames)
-            if totals.displayed_frames
-            else 0.0
-        ),
-        blurred_error=(
-            (totals.blurred_error_total / totals.blurred_frames) if totals.blurred_frames else 0.0
-        ),
-        peak_tolerance=totals.peak_tolerance,
-        budget_exceeded=bool(budget > 0 and tile_count >= budget),
-        truncated=bool(expected_frames > 0 and len(movie) < expected_frames),
-        rate_control_exhausted=bool(
-            tolerance_ceiling > 0.0 and totals.peak_tolerance >= tolerance_ceiling
-        ),
-    )
-
-
-class _Screen:
-    def __init__(self, palette_set: palettes.PaletteSet) -> None:
-        self._palette_set = palette_set
-        self.tile = np.full((GRID_ROWS, GRID_COLS), -1, dtype=np.int64)
-        self.palette = np.zeros((GRID_ROWS, GRID_COLS), dtype=np.int64)
-        self.hflip = np.zeros((GRID_ROWS, GRID_COLS), dtype=bool)
-        self.vflip = np.zeros((GRID_ROWS, GRID_COLS), dtype=bool)
-        self.render = np.zeros((GRID_ROWS, GRID_COLS, TILE_PX, TILE_PX), dtype=np.uint16)
-
-    def drift(
-        self, source: npt.NDArray[np.uint16], targets: npt.NDArray[np.bool_]
-    ) -> npt.NDArray[np.float32]:
-        grid = palettes.oklab_grid(self._palette_set.chroma_weight)
-        source_lab = grid[source[targets]]
-        screen_lab = grid[self.render[targets]]
-        return ((source_lab - screen_lab) ** 2).sum(axis=3).mean(axis=(1, 2))
-
-    def retarget(self, palette_set: palettes.PaletteSet) -> None:
-        self._palette_set = palette_set
-
-    def fidelity(self, source: npt.NDArray[np.uint16]) -> float:
-        grid = palettes.oklab_grid(palettes.DEFAULT_CHROMA_WEIGHT)
-        error: float = float(((grid[source] - grid[self.render]) ** 2).sum(axis=4).mean())
-        return error
-
-    def commit(
-        self,
-        rows: npt.NDArray[np.int64],
-        cols: npt.NDArray[np.int64],
-        refs: list[TileRef | None],
-        assignment: palettes.Assignment,
-        *,
-        force: bool,
-    ) -> list[stream.SlotUpdate]:
-        display = assignment.rendered(self._palette_set)
-        updates: list[stream.SlotUpdate] = []
-        for slot, (row, col) in enumerate(zip(rows, cols, strict=True)):
-            ref = refs[slot]
-            if ref is None:
-                continue
-            bank = self._palette_set.bank_of(int(assignment.palette_ids[slot]))
-            already = (
-                self.tile[row, col] == ref.index
-                and self.palette[row, col] == bank
-                and self.hflip[row, col] == ref.hflip
-                and self.vflip[row, col] == ref.vflip
-            )
-            self.render[row, col] = display[slot]
-            if already and not force:
-                continue
-            self.tile[row, col] = ref.index
-            self.palette[row, col] = bank
-            self.hflip[row, col] = ref.hflip
-            self.vflip[row, col] = ref.vflip
-            updates.append(
-                stream.SlotUpdate(
-                    col=int(col),
-                    row=int(row),
-                    tile=ref.index,
-                    palette=bank,
-                    hflip=ref.hflip,
-                    vflip=ref.vflip,
-                )
-            )
-        return updates
-
-
 def encode(clip: npt.NDArray[np.uint8], options: EncodeOptions) -> EncodeResult:
     _validate(clip)
     sample = to_tiles(neocolor.rgb_to_color_index(clip[:: max(1, options.sample_stride)]))
@@ -358,55 +146,44 @@ def encode(clip: npt.NDArray[np.uint8], options: EncodeOptions) -> EncodeResult:
     )
 
 
+def _fit(
+    tiles: npt.NDArray[np.uint16], options: EncodeOptions, *, count: int, base_bank: int, seed: int
+) -> palettes.PaletteSet:
+    return palettes.build_palette_set(
+        tiles, count=count, base_bank=base_bank, seed=seed, chroma_weight=options.chroma_weight
+    )
+
+
 def _build_palette_sets(
     options: EncodeOptions,
     sample_tiles: npt.NDArray[np.uint16],
     epoch_samples: Sequence[tuple[int, npt.NDArray[np.uint16]]] | None,
 ) -> tuple[list[int], list[palettes.PaletteSet]]:
+    whole = {"count": options.palette_count, "base_bank": options.base_bank, "seed": options.seed}
     if not epoch_samples:
-        return [0], [
-            palettes.build_palette_set(
-                sample_tiles,
-                count=options.palette_count,
-                base_bank=options.base_bank,
-                seed=options.seed,
-                chroma_weight=options.chroma_weight,
-            )
-        ]
-
+        return [0], [_fit(sample_tiles, options, **whole)]
     if len(epoch_samples) == 1:
         start, tiles = epoch_samples[0]
-        return [start], [
-            palettes.build_palette_set(
-                tiles,
-                count=options.palette_count,
-                base_bank=options.base_bank,
-                seed=options.seed,
-                chroma_weight=options.chroma_weight,
-            )
-        ]
-
+        return [start], [_fit(tiles, options, **whole)]
     half = options.palette_count // 2
-    starts: list[int] = []
-    sets: list[palettes.PaletteSet] = []
-    for epoch, (start, tiles) in enumerate(epoch_samples):
-        starts.append(start)
-        sets.append(
-            palettes.build_palette_set(
-                tiles,
-                count=half,
-                base_bank=options.base_bank + (epoch % 2) * half,
-                seed=options.seed + epoch,
-                chroma_weight=options.chroma_weight,
-            )
+    starts = [start for start, _ in epoch_samples]
+    sets = [
+        _fit(
+            tiles,
+            options,
+            count=half,
+            base_bank=options.base_bank + (epoch % 2) * half,
+            seed=options.seed + epoch,
         )
+        for epoch, (_, tiles) in enumerate(epoch_samples)
+    ]
     return starts, sets
 
 
 def _enter_epoch(
     palette_set: palettes.PaletteSet,
     epoch: int,
-    screen: _Screen,
+    screen: Screen,
     dictionary: TileDictionary,
     options: EncodeOptions,
 ) -> palettes.PaletteAssigner:
@@ -424,7 +201,7 @@ def _advance_epoch(
     *,
     epoch_starts: Sequence[int],
     palette_sets: Sequence[palettes.PaletteSet],
-    screen: _Screen,
+    screen: Screen,
     dictionary: TileDictionary,
     options: EncodeOptions,
 ) -> tuple[int, palettes.PaletteAssigner]:
@@ -450,7 +227,7 @@ def _out_of_room(dictionary: TileDictionary, options: EncodeOptions) -> bool:
 
 
 def _record_frame(
-    screen: _Screen,
+    screen: Screen,
     incoming: npt.NDArray[np.uint16],
     index: int,
     rendered: npt.NDArray[np.uint16],
@@ -476,6 +253,168 @@ def _blurred(shown: npt.NDArray[np.uint16], wanted: npt.NDArray[np.uint16]) -> f
     return colour.blurred_error(shown_rgb[None], wanted_rgb[None])
 
 
+def _mean(total: float, count: int) -> float:
+    return (total / count) if count else 0.0
+
+
+class _Encoder:
+    def __init__(
+        self,
+        options: EncodeOptions,
+        epochs: tuple[list[int], list[palettes.PaletteSet]],
+        total_frames: int,
+        on_render: Callable[[npt.NDArray[np.uint16]], None] | None,
+    ) -> None:
+        self.options, self.total_frames, self.on_render = options, total_frames, on_render
+        self.epoch_starts, self.palette_sets = epochs
+        self.epoch = 0
+        self.dictionary = _new_dictionary(options)
+        self.screen = Screen(self.palette_sets[0])
+        self.assigner = _enter_epoch(self.palette_sets[0], 0, self.screen, self.dictionary, options)
+        self.movie = stream.MovieStream()
+        self.rendered = _render_buffer(total_frames, options)
+        self.updates_per_frame = np.zeros(total_frames, dtype=np.int32)
+        self.totals, self.controller = _Totals(), RateController(options)
+        self.last_keyframe = -options.keyframe_interval
+        self.previous: npt.NDArray[np.uint16] | None = None
+        self.pending = np.zeros((GRID_ROWS, GRID_COLS), dtype=bool)
+        self.hold = max(1, options.frame_hold)
+        self.held: npt.NDArray[np.uint16] | None = None
+
+    def _source(
+        self, index: int, incoming: npt.NDArray[np.uint16]
+    ) -> tuple[npt.NDArray[np.uint16], npt.NDArray[np.uint16] | None, npt.NDArray[np.bool_]]:
+        if index % self.hold == 0:
+            self.held = incoming
+        current = self.held if self.held is not None else incoming
+        changed = (
+            np.ones((GRID_ROWS, GRID_COLS), dtype=bool)
+            if self.previous is None
+            else (current != self.previous).any(axis=(2, 3))
+        )
+        previous_source, self.previous = self.previous, current
+        return current, previous_source, changed
+
+    def _advance(self, index: int) -> None:
+        self.epoch, self.assigner = _advance_epoch(
+            self.epoch,
+            index,
+            self.assigner,
+            epoch_starts=self.epoch_starts,
+            palette_sets=self.palette_sets,
+            screen=self.screen,
+            dictionary=self.dictionary,
+            options=self.options,
+        )
+
+    def _is_keyframe(
+        self,
+        index: int,
+        current: npt.NDArray[np.uint16],
+        previous_source: npt.NDArray[np.uint16] | None,
+        changed: npt.NDArray[np.bool_],
+    ) -> bool:
+        scene_cut = redraw.is_scene_cut(current, previous_source, changed, index, self.options) or (
+            index in self.epoch_starts and index > 0
+        )
+        keyframe = scene_cut or (index - self.last_keyframe >= self.options.keyframe_interval)
+        if keyframe:
+            self.last_keyframe = index
+        return keyframe
+
+    def _updates(
+        self, current: npt.NDArray[np.uint16], targets: npt.NDArray[np.bool_], keyframe: bool
+    ) -> list[stream.SlotUpdate]:
+        if not targets.any():
+            return []
+        rows, cols = np.nonzero(targets)
+        assignment = self.assigner.assign(current[rows, cols])
+        self.totals.error_total += float(assignment.error.sum())
+        self.totals.error_pixels += assignment.error.size * TILE_PX * TILE_PX
+        refs = self.dictionary.intern_batch(assignment.nibbles)
+        return self.screen.commit(rows, cols, refs, assignment, force=keyframe)
+
+    def _append(self, updates: list[stream.SlotUpdate], keyframe: bool) -> None:
+        before = self.movie.payload_size()
+        self.movie.append(updates, keyframe=keyframe)
+        written = self.movie.payload_size() - before
+        if keyframe:
+            self.totals.keyframe_bytes += written
+        else:
+            self.totals.delta_bytes += written
+
+    def step(self, index: int, incoming: npt.NDArray[np.uint16]) -> bool:
+        current, previous_source, changed = self._source(index, incoming)
+        self._advance(index)
+        keyframe = self._is_keyframe(index, current, previous_source, changed)
+        tolerance = self.totals.track_tolerance(
+            self.controller.tolerance(len(self.dictionary), index, self.total_frames)
+        )
+        targets, self.pending = redraw.select_targets(
+            current,
+            previous_source,
+            changed,
+            self.pending,
+            screen=self.screen,
+            keyframe=keyframe,
+            options=self.options,
+            tolerance=tolerance,
+        )
+        updates = self._updates(current, targets, keyframe)
+        self._append(updates, keyframe)
+        self.updates_per_frame[index] = len(updates)
+        _record_frame(
+            self.screen,
+            incoming,
+            index,
+            self.rendered,
+            totals=self.totals,
+            options=self.options,
+            on_render=self.on_render,
+        )
+        return _should_stop(self.dictionary, self.options)
+
+    def _stats(self, updates_per_frame: npt.NDArray[np.int32]) -> EncodeStats:
+        movie, totals, options = self.movie, self.totals, self.options
+        tile_count = len(self.dictionary)
+        ceiling = options.tolerance * options.max_tolerance_scale
+        return EncodeStats(
+            frames=len(movie),
+            tile_count=tile_count,
+            dictionary_full=self.dictionary.is_full(),
+            crom_payload_bytes=tile_count * crom.TILE_BYTES,
+            crom_rom_bytes=2 * crom.rom_size_for(tile_count),
+            stream_bytes=movie.payload_size(),
+            stream_rom_bytes=len(movie.blob()),
+            keyframe_bytes=totals.keyframe_bytes,
+            delta_bytes=totals.delta_bytes,
+            index_bytes=len(movie.index_blob()),
+            keyframe_count=len(movie.keyframes()),
+            max_updates=int(updates_per_frame.max()),
+            mean_updates=float(updates_per_frame.mean()),
+            mean_error=_mean(totals.error_total, totals.error_pixels),
+            displayed_error=_mean(totals.displayed_error_total, totals.displayed_frames),
+            blurred_error=_mean(totals.blurred_error_total, totals.blurred_frames),
+            peak_tolerance=totals.peak_tolerance,
+            budget_exceeded=bool(options.tile_budget > 0 and tile_count >= options.tile_budget),
+            truncated=bool(self.total_frames > 0 and len(movie) < self.total_frames),
+            rate_control_exhausted=bool(ceiling > 0.0 and totals.peak_tolerance >= ceiling),
+        )
+
+    def result(self) -> EncodeResult:
+        updates_per_frame = self.updates_per_frame[: len(self.movie)]
+        return EncodeResult(
+            stream=self.movie,
+            dictionary=self.dictionary,
+            palette_set=self.palette_sets[0],
+            palette_sets=self.palette_sets,
+            epoch_starts=self.epoch_starts,
+            updates_per_frame=updates_per_frame,
+            rendered=self.rendered,
+            stats=self._stats(updates_per_frame),
+        )
+
+
 def encode_stream(
     chunks: Iterable[npt.NDArray[np.uint8]],
     options: EncodeOptions,
@@ -485,112 +424,9 @@ def encode_stream(
     epoch_samples: Sequence[tuple[int, npt.NDArray[np.uint16]]] | None = None,
     on_render: Callable[[npt.NDArray[np.uint16]], None] | None = None,
 ) -> EncodeResult:
-    epoch_starts, palette_sets = _build_palette_sets(options, sample_tiles, epoch_samples)
-    epoch = 0
-    dictionary = _new_dictionary(options)
-    screen = _Screen(palette_sets[0])
-    assigner = _enter_epoch(palette_sets[0], 0, screen, dictionary, options)
-    movie = stream.MovieStream()
-
-    rendered = _render_buffer(total_frames, options)
-    updates_per_frame = np.zeros(total_frames, dtype=np.int32)
-    totals, controller = _Totals(), _RateController(options)
-    last_keyframe = -options.keyframe_interval
-
-    previous: npt.NDArray[np.uint16] | None = None
-    previous_source: npt.NDArray[np.uint16] | None = None
-    pending = np.zeros((GRID_ROWS, GRID_COLS), dtype=bool)
-    hold, held = max(1, options.frame_hold), None
+    epochs = _build_palette_sets(options, sample_tiles, epoch_samples)
+    encoder = _Encoder(options, epochs, total_frames, on_render)
     for index, incoming in enumerate(_tile_frames(chunks)):
-        if index % hold == 0:
-            held = incoming
-        current = held if held is not None else incoming
-        changed = (
-            np.ones((GRID_ROWS, GRID_COLS), dtype=bool)
-            if previous is None
-            else (current != previous).any(axis=(2, 3))
-        )
-        previous_source = previous
-        previous = current
-        epoch, assigner = _advance_epoch(
-            epoch,
-            index,
-            assigner,
-            epoch_starts=epoch_starts,
-            palette_sets=palette_sets,
-            screen=screen,
-            dictionary=dictionary,
-            options=options,
-        )
-        scene_cut = _is_scene_cut(current, previous_source, changed, index, options) or (
-            index in epoch_starts and index > 0
-        )
-        keyframe = scene_cut or (index - last_keyframe >= options.keyframe_interval)
-
-        if keyframe:
-            last_keyframe = index
-        tolerance = totals.track_tolerance(
-            controller.tolerance(len(dictionary), index, total_frames)
-        )
-        targets, pending = _select_targets(
-            current,
-            previous_source,
-            changed,
-            pending,
-            screen=screen,
-            keyframe=keyframe,
-            options=options,
-            tolerance=tolerance,
-        )
-
-        updates: list[stream.SlotUpdate] = []
-        if targets.any():
-            rows, cols = np.nonzero(targets)
-            assignment = assigner.assign(current[rows, cols])
-            totals.error_total += float(assignment.error.sum())
-            totals.error_pixels += assignment.error.size * TILE_PX * TILE_PX
-            refs = dictionary.intern_batch(assignment.nibbles)
-            updates = screen.commit(rows, cols, refs, assignment, force=keyframe)
-
-        before = movie.payload_size()
-        movie.append(updates, keyframe=keyframe)
-        written = movie.payload_size() - before
-        if keyframe:
-            totals.keyframe_bytes += written
-        else:
-            totals.delta_bytes += written
-
-        updates_per_frame[index] = len(updates)
-        _record_frame(
-            screen,
-            incoming,
-            index,
-            rendered,
-            totals=totals,
-            options=options,
-            on_render=on_render,
-        )
-        if _should_stop(dictionary, options):
+        if encoder.step(index, incoming):
             break
-
-    updates_per_frame = updates_per_frame[: len(movie)]
-    stats = _build_stats(
-        movie=movie,
-        dictionary=dictionary,
-        updates_per_frame=updates_per_frame,
-        totals=totals,
-        budget=options.tile_budget,
-        expected_frames=total_frames,
-        tolerance_ceiling=options.tolerance * options.max_tolerance_scale,
-    )
-
-    return EncodeResult(
-        stream=movie,
-        dictionary=dictionary,
-        palette_set=palette_sets[0],
-        palette_sets=palette_sets,
-        epoch_starts=epoch_starts,
-        updates_per_frame=updates_per_frame,
-        rendered=rendered,
-        stats=stats,
-    )
+    return encoder.result()

@@ -60,6 +60,14 @@ the requirement.
   The table is kept once, per language, in `fmv-core-python/features/`, and
   each player's suite fails when its README's copy differs from it.
 
+- **Alike in everything the hardware does not force apart.** Beyond the
+  features, the members match in layout, file and module names, command-line
+  flags and their defaults, controls, the menu, messages, the build and test
+  commands, the tooling configuration, the workflows and the documents. A
+  difference is allowed only when the console forces it, and the player's
+  state section names it with the hardware reason. A difference found with no
+  such reason is a gap, closed by moving the weaker member onto the stronger
+  one.
 - **The picture fills the screen.** A source of any shape is scaled until it
   covers the console's raster and then cropped, so a wide film loses its sides.
   Black bars baked into a source file are detected and cropped before scaling.
@@ -89,7 +97,7 @@ the requirement.
 
 ## How a new member starts
 
-1. Read this file, then the newest player end to end, before writing anything.
+1. Read this file, then every player end to end, before writing anything.
 2. Name it `<console>-media-player`, its baker package `<console>media`, and
    its environment variables `<CONSOLE>MEDIA_*`.
 3. Collect the console's binding numbers from the manufacturer's documents
@@ -205,9 +213,9 @@ That choice has a price, paid deliberately:
   task**, in every member, so no member has to be told twice.
 - **No member is a port of another.** Every repository is a member of one
   family of tools, and the text says so. Never describe one as a port, fork,
-  translation or derivative of another, in any language: the Neo Geo player
-  came first, but work has moved between the members in both directions
-  since, and more consoles will join.
+  translation or derivative of another, in any language, and never tell
+  which member came first: work moves between the members in every
+  direction, and more consoles will join.
 - **Capture before asking.** When something is wrong on screen, record the
   emulator, cut the recording into frames and read them. Ask only when that
   loop has run and cannot settle the question, and say what it showed.
@@ -276,13 +284,13 @@ the others do not also get.*
 
 ## The state of this repository
 
-In neogeo-media-player the tile dictionary is resident in character ROM, so
-its encoder settles a rung on a 35-rung quality ladder by real bakes rather
-than paging patterns, and it carries what the other player does not yet:
-ADPCM-B sound, the library and its drop-in bundle, subtitles and seeking. It carries `fmv-core-python` as a submodule and is moving its
-shared concerns onto it.
+neogeo-media-player is the Neo Geo member. Its tile dictionary is resident in
+character ROM, so its encoder settles a rung on a 35-rung quality ladder by
+real bakes rather than paging patterns, and its sound is ADPCM-B samples in
+their own V-ROM. It decodes, scores, verifies films and measures captures
+through `fmv-core-python`.
 
-Gaps against "What every player does" (as of 2026-10-15):
+Gaps against "What every player does" (as of 2026-10-16):
 
 - The cartridge command has no silent build. A library bundle can leave sound
   out with `FMV_AUDIO=no`, and sound lives in its own V-ROM, so leaving it out

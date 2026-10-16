@@ -173,6 +173,28 @@ def _kmeans(
     return labels, centroids
 
 
+def _refine(
+    lab: npt.NDArray[np.float32],
+    weight: npt.NDArray[np.float64],
+    centroids: npt.NDArray[np.float32],
+    rng: np.random.Generator,
+) -> bool:
+    labels = np.argmin(_sqdist(lab, centroids), axis=1)
+    moved = False
+    for index in range(PALETTE_SLOTS):
+        mask = labels == index
+        if not mask.any():
+            centroids[index] = lab[rng.integers(0, lab.shape[0])]
+            moved = True
+            continue
+        total = weight[mask].sum()
+        mean = (lab[mask] * weight[mask, None]).sum(axis=0) / total
+        if not np.allclose(mean, centroids[index]):
+            centroids[index] = mean.astype(np.float32)
+            moved = True
+    return moved
+
+
 def _fit_palette(
     colors: npt.NDArray[np.uint16],
     counts: npt.NDArray[np.int64],
@@ -189,26 +211,29 @@ def _fit_palette(
     rng = np.random.default_rng(seed)
     order = np.argsort(-weight)
     centroids = lab[order[:PALETTE_SLOTS]].astype(np.float32)
-
     for _ in range(_KMEANS_ITERATIONS):
-        labels = np.argmin(_sqdist(lab, centroids), axis=1)
-        moved = False
-        for index in range(PALETTE_SLOTS):
-            mask = labels == index
-            if not mask.any():
-                centroids[index] = lab[rng.integers(0, lab.shape[0])]
-                moved = True
-                continue
-            total = weight[mask].sum()
-            mean = (lab[mask] * weight[mask, None]).sum(axis=0) / total
-            if not np.allclose(mean, centroids[index]):
-                centroids[index] = mean.astype(np.float32)
-                moved = True
-        if not moved:
+        if not _refine(lab, weight, centroids, rng):
             break
 
     chosen = colors[np.argmin(_sqdist(lab, centroids), axis=0)]
     return chosen.astype(np.uint16)
+
+
+def _cluster_palettes(
+    flat: npt.NDArray[np.uint16],
+    labels: npt.NDArray[np.int64],
+    count: int,
+    seed: int,
+    chroma_weight: float,
+) -> npt.NDArray[np.uint16]:
+    palettes = np.zeros((count, PALETTE_SLOTS), dtype=np.uint16)
+    for index in range(count):
+        members = flat[labels == index]
+        if members.size == 0:
+            members = flat
+        colors, counts = np.unique(members.reshape(-1), return_counts=True)
+        palettes[index] = _fit_palette(colors, counts, seed + index, chroma_weight)
+    return palettes
 
 
 def build_palette_set(
@@ -230,16 +255,8 @@ def build_palette_set(
     labels, centroids = _kmeans(descriptors, count, seed)
 
     flat = tiles.reshape(tiles.shape[0], TILE_PIXELS)
-    palettes = np.zeros((count, PALETTE_SLOTS), dtype=np.uint16)
-    for index in range(count):
-        members = flat[labels == index]
-        if members.size == 0:
-            members = flat
-        colors, counts = np.unique(members.reshape(-1), return_counts=True)
-        palettes[index] = _fit_palette(colors, counts, seed + index, chroma_weight)
-
     return PaletteSet(
-        colors=palettes,
+        colors=_cluster_palettes(flat, labels, count, seed, chroma_weight),
         base_bank=base_bank,
         descriptors=centroids,
         chroma_weight=chroma_weight,
@@ -288,21 +305,25 @@ class PaletteAssigner:
         shortlist = self._shortlist(tiles)
         for start in range(0, count, self._chunk):
             stop = min(start + self._chunk, count)
-            pixels = flat[start:stop]
-            picks = shortlist[start:stop]
-            errors = self._error[picks[:, :, None], pixels[:, None, :]].sum(axis=2)
-            winner = np.argmin(errors, axis=1)
-            rows = np.arange(stop - start)
-            chosen = picks[rows, winner]
+            chosen, error, quantised = self._assign_span(flat[start:stop], shortlist[start:stop])
             palette_ids[start:stop] = chosen.astype(np.uint8)
-            best_error[start:stop] = errors[rows, winner]
-            nibbles[start:stop] = self._quantise(chosen, pixels) + 1
+            best_error[start:stop] = error
+            nibbles[start:stop] = quantised
 
         return Assignment(
             palette_ids=palette_ids,
             nibbles=nibbles.reshape(count, TILE_PX, TILE_PX),
             error=best_error,
         )
+
+    def _assign_span(
+        self, pixels: npt.NDArray[np.uint16], picks: npt.NDArray[np.int64]
+    ) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.float32], npt.NDArray[np.uint8]]:
+        errors = self._error[picks[:, :, None], pixels[:, None, :]].sum(axis=2)
+        winner = np.argmin(errors, axis=1)
+        rows = np.arange(pixels.shape[0])
+        chosen = picks[rows, winner]
+        return chosen, errors[rows, winner], self._quantise(chosen, pixels) + 1
 
     def _quantise(
         self, chosen: npt.NDArray[np.int64], pixels: npt.NDArray[np.uint16]

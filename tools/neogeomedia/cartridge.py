@@ -14,13 +14,10 @@ from neogeomedia import bake, denoise, frames, limits, probe, quality, tiercache
 BUILD_SCRIPT = Path(__file__).resolve().parents[2] / "toolchain" / "build-in-docker.sh"
 CARTRIDGE_NAME = "neogeomedia.neo"
 ARCHIVE_NAME = "neogeomedia.zip"
+NO_TIER_FITS = 3
 
 
-def _parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        prog="neogeomedia",
-        description="Bake a movie and build the cartridge that plays it.",
-    )
+def _add_source_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("source", type=Path, help="the video file to put on the cartridge")
     parser.add_argument(
         "--subtitles",
@@ -45,6 +42,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         default=0.0,
         help="seconds to skip at the front",
     )
+
+
+def _add_bake_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--duration",
         type=arguments.number(
@@ -70,6 +70,15 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--bake-only", action="store_true", help="stop after the bake, before the ROM build"
     )
+
+
+def _parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="neogeomedia",
+        description="Bake a movie and build the cartridge that plays it.",
+    )
+    _add_source_args(parser)
+    _add_bake_args(parser)
     return parser.parse_args(argv)
 
 
@@ -127,48 +136,64 @@ def _settle_denoise(args: argparse.Namespace) -> None:
     args.denoise = str(chosen.strength)
 
 
+def _span(args: argparse.Namespace, info: ffmpeg.SourceInfo) -> float:
+    return float(
+        args.duration if args.duration is not None else max(0.0, info.duration - args.start)
+    )
+
+
+def _read_reading(tier: quality.Tier, report: Path, status: int) -> probe.Reading:
+    if not report.is_file():
+        return probe.Reading(tier=tier, tiles=quality.CROM_TILES, capped=True)
+    data = json.loads(report.read_text())
+    capped = (
+        status != 0
+        or bool(data["dictionary_full"])
+        or bool(data["budget_exceeded"])
+        or bool(data.get("truncated"))
+    )
+    return probe.Reading(
+        tier=tier,
+        tiles=int(data["tile_count"]),
+        capped=capped,
+        exhausted=bool(data.get("rate_control_exhausted")),
+    )
+
+
+def _probe_bake(args: argparse.Namespace, scratch: Path, tier: quality.Tier) -> probe.Reading:
+    print(f"measuring {tier.name}", file=sys.stderr)
+    report = scratch / f"{tier.name}.json"
+    argv = [*bake_argv(args), "--report-json", str(report), "--stop-when-over-budget"]
+    argv[argv.index("--quality") + 1] = tier.name
+    argv[argv.index("--build-dir") + 1] = str(scratch / tier.name)
+    return _read_reading(tier, report, bake.main(argv))
+
+
+def _say_how_it_settled(outcome: probe.Outcome) -> None:
+    if outcome.too_expensive:
+        print(f"overran: {', '.join(outcome.too_expensive)}", file=sys.stderr)
+    if outcome.baked:
+        print(f"baked {len(outcome.baked)} rung(s) to settle it", file=sys.stderr)
+    else:
+        print("settled entirely from remembered measurements", file=sys.stderr)
+
+
 def _measured_tier(args: argparse.Namespace) -> quality.Tier | None:
     info = ffmpeg.probe(args.source)
-    span = args.duration if args.duration is not None else max(0.0, info.duration - args.start)
-    minutes = span / quality.SECONDS_PER_MINUTE
+    span = _span(args, info)
     store = args.tier_cache or tiercache.default_store()
     params = tiercache.Params(
-        start=float(args.start), duration=float(span), fit=args.fit, denoise=0.0, frame_hold=1
+        start=float(args.start), duration=span, fit=args.fit, denoise=0.0, frame_hold=1
     )
     key = tiercache.key_for(args.source, params)
     tiercache.describe(store, key, source=args.source, params=params)
     known = tiercache.recall(store, key)
     if known:
         print(f"{len(known)} tier cost(s) already measured for this source", file=sys.stderr)
-
     scratch = args.build_dir.parent / f"{args.build_dir.name}-probe"
-
-    def run(tier: quality.Tier) -> probe.Reading:
-        print(f"measuring {tier.name}", file=sys.stderr)
-        report = scratch / f"{tier.name}.json"
-        argv = [*bake_argv(args), "--report-json", str(report), "--stop-when-over-budget"]
-        argv[argv.index("--quality") + 1] = tier.name
-        argv[argv.index("--build-dir") + 1] = str(scratch / tier.name)
-        status = bake.main(argv)
-        if not report.is_file():
-            return probe.Reading(tier=tier, tiles=quality.CROM_TILES, capped=True)
-        data = json.loads(report.read_text())
-        capped = (
-            status != 0
-            or bool(data["dictionary_full"])
-            or bool(data["budget_exceeded"])
-            or bool(data.get("truncated"))
-        )
-        return probe.Reading(
-            tier=tier,
-            tiles=int(data["tile_count"]),
-            capped=capped,
-            exhausted=bool(data.get("rate_control_exhausted")),
-        )
-
     outcome = probe.search(
-        measure=run,
-        minutes=minutes,
+        measure=lambda tier: _probe_bake(args, scratch, tier),
+        minutes=span / quality.SECONDS_PER_MINUTE,
         budget=quality.CROM_TILES,
         known=known,
         source_fps=float(info.fps),
@@ -178,22 +203,11 @@ def _measured_tier(args: argparse.Namespace) -> quality.Tier | None:
         tiercache.remember(store, key, name, rate)
     if outcome.tier is not None:
         tiercache.describe(store, key, source=args.source, params=params, chosen=outcome.tier.name)
-    if outcome.too_expensive:
-        print(f"overran: {', '.join(outcome.too_expensive)}", file=sys.stderr)
-    if outcome.baked:
-        print(f"baked {len(outcome.baked)} rung(s) to settle it", file=sys.stderr)
-    else:
-        print("settled entirely from remembered measurements", file=sys.stderr)
+    _say_how_it_settled(outcome)
     return outcome.tier
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = _parse_args(sys.argv[1:] if argv is None else argv)
-
-    failure = _check_inputs(args)
-    if failure is not None:
-        return failure
-
+def _settle_quality(args: argparse.Namespace) -> int | None:
     if args.quality == "search":
         tier = _measured_tier(args)
         if tier is None:
@@ -201,35 +215,43 @@ def main(argv: list[str] | None = None) -> int:
                 "this source fits no tier; trim it yourself or lower the runtime",
                 file=sys.stderr,
             )
-            return 3
+            return NO_TIER_FITS
         print(f"measured choice: {tier.name}", file=sys.stderr)
         args.quality = tier.name
         args.denoise = arguments.AUTO if args.denoise is None else args.denoise
-
     if args.denoise == arguments.AUTO:
         _settle_denoise(args)
+    return None
 
+
+def _build_cartridge(build_dir: Path) -> int:
+    print("building the cartridge", file=sys.stderr)
+    environment = dict(os.environ, BUILD=str(build_dir))
+    completed = subprocess.run(["bash", str(BUILD_SCRIPT)], env=environment, check=False)
+    if completed.returncode != 0:
+        return completed.returncode
+    for produced in (build_dir / CARTRIDGE_NAME, build_dir / ARCHIVE_NAME):
+        if produced.exists():
+            print(f"{produced}  {produced.stat().st_size} bytes")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(sys.argv[1:] if argv is None else argv)
+    failure = _check_inputs(args)
+    if failure is not None:
+        return failure
+    unsettled = _settle_quality(args)
+    if unsettled is not None:
+        return unsettled
     print(f"baking {args.source}", file=sys.stderr)
     status = bake.main(bake_argv(args))
     if status != 0:
         return status
-
     if args.bake_only:
         print(f"baked into {args.build_dir}", file=sys.stderr)
         return 0
-
-    print("building the cartridge", file=sys.stderr)
-    environment = dict(os.environ, BUILD=str(args.build_dir))
-    completed = subprocess.run(["bash", str(BUILD_SCRIPT)], env=environment, check=False)
-    if completed.returncode != 0:
-        return completed.returncode
-
-    cartridge = args.build_dir / CARTRIDGE_NAME
-    archive = args.build_dir / ARCHIVE_NAME
-    for produced in (cartridge, archive):
-        if produced.exists():
-            print(f"{produced}  {produced.stat().st_size} bytes")
-    return 0
+    return _build_cartridge(args.build_dir)
 
 
 if __name__ == "__main__":

@@ -130,29 +130,22 @@ def sweep(
 ) -> list[Point]:
     info = ffmpeg.probe(source)
     windows = calibrate.sample_windows(info.duration, count=count, seconds=seconds)
-    clip = np.concatenate(
-        [
-            np.concatenate(list(frames.stream(source, start=offset, duration=span)))
-            for offset, span in windows
-        ]
-    )
-
-    points: list[Point] = []
-    for chroma, tolerance in zip(CHROMA_SWEEP, _paired_tolerances(), strict=True):
-        points.append(
-            measure_point(clip, chroma_weight=chroma, tolerance=tolerance, frame_hold=1, seed=seed)
+    clip = calibrate.windowed_clip(source, windows)
+    colour_points = [
+        measure_point(clip, chroma_weight=chroma, tolerance=tolerance, frame_hold=1, seed=seed)
+        for chroma, tolerance in zip(CHROMA_SWEEP, _paired_tolerances(), strict=True)
+    ]
+    hold_points = [
+        measure_point(
+            clip,
+            chroma_weight=CHROMA_SWEEP[-1],
+            tolerance=TOLERANCE_SWEEP[-1],
+            frame_hold=hold,
+            seed=seed,
         )
-    for hold in HOLD_SWEEP[1:]:
-        points.append(
-            measure_point(
-                clip,
-                chroma_weight=CHROMA_SWEEP[-1],
-                tolerance=TOLERANCE_SWEEP[-1],
-                frame_hold=hold,
-                seed=seed,
-            )
-        )
-    return points
+        for hold in HOLD_SWEEP[1:]
+    ]
+    return [*colour_points, *hold_points]
 
 
 def _paired_tolerances() -> list[float]:

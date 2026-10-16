@@ -140,6 +140,28 @@ def _even(value: int) -> int:
     return value - (value % 2)
 
 
+def _fill_geometry(source_width: int, source_height: int, target: tuple[int, int]) -> Geometry:
+    target_aspect = (target[0] / target[1]) * PIXEL_ASPECT
+    if source_width / source_height > target_aspect:
+        crop = (_even(round(source_height * target_aspect)), _even(source_height))
+    else:
+        crop = (_even(source_width), _even(round(source_width / target_aspect)))
+    return Geometry(crop=crop, image=target, target=target, pad_top=0)
+
+
+def _letterbox_rows(source_aspect: float, target_width: int, target_height: int) -> int:
+    rows_total = target_height // TILE_PX
+    ideal_rows = (target_width * PIXEL_ASPECT / source_aspect) / TILE_PX
+    return max(
+        (
+            rows
+            for rows in range(rows_total, 0, -1)
+            if rows <= ideal_rows + _ROW_EPSILON and (rows_total - rows) % 2 == 0
+        ),
+        default=rows_total,
+    )
+
+
 def plan_geometry(
     source_width: int,
     source_height: int,
@@ -151,36 +173,31 @@ def plan_geometry(
     if fit not in _FIT_MODES:
         msg = f"unknown fit mode {fit!r}, expected one of {_FIT_MODES}"
         raise ValueError(msg)
-
     target = (target_width, target_height)
-    source_aspect = source_width / source_height
-
     if fit == "fill":
-        target_aspect = (target_width / target_height) * PIXEL_ASPECT
-        if source_aspect > target_aspect:
-            crop = (_even(round(source_height * target_aspect)), _even(source_height))
-        else:
-            crop = (_even(source_width), _even(round(source_width / target_aspect)))
-        return Geometry(crop=crop, image=target, target=target, pad_top=0)
-
-    crop = (_even(source_width), _even(source_height))
-    rows_total = target_height // TILE_PX
-    ideal_rows = (target_width * PIXEL_ASPECT / source_aspect) / TILE_PX
-    image_rows = max(
-        (
-            rows
-            for rows in range(rows_total, 0, -1)
-            if rows <= ideal_rows + _ROW_EPSILON and (rows_total - rows) % 2 == 0
-        ),
-        default=rows_total,
-    )
-    image_height = image_rows * TILE_PX
+        return _fill_geometry(source_width, source_height, target)
+    rows = _letterbox_rows(source_width / source_height, target_width, target_height)
+    image_height = rows * TILE_PX
     return Geometry(
-        crop=crop,
+        crop=(_even(source_width), _even(source_height)),
         image=(target_width, image_height),
         target=target,
         pad_top=(target_height - image_height) // 2,
     )
+
+
+def _source_stages(deinterlace: bool, pre_crop: tuple[int, int, int, int] | None) -> list[str]:
+    stages = ["yadif=mode=0:parity=-1:deint=0"] if deinterlace else []
+    if pre_crop is None:
+        return stages
+    bar_w, bar_h, bar_x, bar_y = pre_crop
+    return [*stages, f"crop={bar_w}:{bar_h}:{bar_x}:{bar_y}"]
+
+
+def _picture_stages(denoise: float, motion_blur: int) -> list[str]:
+    cleaned = [Denoise().scaled(denoise).to_filter()] if denoise > 0.0 else []
+    blurred = [f"tmix=frames={motion_blur}"] if motion_blur > 1 else []
+    return [*cleaned, *blurred]
 
 
 def build_filter(
@@ -195,24 +212,16 @@ def build_filter(
     crop_w, crop_h = geometry.crop
     image_w, image_h = geometry.image
     target_w, target_h = geometry.target
-    stages = []
-    if deinterlace:
-        stages.append("yadif=mode=0:parity=-1:deint=0")
-    if pre_crop is not None:
-        bar_w, bar_h, bar_x, bar_y = pre_crop
-        stages.append(f"crop={bar_w}:{bar_h}:{bar_x}:{bar_y}")
-    stages += [
+    padded = [f"pad={target_w}:{target_h}:0:{geometry.pad_top}:black"] if geometry.pad_top else []
+    stages = [
+        *_source_stages(deinterlace, pre_crop),
         f"crop={crop_w}:{crop_h}",
         f"scale={image_w}:{image_h}:flags=lanczos",
+        *_picture_stages(denoise, motion_blur),
+        *padded,
+        f"fps={fps.numerator}/{fps.denominator}",
+        "format=rgb24",
     ]
-    if denoise > 0.0:
-        stages.append(Denoise().scaled(denoise).to_filter())
-    if motion_blur > 1:
-        stages.append(f"tmix=frames={motion_blur}")
-    if geometry.pad_top:
-        stages.append(f"pad={target_w}:{target_h}:0:{geometry.pad_top}:black")
-    stages.append(f"fps={fps.numerator}/{fps.denominator}")
-    stages.append("format=rgb24")
     return ",".join(stages)
 
 

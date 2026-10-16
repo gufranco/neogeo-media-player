@@ -34,9 +34,7 @@ def _build(root, *, banks=1, audio=True):
 def _write(root, **overrides):
     banks = overrides.pop("banks", 1)
     audio = overrides.pop("audio", True)
-    settings = {
-        "target": root / "out",
-        "build_dir": overrides.pop("build_dir", None) or _build(root, banks=banks, audio=audio),
+    figures = {
         "stream_banks": 1,
         "max_updates": 280,
         "tick_cycles": 17920,
@@ -47,10 +45,15 @@ def _write(root, **overrides):
         "first_sprite": 1,
         "frames": 1775,
         "version": (1, 0),
-        "library_root": overrides.pop("library_root", None) or _library(root),
     }
-    settings.update(overrides)
-    return bundle.write_bundle(**settings)
+    build_dir = overrides.pop("build_dir", None) or _build(root, banks=banks, audio=audio)
+    library_root = overrides.pop("library_root", None) or _library(root)
+    return bundle.write_bundle(
+        target=root / "out",
+        build_dir=build_dir,
+        figures=bundle.MovieFigures(**{**figures, **overrides}),
+        library_root=library_root,
+    )
 
 
 class TestLibrarySource:

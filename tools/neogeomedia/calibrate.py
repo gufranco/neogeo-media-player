@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Final
 
 import numpy as np
 import numpy.typing as npt
@@ -10,6 +11,7 @@ from neogeomedia import encode, frames, neocolor, quality
 
 DEFAULT_SAMPLE_COUNT: int = 24
 DEFAULT_SAMPLE_SECONDS: float = 3.0
+SAMPLE_EVERY: Final = 4
 
 
 def sample_windows(duration: float, *, count: int, seconds: float) -> list[tuple[float, float]]:
@@ -35,6 +37,45 @@ def sample_windows(duration: float, *, count: int, seconds: float) -> list[tuple
     return windows
 
 
+def windowed_clip(
+    source: Path,
+    windows: list[tuple[float, float]],
+    *,
+    start: float = 0.0,
+    fit: frames.FitMode = "fill",
+) -> npt.NDArray[np.uint8]:
+    return np.concatenate(
+        [
+            np.concatenate(
+                list(frames.stream(source, start=start + offset, duration=span, fit=fit))
+            )
+            for offset, span in windows
+        ]
+    )
+
+
+def _source_clip(
+    source: Path,
+    info: ffmpeg.SourceInfo,
+    *,
+    count: int,
+    seconds: float,
+    fit: frames.FitMode,
+    start: float,
+    duration: float | None,
+) -> npt.NDArray[np.uint8]:
+    span_total = info.duration - start
+    if duration is not None:
+        span_total = min(span_total, duration)
+    windows = sample_windows(span_total, count=count, seconds=seconds)
+    return windowed_clip(source, windows, start=start, fit=fit)
+
+
+def _minutes(clip: npt.NDArray[np.uint8]) -> float:
+    frames_kept: int = clip.shape[0]
+    return frames_kept / float(frames.VBLANK_FPS) / quality.SECONDS_PER_MINUTE
+
+
 def measure_reference_rate(
     source: Path,
     *,
@@ -46,33 +87,17 @@ def measure_reference_rate(
     duration: float | None = None,
 ) -> float:
     source = Path(source)
-    info = ffmpeg.probe(source)
-    span_total = info.duration - start
-    if duration is not None:
-        span_total = min(span_total, duration)
-    windows = sample_windows(span_total, count=count, seconds=seconds)
-
-    chunks = [
-        np.concatenate(list(frames.stream(source, start=start + offset, duration=span, fit=fit)))
-        for offset, span in windows
-    ]
-    clip = np.concatenate(chunks)
-    tier = quality.tier_by_name(quality.REFERENCE_TIER)
-    sample_tiles = encode.to_tiles(neocolor.rgb_to_color_index(clip[::4])).reshape(-1, 16, 16)
-    result = encode.encode_stream(
-        [clip],
-        encode.EncodeOptions(
-            collect_rendered=False,
-            chroma_weight=tier.chroma_weight,
-            frame_hold=tier.frame_hold,
-            tolerance=tier.tolerance,
-            seed=seed,
-        ),
-        sample_tiles=sample_tiles,
-        total_frames=clip.shape[0],
+    clip = _source_clip(
+        source,
+        ffmpeg.probe(source),
+        count=count,
+        seconds=seconds,
+        fit=fit,
+        start=start,
+        duration=duration,
     )
-    minutes = clip.shape[0] / float(frames.VBLANK_FPS) / quality.SECONDS_PER_MINUTE
-    rate: float = result.stats.tile_count / minutes
+    tier = quality.tier_by_name(quality.REFERENCE_TIER)
+    rate: float = _encode_rate(clip, tier, seed=seed) / _minutes(clip)
     return rate
 
 
@@ -88,34 +113,20 @@ def measure_anchors(
 ) -> tuple[float, dict[float, float]]:
     source = Path(source)
     info = ffmpeg.probe(source)
-    span_total = info.duration - start
-    if duration is not None:
-        span_total = min(span_total, duration)
-    windows = sample_windows(span_total, count=count, seconds=seconds)
-    clip = np.concatenate(
-        [
-            np.concatenate(
-                list(frames.stream(source, start=start + offset, duration=span, fit=fit))
-            )
-            for offset, span in windows
-        ]
+    clip = _source_clip(
+        source, info, count=count, seconds=seconds, fit=fit, start=start, duration=duration
     )
-    minutes = clip.shape[0] / float(frames.VBLANK_FPS) / quality.SECONDS_PER_MINUTE
-
-    measured: dict[float, float] = {}
-    reference_rate = 0.0
+    minutes = _minutes(clip)
     anchors = quality.anchor_tiers(float(info.fps), float(frames.VBLANK_FPS))
-    for tier in anchors:
-        rate = _encode_rate(clip, tier, seed=seed) / minutes
-        measured[tier.relative_cost] = rate
-        if tier.name == quality.REFERENCE_TIER:
-            reference_rate = rate
-
+    rates = [(tier, _encode_rate(clip, tier, seed=seed) / minutes) for tier in anchors]
+    measured = {tier.relative_cost: rate for tier, rate in rates}
+    reference = [rate for tier, rate in rates if tier.name == quality.REFERENCE_TIER]
+    reference_rate = reference[-1] if reference else 0.0
     return reference_rate, {rung: rate / reference_rate for rung, rate in measured.items()}
 
 
 def _encode_rate(clip: npt.NDArray[np.uint8], tier: quality.Tier, *, seed: int) -> float:
-    sample_tiles = encode.to_tiles(neocolor.rgb_to_color_index(clip[::4])).reshape(-1, 16, 16)
+    sample = encode.to_tiles(neocolor.rgb_to_color_index(clip[::SAMPLE_EVERY]))
     result = encode.encode_stream(
         [clip],
         encode.EncodeOptions(
@@ -125,7 +136,7 @@ def _encode_rate(clip: npt.NDArray[np.uint8], tier: quality.Tier, *, seed: int) 
             tolerance=tier.tolerance,
             seed=seed,
         ),
-        sample_tiles=sample_tiles,
+        sample_tiles=sample.reshape(-1, encode.TILE_PX, encode.TILE_PX),
         total_frames=clip.shape[0],
     )
     return float(result.stats.tile_count)

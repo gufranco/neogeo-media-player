@@ -72,6 +72,8 @@ class TierKnobs(TypedDict):
     tile_budget: int
     tolerance: float
     candidates: int
+    frame_hold: int
+    audio_rate_hz: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,16 +149,18 @@ def write_movie_bundle(target: Path, outcome: BakeOutcome) -> bundle.BundleLayou
     return bundle.write_bundle(
         target=target,
         build_dir=outcome.build_dir,
-        stream_banks=outcome.result.stream.bank_count(),
-        max_updates=stats.max_updates,
-        tick_cycles=stats.max_updates * codegen.CYCLES_PER_UPDATE,
-        tile_count=stats.tile_count,
-        crom_payload=outcome.result.dictionary.payload_bytes(),
-        crom_size=crom.rom_size_for(stats.tile_count),
-        palette_base=outcome.result.palette_set.base_bank,
-        first_sprite=stream_mod.FIRST_SPRITE,
-        frames=stats.frames,
-        version=codegen.baker_version(),
+        figures=bundle.MovieFigures(
+            stream_banks=outcome.result.stream.bank_count(),
+            max_updates=stats.max_updates,
+            tick_cycles=stats.max_updates * codegen.CYCLES_PER_UPDATE,
+            tile_count=stats.tile_count,
+            crom_payload=outcome.result.dictionary.payload_bytes(),
+            crom_size=crom.rom_size_for(stats.tile_count),
+            palette_base=outcome.result.palette_set.base_bank,
+            first_sprite=stream_mod.FIRST_SPRITE,
+            frames=stats.frames,
+            version=codegen.baker_version(),
+        ),
     )
 
 
@@ -309,9 +313,17 @@ def _announce_silence(source: Path) -> None:
         )
 
 
-def _tier_knobs(args: argparse.Namespace, tier: quality.Tier | None) -> TierKnobs:
+def _audio_rate_for(args: argparse.Namespace) -> float:
+    if args.audio_rate is not None:
+        return float(args.audio_rate)
+    return quality.audio_hz_for(args.duration / quality.SECONDS_PER_MINUTE)
+
+
+def _tier_knobs(args: argparse.Namespace, tier: quality.Tier | None, frame_hold: int) -> TierKnobs:
     tile_budget = quality.CROM_TILES if tier is not None else None
     return {
+        "frame_hold": frame_hold,
+        "audio_rate_hz": _audio_rate_for(args),
         "denoise": bakeargs.pick(args.denoise, tier.denoise if tier else None, 0.0),
         "chroma_weight": bakeargs.pick(
             args.chroma_weight, tier.chroma_weight if tier else None, 1.0
@@ -328,14 +340,8 @@ def _tier_knobs(args: argparse.Namespace, tier: quality.Tier | None) -> TierKnob
 
 
 def _request_from(
-    args: argparse.Namespace,
-    measured: bakeargs.Measured,
-    frame_hold: int,
-    knobs: TierKnobs,
+    args: argparse.Namespace, measured: bakeargs.Measured, knobs: TierKnobs
 ) -> BakeRequest:
-    audio_rate = args.audio_rate
-    if audio_rate is None:
-        audio_rate = quality.audio_hz_for(args.duration / quality.SECONDS_PER_MINUTE)
     return BakeRequest(
         source=args.source,
         start=args.start,
@@ -343,7 +349,6 @@ def _request_from(
         build_dir=args.build_dir,
         subtitles=args.subtitles,
         fit=args.fit,
-        frame_hold=frame_hold,
         motion_blur=args.motion_blur,
         motion_masking=args.motion_masking,
         dither=args.dither,
@@ -358,7 +363,6 @@ def _request_from(
         sample_stride=measured.sample_stride,
         seed=args.seed,
         preview=args.preview,
-        audio_rate_hz=audio_rate,
         **knobs,
     )
 
@@ -391,7 +395,7 @@ def main(argv: list[str] | None = None) -> int:
     tier = bakeargs.resolve_quality(args)
     measured = bakeargs.measured_settings(args)
     frame_hold = bakeargs.resolve_frame_hold(args, tier)
-    outcome = run(_request_from(args, measured, frame_hold, _tier_knobs(args, tier)))
+    outcome = run(_request_from(args, measured, _tier_knobs(args, tier, frame_hold)))
     return _finish(args, outcome)
 
 

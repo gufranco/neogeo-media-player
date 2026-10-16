@@ -237,6 +237,78 @@ def _budget_lines(fit: Fit, reference_rate: float, has_audio: bool) -> list[str]
     return lines
 
 
+def _source_lines(
+    source: str, minutes: float, size: tuple[int, int], source_fps: float, has_audio: bool
+) -> list[str]:
+    audio = "audio present" if has_audio else "no audio"
+    width, height = size
+    return [
+        "Source",
+        f"  {source}",
+        f"  {clock(minutes)} runtime, {width}x{height}, {source_fps:.2f} fps, {audio}",
+    ]
+
+
+def _shortfall_lines(cheapest: Fit) -> list[str]:
+    return [
+        "",
+        "This source does not fit the cartridge at any quality tier.",
+        f"  The cheapest tier, '{cheapest.tier.name}', still overruns by"
+        f" {clock(cheapest.trim_minutes)}.",
+        f"  Cut the source to {clock(cheapest.capacity_minutes * SAFETY_MARGIN)}"
+        " or shorter and bake again.",
+    ]
+
+
+def _selected_lines(chosen: Fit) -> list[str]:
+    tier = chosen.tier
+    return [
+        "",
+        f"Selected: {tier.name}",
+        f"  {tier.summary}",
+        f"  chroma weight {tier.chroma_weight}, frame hold {tier.frame_hold},"
+        f" tolerance {tier.tolerance}, denoise {tier.denoise}",
+        f"  holds {clock(chosen.capacity_minutes)}, uses {clock(chosen.minutes)},"
+        f" {clock(chosen.spare_minutes)} spare",
+    ]
+
+
+def _upgrade_lines(fits: list[Fit], chosen: Fit) -> list[str]:
+    better = [fit for fit in fits if fit.tier.relative_cost > chosen.tier.relative_cost]
+    if not better:
+        return []
+    nearest = better[-1]
+    return [
+        "",
+        f"To reach '{nearest.tier.name}' instead ({nearest.tier.summary}):",
+        f"  Trim {clock(nearest.trim_minutes)}, bringing the source to"
+        f" {clock(nearest.capacity_minutes * SAFETY_MARGIN)} or shorter.",
+    ]
+
+
+def _calibration_lines(reference_rate: float) -> list[str]:
+    return [
+        "",
+        "Calibration",
+        f"  measured {reference_rate:,.0f} tiles per minute at '{REFERENCE_TIER}'",
+        "",
+        "Quality ladder for this source",
+    ]
+
+
+def _verdict_lines(
+    fits: list[Fit], chosen: Fit | None, reference_rate: float, has_audio: bool
+) -> list[str]:
+    if chosen is None:
+        return _shortfall_lines(fits[-1])
+    return [
+        *_selected_lines(chosen),
+        *_upgrade_lines(fits, chosen),
+        *_budget_lines(chosen, reference_rate, has_audio),
+        *_estimate_caveat(),
+    ]
+
+
 def format_plan(
     *,
     source: str,
@@ -252,52 +324,13 @@ def format_plan(
     scope = {"source_fps": float(source_fps), "vblank_fps": float(vblank_fps)}
     fits = survey(minutes, reference_rate, anchors, **scope)
     chosen = select(minutes, reference_rate, anchors, **scope)
-    audio = "audio present" if has_audio else "no audio"
+    header = _source_lines(source, minutes, (width, height), source_fps, has_audio)
     lines = [
-        "Source",
-        f"  {source}",
-        f"  {clock(minutes)} runtime, {width}x{height}, {source_fps:.2f} fps, {audio}",
-        "",
-        "Calibration",
-        f"  measured {reference_rate:,.0f} tiles per minute at '{REFERENCE_TIER}'",
-        "",
-        "Quality ladder for this source",
+        *header,
+        *_calibration_lines(reference_rate),
         *_ladder_table(fits, vblank_fps),
+        *_verdict_lines(fits, chosen, reference_rate, has_audio),
     ]
-
-    if chosen is None:
-        cheapest = fits[-1]
-        lines += [
-            "",
-            "This source does not fit the cartridge at any quality tier.",
-            f"  The cheapest tier, '{cheapest.tier.name}', still overruns by"
-            f" {clock(cheapest.trim_minutes)}.",
-            f"  Cut the source to {clock(cheapest.capacity_minutes * SAFETY_MARGIN)}"
-            " or shorter and bake again.",
-        ]
-        return "\n".join(lines)
-
-    lines += [
-        "",
-        f"Selected: {chosen.tier.name}",
-        f"  {chosen.tier.summary}",
-        f"  chroma weight {chosen.tier.chroma_weight}, frame hold {chosen.tier.frame_hold},"
-        f" tolerance {chosen.tier.tolerance}, denoise {chosen.tier.denoise}",
-        f"  holds {clock(chosen.capacity_minutes)}, uses {clock(chosen.minutes)},"
-        f" {clock(chosen.spare_minutes)} spare",
-    ]
-
-    better = [fit for fit in fits if fit.tier.relative_cost > chosen.tier.relative_cost]
-    if better:
-        nearest = better[-1]
-        lines += [
-            "",
-            f"To reach '{nearest.tier.name}' instead ({nearest.tier.summary}):",
-            f"  Trim {clock(nearest.trim_minutes)}, bringing the source to"
-            f" {clock(nearest.capacity_minutes * SAFETY_MARGIN)} or shorter.",
-        ]
-    lines += _budget_lines(chosen, reference_rate, has_audio)
-    lines += _estimate_caveat()
     return "\n".join(lines)
 
 

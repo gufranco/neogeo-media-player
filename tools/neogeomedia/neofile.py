@@ -87,6 +87,31 @@ def _interleave(first: Path, second: Path, target: BinaryIO, chunk_bytes: int) -
             target.write(merged)
 
 
+def _region_paths(rom_dir: Path) -> dict[str, Path]:
+    paths = {key: _require(rom_dir, key) for key in REGION_FILES}
+    voice_two = rom_dir / OPTIONAL_REGION_FILES["v2"]
+    return {**paths, "v2": voice_two} if voice_two.is_file() else paths
+
+
+def _region_sizes(paths: dict[str, Path]) -> dict[str, int]:
+    sizes = {key: path.stat().st_size for key, path in paths.items()}
+    if sizes["c1"] != sizes["c2"]:
+        msg = f"character halves must be the same size, got {sizes['c1']} and {sizes['c2']}"
+        raise ValueError(msg)
+    return sizes
+
+
+def _write_container(output: Path, header: bytes, paths: dict[str, Path], chunk_bytes: int) -> Path:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open("wb") as target:
+        target.write(header)
+        for key in ("p", "s", "m", "v1", "v2"):
+            if key in paths:
+                _copy(paths[key], target, chunk_bytes)
+        _interleave(paths["c1"], paths["c2"], target, chunk_bytes)
+    return output
+
+
 def write_neo(
     *,
     rom_dir: Path,
@@ -99,16 +124,8 @@ def write_neo(
     ngh: int = 0x9999,
     chunk_bytes: int = DEFAULT_CHUNK_BYTES,
 ) -> Path:
-    rom_dir = Path(rom_dir)
-    paths = {key: _require(rom_dir, key) for key in REGION_FILES}
-    voice_two = rom_dir / OPTIONAL_REGION_FILES["v2"]
-    if voice_two.is_file():
-        paths["v2"] = voice_two
-    sizes = {key: path.stat().st_size for key, path in paths.items()}
-    if sizes["c1"] != sizes["c2"]:
-        msg = f"character halves must be the same size, got {sizes['c1']} and {sizes['c2']}"
-        raise ValueError(msg)
-
+    paths = _region_paths(Path(rom_dir))
+    sizes = _region_sizes(paths)
     header = build_header(
         psz=sizes["p"],
         ssz=sizes["s"],
@@ -123,16 +140,7 @@ def write_neo(
         screenshot=screenshot,
         ngh=ngh,
     )
-
-    output = Path(output)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("wb") as target:
-        target.write(header)
-        for key in ("p", "s", "m", "v1", "v2"):
-            if key in paths:
-                _copy(paths[key], target, chunk_bytes)
-        _interleave(paths["c1"], paths["c2"], target, chunk_bytes)
-    return output
+    return _write_container(Path(output), header, paths, chunk_bytes)
 
 
 def main(argv: list[str]) -> int:

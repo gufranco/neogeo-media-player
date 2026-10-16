@@ -17,6 +17,11 @@ PROM_MAX_BYTES: Final = PROM_FIXED_BYTES + PROM_BANK_LIMIT * PROM_BANK_BYTES
 
 REQUIRED_REGIONS: Final = ("p1.p1", "s1.s1", "m1.m1", "v11.v1", "c1.c1", "c2.c2")
 OPTIONAL_REGIONS: Final = ("v21.v2",)
+SIMPLE_AREAS: Final = (
+    ("s1.s1", "fixed"),
+    ("m1.m1", "audiocpu"),
+    ("v11.v1", "ymsnd:adpcma"),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,63 +51,76 @@ def _rom_element(
     ElementTree.SubElement(parent, "rom", attrs)
 
 
-def build_software_list(
-    rom_dir: Path, *, name: str, description: str, year: int, publisher: str
+def _data_area(
+    part: ElementTree.Element, name: str, size: int, **extra: str
 ) -> ElementTree.Element:
-    root = ElementTree.Element(
-        "softwarelist", {"name": "neogeo", "description": f"{description} homebrew cartridge"}
-    )
+    return ElementTree.SubElement(part, "dataarea", {"name": name, "size": str(size), **extra})
+
+
+def _cart_part(
+    root: ElementTree.Element, *, name: str, description: str, year: int, publisher: str
+) -> ElementTree.Element:
     software = ElementTree.SubElement(root, "software", {"name": name})
     ElementTree.SubElement(software, "description").text = description
     ElementTree.SubElement(software, "year").text = str(year)
     ElementTree.SubElement(software, "publisher").text = publisher
     part = ElementTree.SubElement(software, "part", {"name": "cart", "interface": "neo_cart"})
     ElementTree.SubElement(part, "feature", {"name": "release", "value": "AES"})
+    return part
 
+
+def _add_program_and_sound(part: ElementTree.Element, rom_dir: Path) -> None:
     program = rom_dir / "p1.p1"
-    area = ElementTree.SubElement(
-        part,
-        "dataarea",
-        {
-            "name": "maincpu",
-            "size": str(program.stat().st_size),
-            "width": "16",
-            "endianness": "big",
-        },
-    )
+    area = _data_area(part, "maincpu", program.stat().st_size, width="16", endianness="big")
     _rom_element(area, program, "load16_word_swap")
-
-    for region, area_name in (
-        ("s1.s1", "fixed"),
-        ("m1.m1", "audiocpu"),
-        ("v11.v1", "ymsnd:adpcma"),
-    ):
+    for region, area_name in SIMPLE_AREAS:
         path = rom_dir / region
-        area = ElementTree.SubElement(
-            part, "dataarea", {"name": area_name, "size": str(path.stat().st_size)}
-        )
-        _rom_element(area, path)
-
+        _rom_element(_data_area(part, area_name, path.stat().st_size), path)
     voice_two = rom_dir / "v21.v2"
     if voice_two.is_file():
-        area = ElementTree.SubElement(
-            part, "dataarea", {"name": "ymsnd:adpcmb", "size": str(voice_two.stat().st_size)}
-        )
-        _rom_element(area, voice_two)
+        _rom_element(_data_area(part, "ymsnd:adpcmb", voice_two.stat().st_size), voice_two)
 
+
+def _add_sprites(part: ElementTree.Element, rom_dir: Path) -> None:
     first, second = rom_dir / "c1.c1", rom_dir / "c2.c2"
-    area = ElementTree.SubElement(
-        part,
-        "dataarea",
-        {
-            "name": "sprites",
-            "size": str(first.stat().st_size + second.stat().st_size),
-            "width": "32",
-        },
-    )
+    size = first.stat().st_size + second.stat().st_size
+    area = _data_area(part, "sprites", size, width="32")
     _rom_element(area, first, "load16_byte", offset=0)
     _rom_element(area, second, "load16_byte", offset=1)
+
+
+def build_software_list(
+    rom_dir: Path, *, name: str, description: str, year: int, publisher: str
+) -> ElementTree.Element:
+    root = ElementTree.Element(
+        "softwarelist", {"name": "neogeo", "description": f"{description} homebrew cartridge"}
+    )
+    part = _cart_part(root, name=name, description=description, year=year, publisher=publisher)
+    _add_program_and_sound(part, rom_dir)
+    _add_sprites(part, rom_dir)
     return root
+
+
+def _check_regions(rom_dir: Path) -> None:
+    for region in REQUIRED_REGIONS:
+        if not (rom_dir / region).is_file():
+            msg = f"missing cart region {region} in {rom_dir}"
+            raise FileNotFoundError(msg)
+    program_bytes = (rom_dir / "p1.p1").stat().st_size
+    if program_bytes > PROM_MAX_BYTES:
+        msg = (
+            f"program ROM is {program_bytes} bytes, beyond the {PROM_MAX_BYTES} the three-bit "
+            f"bank register can reach"
+        )
+        raise ValueError(msg)
+
+
+def _write_archive(rom_dir: Path, output: Path) -> None:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    present = [r for r in (*REQUIRED_REGIONS, *OPTIONAL_REGIONS) if (rom_dir / r).is_file()]
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_STORED) as archive:
+        for region in present:
+            archive.write(rom_dir / region, region)
 
 
 def write_cart(
@@ -114,27 +132,9 @@ def write_cart(
     year: int = 2026,
     publisher: str = "neogeomedia",
 ) -> CartPackage:
-    rom_dir = Path(rom_dir)
-    for region in REQUIRED_REGIONS:
-        if not (rom_dir / region).is_file():
-            msg = f"missing cart region {region} in {rom_dir}"
-            raise FileNotFoundError(msg)
-
-    program_bytes = (rom_dir / "p1.p1").stat().st_size
-    if program_bytes > PROM_MAX_BYTES:
-        msg = (
-            f"program ROM is {program_bytes} bytes, beyond the {PROM_MAX_BYTES} the three-bit "
-            f"bank register can reach"
-        )
-        raise ValueError(msg)
-
-    output = Path(output)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    present = [r for r in (*REQUIRED_REGIONS, *OPTIONAL_REGIONS) if (rom_dir / r).is_file()]
-    with zipfile.ZipFile(output, "w", zipfile.ZIP_STORED) as archive:
-        for region in present:
-            archive.write(rom_dir / region, region)
-
+    rom_dir, output = Path(rom_dir), Path(output)
+    _check_regions(rom_dir)
+    _write_archive(rom_dir, output)
     listing = output.parent / "mame-hash" / "neogeo.xml"
     listing.parent.mkdir(parents=True, exist_ok=True)
     tree = ElementTree.ElementTree(

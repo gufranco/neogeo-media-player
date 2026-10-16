@@ -6,6 +6,7 @@ import subprocess
 import sys
 from collections.abc import Iterator
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 
@@ -134,7 +135,16 @@ def reconstruct_frame(baked: Path, frame: int, *, base_bank: int = 16) -> np.nda
     )
 
 
-def main(argv: list[str]) -> int:
+class Scan(NamedTuple):
+    best: int
+    best_error: float
+    best_frame: np.ndarray | None
+    seen: int
+    worst: float
+    scored: dict[int, float]
+
+
+def _parse(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Match a capture against the baked render.")
     parser.add_argument("--capture", type=Path, required=True)
     parser.add_argument("--preview", type=Path, default=None)
@@ -144,81 +154,98 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--max-mean-error", type=float, default=1.0)
     parser.add_argument("--min-separation", type=float, default=1.0)
     args = parser.parse_args(argv)
-
     if args.preview is None and args.baked is None:
         parser.error("pass either --preview or --baked")
     if args.baked is not None and args.frame is None:
         parser.error("--baked needs --frame")
+    return args
 
-    capture = downscale_capture(decode_capture(args.capture))
 
+def _geometry_complaint(capture: np.ndarray, overscan: int) -> str | None:
     height, width = capture.shape[:2]
     if height != RASTER_HEIGHT:
-        print(
-            f"capture height {height} is not the {RASTER_HEIGHT} line active area",
-            file=sys.stderr,
-        )
-        return 2
+        return f"capture height {height} is not the {RASTER_HEIGHT} line active area"
+    if width != RASTER_WIDTH - 2 * overscan:
+        return f"capture width {width} does not match a {overscan} pixel overscan"
+    return None
 
-    left = args.overscan
-    right = RASTER_WIDTH - args.overscan
-    if width != right - left:
-        print(
-            f"capture width {width} does not match a {args.overscan} pixel overscan",
-            file=sys.stderr,
-        )
-        return 2
 
-    reference = (
-        stream_preview(args.preview)
-        if args.preview is not None
-        else iter([reconstruct_frame(args.baked, args.frame)])
-    )
+def _scan(reference: Iterator[np.ndarray], capture: np.ndarray, overscan: int) -> Scan:
     target = capture.astype(np.int16)
     best, best_error, best_frame, count = -1, float("inf"), None, 0
     worst = 0.0
     scored: dict[int, float] = {}
     for index, frame in enumerate(reference):
-        cropped = frame[:, left:right, :].astype(np.int16)
+        cropped = frame[:, overscan : RASTER_WIDTH - overscan, :].astype(np.int16)
         error = float(np.abs(cropped - target).mean())
         scored[index] = error
         worst = max(worst, error)
         if error < best_error:
             best, best_error, best_frame = index, error, cropped
         count = index + 1
-    if best_frame is None:
-        print("the reference produced no frames", file=sys.stderr)
-        return 2
+    return Scan(best, best_error, best_frame, count, worst, scored)
 
-    print(f"best match: rendered frame {best} of {count}")
-    print(f"mean absolute error: {best_error:.4f} of 255")
+
+def _nearest_rival(scan: Scan) -> tuple[int, float] | None:
+    run = tied_run(scan.scored, scan.best)
+    rivals = {step: error for step, error in scan.scored.items() if step not in run}
+    if not rivals:
+        return None
+    contender = min(rivals, key=lambda step: rivals[step])
+    return contender, rivals[contender]
+
+
+def _report(
+    scan: Scan, best_frame: np.ndarray, capture: np.ndarray, rival: tuple[int, float] | None
+) -> None:
+    print(f"best match: rendered frame {scan.best} of {scan.seen}")
+    print(f"mean absolute error: {scan.best_error:.4f} of 255")
     print(f"exact pixel match: {np.array_equal(best_frame.astype(np.uint8), capture)}")
-    print(f"worst frame error: {worst:.4f}")
+    print(f"worst frame error: {scan.worst:.4f}")
+    if rival is not None:
+        contender, error = rival
+        margin = error - scan.best_error
+        print(f"nearest rival: frame {contender} at {error:.4f}, {margin:.4f} behind")
 
-    rivals = {step: error for step, error in scored.items() if step not in tied_run(scored, best)}
-    contender = min(rivals, key=lambda step: rivals[step]) if rivals else None
-    if contender is not None:
-        margin = rivals[contender] - best_error
-        print(f"nearest rival: frame {contender} at {rivals[contender]:.4f}, {margin:.4f} behind")
 
-    if best_error > args.max_mean_error:
+def _verdict(scan: Scan, rival: tuple[int, float] | None, args: argparse.Namespace) -> int:
+    if scan.best_error > args.max_mean_error:
         print(
-            f"FAIL: best match error {best_error:.4f} exceeds {args.max_mean_error}",
+            f"FAIL: best match error {scan.best_error:.4f} exceeds {args.max_mean_error}",
             file=sys.stderr,
         )
         return 1
-
-    if contender is not None and rivals[contender] - best_error < args.min_separation:
+    if rival is not None and rival[1] - scan.best_error < args.min_separation:
         print(
-            f"AMBIGUOUS: frame {best} at {best_error:.4f} and frame {contender} at "
-            f"{rivals[contender]:.4f} sit within {args.min_separation} of each other, so which "
+            f"AMBIGUOUS: frame {scan.best} at {scan.best_error:.4f} and frame {rival[0]} at "
+            f"{rival[1]:.4f} sit within {args.min_separation} of each other, so which "
             f"one the capture shows is a guess rather than a measurement",
             file=sys.stderr,
         )
         return 2
-
     print("PASS")
     return 0
+
+
+def main(argv: list[str]) -> int:
+    args = _parse(argv)
+    capture = downscale_capture(decode_capture(args.capture))
+    complaint = _geometry_complaint(capture, args.overscan)
+    if complaint is not None:
+        print(complaint, file=sys.stderr)
+        return 2
+    reference = (
+        stream_preview(args.preview)
+        if args.preview is not None
+        else iter([reconstruct_frame(args.baked, args.frame)])
+    )
+    scan = _scan(reference, capture, args.overscan)
+    if scan.best_frame is None:
+        print("the reference produced no frames", file=sys.stderr)
+        return 2
+    rival = _nearest_rival(scan)
+    _report(scan, scan.best_frame, capture, rival)
+    return _verdict(scan, rival, args)
 
 
 if __name__ == "__main__":

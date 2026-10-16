@@ -22,9 +22,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = _parse_args(sys.argv[1:] if argv is None else argv)
-    info = ffmpeg.probe(args.source)
+def _calibrate(
+    args: argparse.Namespace, info: ffmpeg.SourceInfo
+) -> tuple[float, dict[float, float]]:
     windows = calibrate.sample_windows(
         info.duration, count=args.samples, seconds=args.sample_seconds
     )
@@ -34,13 +34,19 @@ def main(argv: list[str] | None = None) -> int:
         f" {info.duration:.0f}s, at the '{quality.REFERENCE_TIER}' tier...",
         file=sys.stderr,
     )
-    rate, anchors = calibrate.measure_anchors(
+    return calibrate.measure_anchors(
         args.source,
         count=args.samples,
         seconds=args.sample_seconds,
         fit=args.fit,
         seed=args.seed,
     )
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(sys.argv[1:] if argv is None else argv)
+    info = ffmpeg.probe(args.source)
+    rate, anchors = _calibrate(args, info)
     print(
         quality.format_plan(
             source=str(args.source),

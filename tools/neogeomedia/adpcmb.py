@@ -23,6 +23,13 @@ BASE_RATE_HZ: Final = float(CHIP_RATE_HZ)
 PAGE_BYTES: Final = 256
 SILENT_BYTE: Final = 0x08
 ADPCM_B_MAX_BYTES: Final = 16 << 20
+NIBBLE_VALUES: Final = 16
+NIBBLE_BITS: Final = 4
+MAGNITUDE_MASK: Final = 0x07
+SIGN_BIT: Final = 0x08
+PAD_NIBBLE: Final = 0x08
+DELTA_DIVISOR: Final = 8
+STEP_DIVISOR: Final = 64
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +67,50 @@ def rate_for(delta_n: int) -> float:
     return float(exact_rate(delta_n))
 
 
+def _best_nibble(target: int, accumulator: int, step: int) -> tuple[int, int]:
+    best_nibble = 0
+    best_error = None
+    best_accumulator = accumulator
+    for candidate in range(NIBBLE_VALUES):
+        delta = (2 * (candidate & MAGNITUDE_MASK) + 1) * step // DELTA_DIVISOR
+        if candidate & SIGN_BIT:
+            delta = -delta
+        landed = min(SAMPLE_MAX, max(SAMPLE_MIN, accumulator + delta))
+        error = abs(landed - target)
+        if best_error is None or error < best_error:
+            best_error = error
+            best_nibble = candidate
+            best_accumulator = landed
+    return best_nibble, best_accumulator
+
+
+def _next_step(step: int, nibble: int) -> int:
+    scaled = (step * STEP_SCALE[nibble & MAGNITUDE_MASK]) // STEP_DIVISOR
+    return STEP_MIN if scaled < STEP_MIN else (STEP_MAX if scaled > STEP_MAX else scaled)
+
+
+def _nibbles(targets: list[int]) -> list[int]:
+    accumulator = 0
+    step = STEP_MIN
+    nibbles: list[int] = []
+    for target in targets:
+        nibble, accumulator = _best_nibble(target, accumulator, step)
+        step = _next_step(step, nibble)
+        nibbles.append(nibble)
+    return nibbles
+
+
+def _pack(nibbles: list[int]) -> bytes:
+    padded = [*nibbles, PAD_NIBBLE] if len(nibbles) % 2 else nibbles
+    payload = bytes(
+        (padded[index] << NIBBLE_BITS) | padded[index + 1] for index in range(0, len(padded), 2)
+    )
+    remainder = len(payload) % PAGE_BYTES
+    if not remainder:
+        return payload
+    return payload + bytes([SILENT_BYTE]) * (PAGE_BYTES - remainder)
+
+
 def encode(samples: npt.NDArray[np.integer], *, rate_hz: float = 22050.0) -> EncodedAudio:
     if samples.ndim != 1:
         msg = f"audio must be mono, got shape {samples.shape}"
@@ -67,48 +118,9 @@ def encode(samples: npt.NDArray[np.integer], *, rate_hz: float = 22050.0) -> Enc
     if samples.size == 0:
         msg = "cannot encode an empty signal"
         raise ValueError(msg)
-
     targets = np.clip(samples.astype(np.int32), SAMPLE_MIN, SAMPLE_MAX).tolist()
-    accumulator = 0
-    step = STEP_MIN
-    nibbles: list[int] = []
-
-    for target in targets:
-        best_nibble = 0
-        best_error = None
-        best_accumulator = accumulator
-        for candidate in range(16):
-            delta = (2 * (candidate & 7) + 1) * step // 8
-            if candidate & 8:
-                delta = -delta
-            landed = accumulator + delta
-            if landed < SAMPLE_MIN:
-                landed = SAMPLE_MIN
-            elif landed > SAMPLE_MAX:
-                landed = SAMPLE_MAX
-            error = abs(landed - target)
-            if best_error is None or error < best_error:
-                best_error = error
-                best_nibble = candidate
-                best_accumulator = landed
-        accumulator = best_accumulator
-        scaled = (step * STEP_SCALE[best_nibble & 7]) // 64
-        step = STEP_MIN if scaled < STEP_MIN else (STEP_MAX if scaled > STEP_MAX else scaled)
-        nibbles.append(best_nibble)
-
-    if len(nibbles) % 2:
-        nibbles.append(0x08)
-
-    payload = bytearray(len(nibbles) // 2)
-    for index in range(0, len(nibbles), 2):
-        payload[index // 2] = (nibbles[index] << 4) | nibbles[index + 1]
-
-    remainder = len(payload) % PAGE_BYTES
-    if remainder:
-        payload += bytes([SILENT_BYTE]) * (PAGE_BYTES - remainder)
-
     return EncodedAudio(
-        payload=bytes(payload), sample_count=samples.size, delta_n=delta_n_for(rate_hz)
+        payload=_pack(_nibbles(targets)), sample_count=samples.size, delta_n=delta_n_for(rate_hz)
     )
 
 

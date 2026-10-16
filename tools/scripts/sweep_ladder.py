@@ -96,6 +96,56 @@ def format_report(rows: list[Measurement], *, reference: str) -> str:
     return "\n".join(lines)
 
 
+def _bake_command(
+    source: Path, tier: quality.Tier, *, start: float, duration: float, work: Path, report: Path
+) -> list[str]:
+    return [
+        sys.executable,
+        "-m",
+        "neogeomedia.bake",
+        "--source",
+        str(source),
+        "--start",
+        str(start),
+        "--duration",
+        str(duration),
+        "--quality",
+        tier.name,
+        "--build-dir",
+        str(work),
+        "--report-json",
+        str(report),
+    ]
+
+
+def _bake(
+    source: Path, tier: quality.Tier, out: Path, *, start: float, duration: float, keep: bool
+) -> Path | None:
+    report = out / f"{tier.name}.json"
+    if report.is_file():
+        return report
+    work = out / f"work-{tier.name}"
+    command = _bake_command(source, tier, start=start, duration=duration, work=work, report=report)
+    print(f"baking {tier.name}", file=sys.stderr)
+    done = subprocess.run(command, capture_output=True, text=True, check=False)
+    if done.returncode != 0:
+        print(f"  {tier.name} failed: {done.stderr.strip().splitlines()[-1:]}", file=sys.stderr)
+        return None
+    if not keep:
+        subprocess.run(["rm", "-rf", str(work)], check=False)
+    return report
+
+
+def _measurement(tier: quality.Tier, report: Path) -> Measurement:
+    data = json.loads(report.read_text())
+    return Measurement(
+        name=tier.name,
+        declared=tier.relative_cost,
+        tiles=int(data["tile_count"]),
+        error=float(data["displayed_error"]),
+    )
+
+
 def measure(
     source: Path, out: Path, *, start: float, duration: float, keep: bool
 ) -> list[Measurement]:
@@ -103,50 +153,13 @@ def measure(
     source_fps = float(ffmpeg.probe(source).fps)
     vblank = float(frames.VBLANK_FPS)
     rows: list[Measurement] = []
-
     for tier in quality.LADDER:
         if not quality.reachable(tier, source_fps=source_fps, vblank_fps=vblank):
             print(f"skip {tier.name}, its hold drops no frame of this source", file=sys.stderr)
             continue
-        report = out / f"{tier.name}.json"
-        if not report.is_file():
-            work = out / f"work-{tier.name}"
-            command = [
-                sys.executable,
-                "-m",
-                "neogeomedia.bake",
-                "--source",
-                str(source),
-                "--start",
-                str(start),
-                "--duration",
-                str(duration),
-                "--quality",
-                tier.name,
-                "--build-dir",
-                str(work),
-                "--report-json",
-                str(report),
-            ]
-            print(f"baking {tier.name}", file=sys.stderr)
-            done = subprocess.run(command, capture_output=True, text=True, check=False)
-            if done.returncode != 0:
-                print(
-                    f"  {tier.name} failed: {done.stderr.strip().splitlines()[-1:]}",
-                    file=sys.stderr,
-                )
-                continue
-            if not keep:
-                subprocess.run(["rm", "-rf", str(work)], check=False)
-        data = json.loads(report.read_text())
-        rows.append(
-            Measurement(
-                name=tier.name,
-                declared=tier.relative_cost,
-                tiles=int(data["tile_count"]),
-                error=float(data["displayed_error"]),
-            )
-        )
+        report = _bake(source, tier, out, start=start, duration=duration, keep=keep)
+        if report is not None:
+            rows.append(_measurement(tier, report))
     return rows
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import struct
 from dataclasses import dataclass
 from typing import Final
@@ -17,6 +18,7 @@ MAX_TILE_NUMBER: Final = 1 << 20
 MAX_PALETTE: Final = 1 << 8
 PROM_BANK_BYTES: Final = 1 << 20
 PROM_BANK_LIMIT: Final = 8
+TILE_LOW_MASK: Final = 0xFFFF
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,16 +48,15 @@ def attribute_word(*, palette: int, tile: int, hflip: bool, vflip: bool) -> int:
     return (palette << 8) | (((tile >> 16) & 0x0F) << 4) | (int(vflip) << 1) | int(hflip)
 
 
-def pack_frame(updates: list[SlotUpdate]) -> bytes:
-    ordered = sorted(updates, key=lambda u: (u.col, u.row))
-    seen: set[tuple[int, int]] = set()
-    for item in ordered:
-        slot = (item.col, item.row)
-        if slot in seen:
+def _reject_duplicates(ordered: list[SlotUpdate]) -> None:
+    slots = [(item.col, item.row) for item in ordered]
+    for earlier, slot in itertools.pairwise(slots):
+        if earlier == slot:
             msg = f"duplicate update for slot {slot} in one frame"
             raise ValueError(msg)
-        seen.add(slot)
 
+
+def _runs(ordered: list[SlotUpdate]) -> list[list[SlotUpdate]]:
     runs: list[list[SlotUpdate]] = []
     for item in ordered:
         if runs:
@@ -64,20 +65,25 @@ def pack_frame(updates: list[SlotUpdate]) -> bytes:
                 runs[-1].append(item)
                 continue
         runs.append([item])
+    return runs
 
-    out = bytearray(struct.pack(">H", len(runs)))
-    for run in runs:
-        head = run[0]
-        out += struct.pack(">HH", vram_address(head.col, head.row), len(run))
-        for item in run:
-            out += struct.pack(
-                ">HH",
-                item.tile & 0xFFFF,
-                attribute_word(
-                    palette=item.palette, tile=item.tile, hflip=item.hflip, vflip=item.vflip
-                ),
-            )
-    return bytes(out)
+
+def _pack_run(run: list[SlotUpdate]) -> bytes:
+    head = run[0]
+    words = [struct.pack(">HH", vram_address(head.col, head.row), len(run))]
+    for item in run:
+        attribute = attribute_word(
+            palette=item.palette, tile=item.tile, hflip=item.hflip, vflip=item.vflip
+        )
+        words.append(struct.pack(">HH", item.tile & TILE_LOW_MASK, attribute))
+    return b"".join(words)
+
+
+def pack_frame(updates: list[SlotUpdate]) -> bytes:
+    ordered = sorted(updates, key=lambda u: (u.col, u.row))
+    _reject_duplicates(ordered)
+    runs = _runs(ordered)
+    return struct.pack(">H", len(runs)) + b"".join(_pack_run(run) for run in runs)
 
 
 class MovieStream:

@@ -184,7 +184,7 @@ jobs:
             --build-dir build --bundle build/bundle
 
       - name: A developer's project builds against the bundle
-        run: make cutscene
+        run: make example
 
       - name: The example produced a cartridge
         run: |
@@ -198,7 +198,7 @@ jobs:
       - name: The same project builds with the movie's soundtrack
         run: |
           set -euo pipefail
-          make cutscene EXAMPLE=build/example-audio FMV_AUDIO=yes
+          make example EXAMPLE=build/example-audio FMV_AUDIO=yes
           docker run --rm --platform linux/amd64 --user "$(id -u):$(id -g)" \
             -v "$PWD:/work" -w /work neogeo-media-player-toolchain \
             bash examples/cutscene/check_audio.sh build/example-audio

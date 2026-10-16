@@ -33,12 +33,12 @@ uv --project tools run python -m neogeomedia.bake \
     --source my-film.mkv --quality q17 --duration 30 \
     --build-dir build --preview build/preview.mkv --bundle build/bundle
 
-BUNDLE=$PWD/build/bundle bash examples/cutscene/build.sh
+make example
 ```
 
-The cartridge lands in `build/example/cutscene/build/rom/`. Without ngdevkit
-installed, `make cutscene` runs the same script in the pinned toolchain image,
-and `make cutscene FMV_AUDIO=yes` builds it with the movie's own sound driver.
+`make example` runs [`build.sh`](build.sh) in the pinned toolchain image as
+the calling user, and the cartridge lands in `build/example/cutscene/build/rom/`.
+`make example FMV_AUDIO=yes` builds it with the movie's own sound driver.
 
 ## Checking it
 

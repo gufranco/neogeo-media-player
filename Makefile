@@ -10,7 +10,7 @@ FMV_AUDIO    := no
 OBJECTS      := $(BUILD)/main.o $(BUILD)/menu.o $(BUILD)/fmv.o $(BUILD)/timeline.o \
                 $(BUILD)/fmv_audio.o $(BUILD)/guard.o
 
-.PHONY: all image rom analyse timing cutscene hooks shell clean distclean
+.PHONY: all image rom analyse timing example hooks shell clean distclean
 all: rom
 
 image:
@@ -32,7 +32,7 @@ timing: image
 	    m68k-neogeo-elf-objdump -dr "$$object" > "$$object.dis"; done'
 	uv --project tools run python tools/scripts/check_vram_timing.py $(OBJECTS:.o=.o.dis)
 
-cutscene: image
+example: image
 	$(DOCKER) -e BUNDLE=/work/$(BUILD)/bundle -e WORK=/work/$(EXAMPLE) \
 	    -e FMV_AUDIO=$(FMV_AUDIO) $(DOCKER_IMAGE) bash examples/cutscene/build.sh
 

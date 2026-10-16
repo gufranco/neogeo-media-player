@@ -5,6 +5,8 @@ import pytest
 from neogeomedia import plan, quality
 from tests.bakehelp import lavfi_clip
 
+pytestmark = pytest.mark.ffmpeg
+
 
 @pytest.fixture(scope="module")
 def synthetic_clip(tmp_path_factory):

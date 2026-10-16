@@ -8,6 +8,8 @@ import pytest
 from neogeomedia import bake, epochs, frames
 from tests.bakehelp import lavfi_clip
 
+pytestmark = pytest.mark.ffmpeg
+
 
 @pytest.fixture(scope="module")
 def cut_clip(tmp_path_factory):

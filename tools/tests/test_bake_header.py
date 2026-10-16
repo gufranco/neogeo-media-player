@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import pytest
+
 from neogeomedia import codegen
 from tests.bakehelp import generated
+
+pytestmark = pytest.mark.ffmpeg
 
 HEADER = "movie_data.h"
 

@@ -7,6 +7,8 @@ import pytest
 from neogeomedia import calibrate, quality
 from tests.bakehelp import lavfi_clip
 
+pytestmark = pytest.mark.ffmpeg
+
 BUSY_OVER_BLACK = 10.0
 
 

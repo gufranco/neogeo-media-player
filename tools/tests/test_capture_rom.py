@@ -87,6 +87,7 @@ class TestOptions:
 
 
 class TestPng:
+    @pytest.mark.ffmpeg
     def test_the_written_png_decodes_to_the_same_pixels(self, capture_rom, tmp_path):
         # Arrange
         fake = seeded()
@@ -104,6 +105,7 @@ class TestPng:
 
 
 class TestCapture:
+    @pytest.mark.ffmpeg
     def test_the_last_frame_of_the_run_is_saved(self, capture_rom, core, cartridge, tmp_path):
         # Arrange
         out = tmp_path / "shot" / "last.png"
@@ -175,6 +177,7 @@ class TestHeldButtons:
         # Assert
         assert str(refused.value) == "a hold reads FRAME:BUTTON[+BUTTON], got 'start'"
 
+    @pytest.mark.ffmpeg
     def test_held_buttons_reach_the_core(self, capture_rom, core, cartridge, tmp_path):
         # Arrange
         out = tmp_path / "held.png"

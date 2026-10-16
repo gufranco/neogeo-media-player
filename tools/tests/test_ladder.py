@@ -227,6 +227,7 @@ class TestMeasuringOnePoint:
 
 
 class TestSweepingAFilm:
+    @pytest.mark.ffmpeg
     def test_it_walks_every_colour_step_then_every_hold(self):
         # Arrange
         source = SYNTHETIC_FILM

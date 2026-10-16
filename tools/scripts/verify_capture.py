@@ -17,6 +17,7 @@ from tests.geolith_model import GeolithTileReader, StreamPlayer
 
 RASTER_WIDTH = 320
 RASTER_HEIGHT = 224
+MIN_SCALE_FACTOR = 2
 
 TIE = 1e-9
 
@@ -86,7 +87,7 @@ def downscale_capture(capture: np.ndarray) -> np.ndarray:
     if height % RASTER_HEIGHT != 0:
         return capture
     factor = height // RASTER_HEIGHT
-    if factor < 2 or width % factor != 0:
+    if factor < MIN_SCALE_FACTOR or width % factor != 0:
         return capture
     offset = factor // 2
     return capture[offset::factor, offset::factor]

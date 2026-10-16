@@ -13,6 +13,7 @@ TILE_PIXELS: Final = TILE_PX * TILE_PX
 PALETTE_SLOTS: Final = neocolor.PALETTE_USABLE_COLORS
 CRAM_BANKS: Final = 256
 DESCRIPTOR_DIMS: Final = 9
+TABLE_DIMS: Final = 2
 _KMEANS_ITERATIONS: Final = 24
 _ASSIGN_CHUNK_BYTES: Final = 64 << 20
 _MIX_SCALE: Final = 255.0
@@ -68,7 +69,7 @@ class PaletteSet:
     chroma_weight: float = DEFAULT_CHROMA_WEIGHT
 
     def __post_init__(self) -> None:
-        if self.colors.ndim != 2 or self.colors.shape[1] != PALETTE_SLOTS:
+        if self.colors.ndim != TABLE_DIMS or self.colors.shape[1] != PALETTE_SLOTS:
             msg = f"palette table must be (count, {PALETTE_SLOTS}), got {self.colors.shape}"
             raise ValueError(msg)
         if self.base_bank + self.colors.shape[0] > CRAM_BANKS:

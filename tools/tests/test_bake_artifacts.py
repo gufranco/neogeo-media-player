@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import pytest
+
 from neogeomedia import codegen, crom, stream
 from tests.bakehelp import baked_size, generated
+
+pytestmark = pytest.mark.ffmpeg
 
 
 class TestCharacterRom:

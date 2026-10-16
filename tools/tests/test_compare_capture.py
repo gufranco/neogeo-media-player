@@ -11,6 +11,8 @@ from neogeomedia import frames
 from tests.bakehelp import lavfi_clip
 from tests.scripthelp import build_core, load_script
 
+pytestmark = pytest.mark.ffmpeg
+
 FRAMES = 40
 HEIGHT = 224
 WIDTH = 304

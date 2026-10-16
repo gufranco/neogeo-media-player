@@ -11,6 +11,8 @@ import pytest
 from neogeomedia import bake
 from tests.bakehelp import generated, small_request, tone_clip
 
+pytestmark = pytest.mark.ffmpeg
+
 _spec = importlib.util.spec_from_file_location(
     "verify_capture", Path(__file__).resolve().parents[1] / "scripts" / "verify_capture.py"
 )

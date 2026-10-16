@@ -83,10 +83,12 @@ MOVEMENT_FLOOR_MINIMUM: Final = 1e-6
 
 MOVEMENT_SAMPLE_SECONDS: Final = 1.2
 
+MIN_FRAMES_FOR_MOVEMENT: Final = 2
+
 
 def movement_floor(path: Path, *, duration: float = MOVEMENT_SAMPLE_SECONDS) -> float:
     clip = np.concatenate(list(frames.stream(Path(path), start=0.0, duration=duration)))
-    if clip.shape[0] < 2:
+    if clip.shape[0] < MIN_FRAMES_FOR_MOVEMENT:
         return MOVEMENT_FLOOR_MINIMUM
     grid = palettes.oklab_grid(1.0)
     tiles = encode.to_tiles(neocolor.rgb_to_color_index(clip))

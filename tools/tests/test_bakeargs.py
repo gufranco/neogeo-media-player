@@ -8,6 +8,8 @@ from fmvcore import ffmpeg
 
 from neogeomedia import bakeargs, content, quality
 
+pytestmark = pytest.mark.ffmpeg
+
 SOURCE = ["--source", "clip.mp4", "--duration", "1"]
 
 

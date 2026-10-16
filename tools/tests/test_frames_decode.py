@@ -8,6 +8,8 @@ import pytest
 from neogeomedia import frames
 from tests.bakehelp import lavfi_clip
 
+pytestmark = pytest.mark.ffmpeg
+
 RASTER = (224, 320, 3)
 
 

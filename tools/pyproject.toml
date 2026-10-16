@@ -38,12 +38,14 @@ target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "PL", "RUF", "ARG", "PTH"]
-ignore = ["PLR0913", "PLR2004"]
+ignore = ["PLR0913"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["PLR2004"]
 
 [tool.mypy]
 strict = true
 warn_unreachable = true
-disallow_any_explicit = false
 
 [[tool.mypy.overrides]]
 module = "tests.*"
@@ -63,8 +65,10 @@ exclude_lines = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["error"]
 markers = [
     "reads_real_store: reads the project tier file without writing it",
+    "ffmpeg: decodes through ffmpeg; skipped without it unless NEOGEOMEDIA_FFMPEG_REQUIRED=1",
 ]
-addopts = "-q"
 

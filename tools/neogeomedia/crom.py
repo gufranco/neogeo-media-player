@@ -9,15 +9,17 @@ TILE_PX: Final = 16
 TILE_BYTES_PER_ROM: Final = 64
 TILE_BYTES: Final = TILE_BYTES_PER_ROM * 2
 MIN_ROM_BYTES: Final = 1 << 20
+TILE_BATCH_DIMS: Final = 3
+MAX_PIXEL_INDEX: Final = 0x0F
 
 _BIT_POSITIONS: Final = np.arange(8, dtype=np.uint8)
 
 
 def pack_tiles(tiles: npt.NDArray[np.uint8]) -> tuple[npt.NDArray[np.uint8], npt.NDArray[np.uint8]]:
-    if tiles.ndim != 3 or tiles.shape[1:] != (TILE_PX, TILE_PX):
+    if tiles.ndim != TILE_BATCH_DIMS or tiles.shape[1:] != (TILE_PX, TILE_PX):
         msg = f"tiles must be a batch of 16x16 arrays, got shape {tiles.shape}"
         raise ValueError(msg)
-    if tiles.size and int(tiles.max()) > 0x0F:
+    if tiles.size and int(tiles.max()) > MAX_PIXEL_INDEX:
         msg = "tile pixels must be 4-bit palette indices in the range 0 to 15"
         raise ValueError(msg)
 

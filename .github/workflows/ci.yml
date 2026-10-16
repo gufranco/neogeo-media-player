@@ -106,6 +106,7 @@ jobs:
       - name: Tests and coverage
         env:
           NEOGEOMEDIA_CLIPS_REQUIRED: "1"
+          NEOGEOMEDIA_FFMPEG_REQUIRED: "1"
         run: |
           uv --project tools run python -m pytest tools/tests \
             --cov=neogeomedia \

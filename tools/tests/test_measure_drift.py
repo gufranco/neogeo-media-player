@@ -4,6 +4,8 @@ import pytest
 
 from tests.capturehelp import flat_bake, flat_capture, load_script
 
+pytestmark = pytest.mark.ffmpeg
+
 FRAMES = 6
 MATCH = 16
 NEAR = 15

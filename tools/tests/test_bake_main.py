@@ -8,6 +8,8 @@ import pytest
 from neogeomedia import bake, bundle
 from tests.bakehelp import SYNTHETIC_FILM, small_argv, tone_clip
 
+pytestmark = pytest.mark.ffmpeg
+
 
 @pytest.fixture(scope="module")
 def tone(tmp_path_factory):

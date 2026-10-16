@@ -32,6 +32,7 @@ class TestPreviewCodec:
 
 
 class TestPreviewWriter:
+    @pytest.mark.ffmpeg
     def test_frames_written_come_back_out_of_a_lossless_preview(self, tmp_path):
         # Arrange
         rng = np.random.default_rng(7)
@@ -53,6 +54,7 @@ class TestPreviewWriter:
         decoded = np.frombuffer(raw, np.uint8).reshape(-1, *shape, 3)
         assert np.array_equal(decoded[0], neocolor.color_index_to_rgb(frame))
 
+    @pytest.mark.ffmpeg
     def test_a_preview_ffmpeg_cannot_write_is_an_error(self, tmp_path):
         # Arrange
         writer = preview.PreviewWriter(tmp_path / "preview.not-a-container")

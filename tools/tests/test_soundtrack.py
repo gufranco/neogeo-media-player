@@ -7,6 +7,8 @@ import pytest
 from neogeomedia import adpcmb, soundtrack
 from neogeomedia import frames as frames_mod
 
+pytestmark = pytest.mark.ffmpeg
+
 
 def _make_clip(path, *, with_tone: bool):
     tone = ["-f", "lavfi", "-i", "sine=frequency=440:duration=1"] if with_tone else []

@@ -10,6 +10,8 @@ import pytest
 
 from neogeomedia import bake, clips
 
+pytestmark = pytest.mark.ffmpeg
+
 FILMS = clips.load()
 
 

@@ -20,6 +20,7 @@ DEFAULT_AUDIO_HZ: Final = MAX_AUDIO_HZ
 MIN_AUDIO_HZ: Final = 8000.0
 SECONDS_PER_MINUTE: Final = 60.0
 SAFETY_MARGIN: Final = 0.92
+FLAT_SPAN: Final = 1e-12
 
 
 @dataclass(frozen=True, slots=True)
@@ -412,7 +413,7 @@ def rescale(relative_cost: float, *, anchors: dict[float, float]) -> float:
         low, high = known[index - 1], known[index]
 
     span = math.log(high[0]) - math.log(low[0])
-    if abs(span) < 1e-12:
+    if abs(span) < FLAT_SPAN:
         return low[1]
     ratio = (math.log(relative_cost) - math.log(low[0])) / span
     return math.exp(math.log(low[1]) + ratio * (math.log(high[1]) - math.log(low[1])))

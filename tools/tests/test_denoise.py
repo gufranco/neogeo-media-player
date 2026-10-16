@@ -58,6 +58,7 @@ class TestChoose:
 
 
 class TestMeasure:
+    @pytest.mark.ffmpeg
     def test_every_candidate_is_scored_against_the_undenoised_source(self):
         # Arrange
         tier = quality.tier_by_name("q17")
@@ -71,6 +72,7 @@ class TestMeasure:
             True,
         )
 
+    @pytest.mark.ffmpeg
     def test_denoising_spends_no_more_tiles_than_leaving_the_source_alone(self):
         # Arrange
         tier = quality.tier_by_name("q17")

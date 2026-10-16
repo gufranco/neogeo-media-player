@@ -5,6 +5,8 @@ import pytest
 from neogeomedia import content
 from tests.bakehelp import lavfi_clip
 
+pytestmark = pytest.mark.ffmpeg
+
 COLOUR_BARS = "testsrc=size=640x360:rate=25:duration=2"
 MOVING = "testsrc=size=320x224:rate=25:duration=2"
 STILL_RED = "color=c=red:size=320x224:rate=25:duration=2"

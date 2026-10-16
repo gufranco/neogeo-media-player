@@ -9,6 +9,8 @@ from fmvcore.testing import seeded
 from tests.bakehelp import SYNTHETIC_FILM
 from tests.scripthelp import load_script
 
+pytestmark = pytest.mark.ffmpeg
+
 SKIPPED = ("q31", "q32", "q33")
 REACHABLE = tuple(
     name for name in (f"q{index:02d}" for index in range(1, 36)) if name not in SKIPPED

@@ -1,9 +1,17 @@
 from __future__ import annotations
 
 import pytest
+from fmvcore import testing
 
 from neogeomedia import bake, tiercache
 from tests.bakehelp import lavfi_clip, small_request
+
+FFMPEG_REQUIRED_ENV = "NEOGEOMEDIA_FFMPEG_REQUIRED"
+DECODERS = ("ffmpeg", "ffprobe")
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    testing.require_tools(item, marker="ffmpeg", tools=DECODERS, required_env=FFMPEG_REQUIRED_ENV)
 
 
 @pytest.fixture(autouse=True)

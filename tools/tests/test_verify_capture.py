@@ -18,6 +18,8 @@ from tests.capturehelp import (
     write_png,
 )
 
+pytestmark = pytest.mark.ffmpeg
+
 verify_capture = load_script("verify_capture")
 
 PREVIEW_FRAMES = 6

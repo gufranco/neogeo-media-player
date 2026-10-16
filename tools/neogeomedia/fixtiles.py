@@ -11,6 +11,7 @@ TILE_PX: Final = 8
 TILE_BYTES: Final = 32
 COLUMN_PAIR_OFFSETS: Final = (0x10, 0x18, 0x00, 0x08)
 MAX_TILE_INDEX: Final = 0x1000
+MAX_PIXEL_INDEX: Final = 0x0F
 
 TRANSPARENT: Final = 0
 INK: Final = 1
@@ -81,7 +82,7 @@ def pack_tile(pixels: list[list[int]]) -> bytes:
             left = pixels[y][pair * 2]
             right = pixels[y][pair * 2 + 1]
             for value in (left, right):
-                if not 0 <= value <= 0x0F:
+                if not 0 <= value <= MAX_PIXEL_INDEX:
                     msg = "fix pixels must be 4-bit palette indices in the range 0 to 15"
                     raise ValueError(msg)
             out[offset + y] = (left & 0x0F) | ((right & 0x0F) << 4)

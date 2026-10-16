@@ -20,6 +20,8 @@ from tests.cartridgehelp import (
     two_tone_clip,
 )
 
+pytestmark = pytest.mark.ffmpeg
+
 fake = seeded()
 WHOLE_CLIP_FRAMES = 12
 SUBTITLE_STRIDE = 8 + 2 * 40

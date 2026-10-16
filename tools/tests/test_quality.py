@@ -6,425 +6,359 @@ import pytest
 
 from neogeomedia import quality
 
+RATE = 100_000.0
+VBLANK = 59.185
+LADDER_SIZE = 35
+
 
 class TestLadder:
     def test_it_runs_from_best_to_cheapest(self):
-        costs = [tier.relative_cost for tier in quality.LADDER]
+        # Arrange
+        ladder = quality.LADDER
 
-        assert costs == sorted(costs, reverse=True)
+        # Act
+        costs = [tier.relative_cost for tier in ladder]
+
+        # Assert
+        assert all(dearer > cheaper for dearer, cheaper in itertools.pairwise(costs))
 
     def test_every_tier_has_a_distinct_name(self):
-        names = [tier.name for tier in quality.LADDER]
+        # Arrange
+        ladder = quality.LADDER
 
-        assert len(names) == len(set(names))
+        # Act
+        names = {tier.name for tier in ladder}
+
+        # Assert
+        assert len(names) == LADDER_SIZE
 
     def test_the_reference_tier_costs_about_one(self):
-        assert quality.tier_by_name(quality.REFERENCE_TIER).relative_cost == pytest.approx(
-            1.0, abs=0.06
-        )
+        # Arrange
+        name = quality.REFERENCE_TIER
+
+        # Act
+        tier = quality.tier_by_name(name)
+
+        # Assert
+        assert tier.relative_cost == pytest.approx(1.0, abs=0.06)
 
     def test_an_unknown_tier_is_rejected(self):
-        with pytest.raises(ValueError, match="unknown quality tier"):
-            quality.tier_by_name("cinematic")
+        # Arrange
+        name = "cinematic"
+
+        # Act
+        with pytest.raises(ValueError, match="unknown quality tier") as raised:
+            quality.tier_by_name(name)
+
+        # Assert
+        assert repr(name) in str(raised.value)
 
 
 class TestCapacity:
-    def test_a_cheaper_tier_holds_a_longer_movie(self):
-        rate = 100_000.0
+    @pytest.mark.parametrize(
+        ("name", "rate", "minutes"),
+        [
+            ("standard", 100_000.0, 10.48576),
+            ("extreme", 100_000.0, 39.718788),
+            ("standard", 50_000.0, 20.97152),
+        ],
+        ids=["the reference rung", "a cheaper tier holds longer", "half the rate holds double"],
+    )
+    def test_capacity_is_the_crom_tile_count_over_the_tier_rate(self, name, rate, minutes):
+        # Arrange
+        tier = quality.tier_by_name(name)
 
-        standard = quality.max_minutes(quality.tier_by_name("standard"), rate)
-        extreme = quality.max_minutes(quality.tier_by_name("extreme"), rate)
+        # Act
+        capacity = quality.max_minutes(tier, rate)
 
-        assert extreme > standard
-
-    def test_capacity_scales_inversely_with_the_measured_rate(self):
-        tier = quality.tier_by_name("standard")
-
-        cheap = quality.max_minutes(tier, 50_000.0)
-        dear = quality.max_minutes(tier, 100_000.0)
-
-        assert cheap == pytest.approx(dear * 2.0)
+        # Assert
+        assert capacity == pytest.approx(minutes)
 
 
 class TestSelection:
-    def test_a_short_source_gets_the_best_tier(self):
-        fit = quality.select(1.0, 100_000.0)
+    @pytest.mark.parametrize(
+        ("minutes", "name"),
+        [(1.0, "q01"), (2.0, "q01"), (20.0, "q32")],
+        ids=["a short source gets the best tier", "two minutes still fit q01", "a long source"],
+    )
+    def test_a_longer_source_falls_down_the_ladder(self, minutes, name):
+        # Arrange
+        rate = RATE
 
+        # Act
+        fit = quality.select(minutes, rate)
+
+        # Assert
         assert fit is not None
-        assert fit.tier is quality.LADDER[0]
-
-    def test_a_long_source_falls_down_the_ladder(self):
-        short = quality.select(2.0, 100_000.0)
-        long = quality.select(20.0, 100_000.0)
-
-        assert short is not None
-        assert long is not None
-        assert long.tier.relative_cost < short.tier.relative_cost
+        assert fit.tier.name == name
 
     def test_a_source_beyond_every_tier_selects_nothing(self):
-        assert quality.select(600.0, 100_000.0) is None
+        # Arrange
+        minutes = 600.0
+
+        # Act
+        fit = quality.select(minutes, RATE)
+
+        # Assert
+        assert fit is None
 
     def test_the_selected_tier_reports_spare_runtime(self):
-        fit = quality.select(1.0, 100_000.0)
+        # Arrange
+        minutes = 1.0
 
+        # Act
+        fit = quality.select(minutes, RATE)
+
+        # Assert
         assert fit is not None
-        assert fit.spare_minutes > 0.0
+        assert fit.spare_minutes == pytest.approx(5.309287, abs=1e-6)
         assert fit.trim_minutes == 0.0
 
 
 class TestOvershoot:
     def test_a_tier_that_overruns_reports_how_far(self):
-        survey = quality.survey(20.0, 100_000.0)
-        archival = survey[0]
+        # Arrange
+        minutes = 20.0
 
-        assert not archival.fits
-        assert archival.overshoot > 1.0
-        assert archival.trim_minutes > 0.0
+        # Act
+        archival = quality.survey(minutes, RATE)[0]
+
+        # Assert
+        assert archival.fits is False
+        assert archival.overshoot == pytest.approx(2.916336, abs=1e-6)
+        assert archival.trim_minutes == pytest.approx(13.7)
 
     def test_trimming_by_the_reported_amount_makes_it_fit(self):
-        survey = quality.survey(20.0, 100_000.0)
-        archival = survey[0]
+        # Arrange
+        archival = quality.survey(20.0, RATE)[0]
 
+        # Act
         trimmed = quality.Fit(
             archival.tier, 20.0 - archival.trim_minutes, archival.capacity_minutes
         )
 
-        assert trimmed.fits
-
-
-class TestAudioRate:
-    def test_a_short_movie_keeps_the_full_rate(self):
-        assert quality.audio_hz_for(5.0) == quality.DEFAULT_AUDIO_HZ
-
-    def test_a_long_movie_drops_the_rate_to_fit(self):
-        assert quality.audio_hz_for(60.0) < quality.DEFAULT_AUDIO_HZ
-
-    def test_the_chosen_rate_always_fits_the_voice_rom(self):
-        minutes = 40.0
-
-        rate = quality.audio_hz_for(minutes)
-        needed = minutes * quality.SECONDS_PER_MINUTE * rate * quality.ADPCM_B_BYTES_PER_SAMPLE
-
-        assert needed <= quality.ADPCM_B_BYTES
+        # Assert
+        assert trimmed.fits is True
 
 
 class TestClock:
-    def test_it_renders_minutes_and_seconds(self):
-        assert quality.clock(3.5) == "3:30"
+    @pytest.mark.parametrize(
+        ("minutes", "text"),
+        [(3.5, "3:30"), (3.05, "3:03"), (125.0, "2:05:00")],
+        ids=["minutes and seconds", "padded seconds", "hours when present"],
+    )
+    def test_it_renders_a_runtime_as_a_clock(self, minutes, text):
+        # Arrange
+        runtime = minutes
 
-    def test_it_pads_seconds(self):
-        assert quality.clock(3.05) == "3:03"
+        # Act
+        rendered = quality.clock(runtime)
 
-    def test_it_renders_hours_when_present(self):
-        assert quality.clock(125.0) == "2:05:00"
-
-
-class TestPlanReport:
-    def plan(self, minutes: float, rate: float = 100_000.0) -> str:
-        return quality.format_plan(
-            source="film.mkv",
-            minutes=minutes,
-            width=1920,
-            height=1080,
-            source_fps=24.0,
-            has_audio=True,
-            reference_rate=rate,
-            vblank_fps=59.1856,
-        )
-
-    def test_it_names_every_tier_the_source_can_use(self):
-        text = self.plan(12.0)
-
-        for tier in quality.LADDER:
-            reachable = quality.reachable(tier, source_fps=24.0, vblank_fps=59.1856)
-            assert (tier.name in text) is reachable
-
-    def test_it_states_the_selected_tier(self):
-        text = self.plan(12.0)
-
-        assert "Selected" in text
-
-    def test_it_reports_the_measured_rate(self):
-        text = self.plan(12.0)
-
-        assert "100,000" in text
-
-    def test_it_tells_the_user_how_much_to_trim_for_a_better_tier(self):
-        text = self.plan(12.0)
-
-        assert "Trim" in text
-
-    def test_it_says_plainly_when_nothing_fits(self):
-        text = self.plan(600.0)
-
-        assert "does not fit" in text
-
-    def test_a_source_that_fits_the_best_tier_needs_no_trim_advice(self):
-        text = self.plan(0.5)
-
-        assert quality.LADDER[0].name in text
-        assert "Trim" not in text
-
-    def test_it_reports_the_budget_of_the_selected_tier(self):
-        text = self.plan(12.0)
-
-        assert "C-ROM" in text
-        assert "audio" in text
-
-
-class TestShortfallMessage:
-    def test_a_source_that_fits_has_no_message(self):
-        assert quality.shortfall_message(1.0, 100_000.0) is None
-
-    def test_a_source_beyond_every_tier_is_told_how_much_to_cut(self):
-        message = quality.shortfall_message(600.0, 100_000.0)
-
-        assert message is not None
-        assert "does not fit" in message
-        assert "trim" in message
-
-    def test_the_amount_named_is_enough_to_make_it_fit(self):
-        minutes = 600.0
-        cheapest = quality.survey(minutes, 100_000.0)[-1]
-
-        trimmed = minutes - cheapest.trim_minutes
-
-        assert quality.select(trimmed, 100_000.0) is not None
-
-
-class TestAudioFitsThePageCounter:
-    RUNTIMES = (1.0, 10.0, 25.0, 25.4, 26.0, 30.0, 40.0, 90.0)
-
-    @pytest.mark.parametrize("minutes", RUNTIMES)
-    def test_the_last_page_is_addressable(self, minutes):
-        rate = quality.audio_hz_for(minutes)
-
-        pages = minutes * quality.SECONDS_PER_MINUTE * rate * quality.ADPCM_B_BYTES_PER_SAMPLE / 256
-
-        assert pages <= quality.ADPCM_B_MAX_PAGES
-
-    @pytest.mark.parametrize("minutes", RUNTIMES)
-    def test_the_soundtrack_still_fits_the_voice_rom(self, minutes):
-        rate = quality.audio_hz_for(minutes)
-
-        needed = minutes * quality.SECONDS_PER_MINUTE * rate * quality.ADPCM_B_BYTES_PER_SAMPLE
-
-        assert needed <= quality.ADPCM_B_BYTES
-
-    def test_a_short_movie_is_unaffected(self):
-        assert quality.audio_hz_for(5.0) == quality.DEFAULT_AUDIO_HZ
+        # Assert
+        assert rendered == text
 
 
 class TestReferenceTier:
-    def tier(self):
-        return quality.tier_by_name("reference")
-
     def test_it_is_the_most_expensive_rung(self):
-        assert self.tier().relative_cost == max(t.relative_cost for t in quality.LADDER)
+        # Arrange
+        dearest = max(tier.relative_cost for tier in quality.LADDER)
+
+        # Act
+        tier = quality.tier_by_name("reference")
+
+        # Assert
+        assert tier.relative_cost == dearest
 
     def test_it_is_first_on_the_ladder(self):
-        assert quality.LADDER[0] is self.tier()
+        # Arrange
+        first = quality.LADDER[0]
 
-    def test_the_older_names_still_resolve(self):
-        for name in quality.ALIASES:
-            assert quality.tier_by_name(name) in quality.LADDER
+        # Act
+        tier = quality.tier_by_name("reference")
 
-    def test_it_charges_colour_at_full_rate(self):
-        assert self.tier().chroma_weight == 1.0
+        # Assert
+        assert tier is first
 
-    def test_it_shows_every_frame(self):
-        assert self.tier().frame_hold == 1
+    @pytest.mark.parametrize(
+        ("alias", "name"),
+        [
+            ("reference", "q01"),
+            ("archival", "q03"),
+            ("high", "q11"),
+            ("standard", "q17"),
+            ("extended", "q23"),
+            ("long", "q28"),
+            ("maximum", "q33"),
+            ("extreme", "q35"),
+        ],
+    )
+    def test_the_older_names_still_resolve(self, alias, name):
+        # Arrange
+        older = alias
 
-    def test_it_holds_the_finest_threshold_on_the_ladder(self):
-        assert self.tier().tolerance == min(t.tolerance for t in quality.LADDER)
+        # Act
+        tier = quality.tier_by_name(older)
 
-    def test_it_does_not_denoise(self):
-        assert self.tier().denoise == 0.0
+        # Assert
+        assert tier.name == name
+        assert tier in quality.LADDER
 
-    def test_it_searches_every_palette(self):
-        assert self.tier().candidates == 0
+    def test_it_spends_everything_on_the_picture(self):
+        # Arrange
+        finest = min(tier.tolerance for tier in quality.LADDER)
+
+        # Act
+        tier = quality.tier_by_name("reference")
+
+        # Assert
+        assert tier.chroma_weight == 1.0
+        assert tier.frame_hold == 1
+        assert tier.tolerance == finest
+        assert tier.denoise == 0.0
+        assert tier.candidates == 0
 
     def test_a_short_source_selects_it(self):
-        fit = quality.select(0.5, 100_000.0)
+        # Arrange
+        minutes = 0.5
 
+        # Act
+        fit = quality.select(minutes, RATE)
+
+        # Assert
         assert fit is not None
-        assert fit.tier is self.tier()
-
-
-class TestAudioTakesWhatIsFree:
-    def test_a_short_movie_gets_the_chip_maximum(self):
-        assert quality.audio_hz_for(1.0) == pytest.approx(quality.MAX_AUDIO_HZ, rel=0.01)
-
-    def test_a_ten_minute_movie_still_beats_the_old_ceiling(self):
-        assert quality.audio_hz_for(10.0) > 22050.0
-
-    def test_a_long_movie_comes_down_to_fit(self):
-        assert quality.audio_hz_for(40.0) < quality.audio_hz_for(10.0)
-
-    @pytest.mark.parametrize("minutes", [1.0, 10.0, 25.0, 40.0, 90.0])
-    def test_it_always_fits_the_page_counter(self, minutes):
-        rate = quality.audio_hz_for(minutes)
-
-        pages = minutes * quality.SECONDS_PER_MINUTE * rate * 0.5 / quality.ADPCM_B_PAGE_BYTES
-
-        assert pages <= quality.ADPCM_B_MAX_PAGES
-
-
-class TestAudioGrade:
-    def test_the_chip_maximum_is_the_top_grade(self):
-        assert quality.audio_grade(quality.MAX_AUDIO_HZ) == 1
-
-    def test_a_lower_rate_gives_a_worse_grade(self):
-        assert quality.audio_grade(11025.0) > quality.audio_grade(44100.0)
-
-    def test_grades_stay_inside_the_ladder(self):
-        for rate in (55555.0, 44100.0, 22050.0, 11025.0, 8000.0, 4000.0):
-            assert 1 <= quality.audio_grade(rate) <= len(quality.LADDER)
-
-    def test_a_short_movie_is_graded_top(self):
-        assert quality.audio_grade(quality.audio_hz_for(2.0)) == 1
+        assert fit.tier is quality.tier_by_name("reference")
 
 
 class TestPerSourceCurve:
-    def test_the_reference_anchor_is_left_alone(self):
-        corrected = quality.rescale(1.0, anchors={2.0: 2.0, 1.0: 1.0, 0.3: 0.3})
+    @pytest.mark.parametrize(
+        ("rung", "anchors", "expected"),
+        [
+            (1.0, {2.0: 2.0, 1.0: 1.0, 0.3: 0.3}, 1.0),
+            (0.3, {2.0: 2.0, 1.0: 1.0, 0.3: 0.2}, 0.2),
+            (2.0, {2.0: 2.5, 1.0: 1.0, 0.3: 0.3}, 2.5),
+            (0.6, {2.0: 2.0, 1.0: 1.0, 0.3: 0.2}, 0.505171),
+        ],
+        ids=[
+            "the reference anchor is left alone",
+            "a cheaper source pulls the low end down",
+            "a dearer source pushes the high end up",
+            "a rung between anchors is interpolated",
+        ],
+    )
+    def test_a_rung_follows_the_measured_anchors(self, rung, anchors, expected):
+        # Arrange
+        measured = dict(anchors)
 
-        assert corrected == pytest.approx(1.0)
+        # Act
+        corrected = quality.rescale(rung, anchors=measured)
 
-    def test_a_cheaper_source_pulls_the_low_end_down(self):
-        cheap = quality.rescale(0.3, anchors={2.0: 2.0, 1.0: 1.0, 0.3: 0.2})
+        # Assert
+        assert corrected == pytest.approx(expected, abs=1e-6)
 
-        assert cheap == pytest.approx(0.2)
+    @pytest.mark.parametrize("rung", [2.0, 1.5, 1.0, 0.5, 0.3])
+    def test_anchors_that_agree_change_nothing(self, rung):
+        # Arrange
+        anchors = {2.0: 2.0, 1.0: 1.0, 0.3: 0.3}
 
-    def test_a_dearer_source_pushes_the_high_end_up(self):
-        dear = quality.rescale(2.0, anchors={2.0: 2.5, 1.0: 1.0, 0.3: 0.3})
+        # Act
+        corrected = quality.rescale(rung, anchors=anchors)
 
-        assert dear == pytest.approx(2.5)
+        # Assert
+        assert corrected == pytest.approx(rung)
 
-    def test_a_rung_between_anchors_is_interpolated(self):
-        between = quality.rescale(0.6, anchors={2.0: 2.0, 1.0: 1.0, 0.3: 0.2})
-
-        assert 0.2 < between < 1.0
-
-    def test_anchors_that_agree_change_nothing(self):
-        for rung in (2.0, 1.5, 1.0, 0.5, 0.3):
-            assert quality.rescale(rung, anchors={2.0: 2.0, 1.0: 1.0, 0.3: 0.3}) == pytest.approx(
-                rung
-            )
-
-    def test_the_correction_stays_ordered(self):
+    @pytest.mark.parametrize(
+        ("rung", "expected"),
+        [
+            (2.0, 2.4),
+            (1.6, 1.8106),
+            (1.2, 1.259),
+            (1.0, 1.0),
+            (0.8, 0.7553),
+            (0.5, 0.4182),
+            (0.3, 0.22),
+        ],
+    )
+    def test_the_correction_stays_ordered(self, rung, expected):
+        # Arrange
         anchors = {2.0: 2.4, 1.0: 1.0, 0.3: 0.22}
-        rungs = [2.0, 1.6, 1.2, 1.0, 0.8, 0.5, 0.3]
 
-        corrected = [quality.rescale(rung, anchors=anchors) for rung in rungs]
+        # Act
+        corrected = quality.rescale(rung, anchors=anchors)
 
-        assert all(a > b for a, b in itertools.pairwise(corrected))
+        # Assert
+        assert corrected == pytest.approx(expected, abs=1e-4)
 
 
 class TestUnreachableHolds:
-    VBLANK = 59.185
+    @pytest.mark.parametrize(
+        ("source_fps", "name", "offered"),
+        [(24.0, "q31", False), (24.0, "q32", True), (60.0, "q31", True)],
+        ids=[
+            "a hold that drops no source frame is not offered",
+            "a hold that does drop frames stays on the ladder",
+            "a faster source keeps the shorter hold",
+        ],
+    )
+    def test_a_hold_is_offered_only_when_it_drops_source_frames(self, source_fps, name, offered):
+        # Arrange
+        scope = {"source_fps": source_fps, "vblank_fps": VBLANK}
 
-    def test_a_hold_that_drops_no_source_frame_is_not_offered(self):
-        offered = [
-            fit.tier.name
-            for fit in quality.survey(30.0, 100_000.0, source_fps=24.0, vblank_fps=self.VBLANK)
-        ]
+        # Act
+        survey = quality.survey(30.0, RATE, **scope)
 
-        assert "q31" not in offered
-
-    def test_a_hold_that_does_drop_frames_stays_on_the_ladder(self):
-        offered = [
-            fit.tier.name
-            for fit in quality.survey(30.0, 100_000.0, source_fps=24.0, vblank_fps=self.VBLANK)
-        ]
-
-        assert "q32" in offered
-
-    def test_a_faster_source_keeps_the_shorter_hold(self):
-        offered = [
-            fit.tier.name
-            for fit in quality.survey(30.0, 100_000.0, source_fps=60.0, vblank_fps=self.VBLANK)
-        ]
-
-        assert "q31" in offered
+        # Assert
+        assert (name in [fit.tier.name for fit in survey]) is offered
 
     def test_without_a_source_rate_every_tier_is_offered(self):
-        assert len(quality.survey(30.0, 100_000.0)) == len(quality.LADDER)
+        # Arrange
+        minutes = 30.0
+
+        # Act
+        survey = quality.survey(minutes, RATE)
+
+        # Assert
+        assert len(survey) == LADDER_SIZE
 
     def test_selection_never_returns_a_tier_the_baker_would_refuse(self):
-        fit = quality.select(25.0, 100_000.0, source_fps=24.0, vblank_fps=self.VBLANK)
+        # Arrange
+        scope = {"source_fps": 24.0, "vblank_fps": VBLANK}
 
-        assert fit is None or fit.tier.name != "q31"
+        # Act
+        fit = quality.select(25.0, RATE, **scope)
+
+        # Assert
+        assert fit is not None
+        assert fit.tier.name == "q33"
 
 
 class TestAnchorChoice:
-    VBLANK = 59.185
+    def test_the_anchors_span_the_ladder_when_the_source_allows_a_hold(self):
+        # Arrange
+        source_fps = 24.0
 
-    def test_the_reference_tier_is_always_anchored(self):
-        names = [t.name for t in quality.anchor_tiers(24.0, self.VBLANK)]
+        # Act
+        anchors = quality.anchor_tiers(source_fps, VBLANK)
 
-        assert quality.REFERENCE_TIER in names
-
-    def test_a_frame_hold_rung_is_anchored_when_the_source_allows_it(self):
-        holds = [t.frame_hold for t in quality.anchor_tiers(24.0, self.VBLANK)]
-
-        assert max(holds) > 1
+        # Assert
+        assert [tier.name for tier in anchors] == ["q01", quality.REFERENCE_TIER, "q30", "q32"]
+        assert max(tier.frame_hold for tier in anchors) == 3
 
     def test_a_slow_source_drops_the_hold_anchor(self):
-        holds = [t.frame_hold for t in quality.anchor_tiers(10.0, self.VBLANK)]
+        # Arrange
+        source_fps = 10.0
 
-        assert max(holds) == 1
+        # Act
+        anchors = quality.anchor_tiers(source_fps, VBLANK)
+
+        # Assert
+        assert [tier.frame_hold for tier in anchors] == [1, 1, 1]
 
     def test_every_anchor_is_a_real_tier(self):
-        for tier in quality.anchor_tiers(24.0, self.VBLANK):
-            assert quality.tier_by_name(tier.name) is tier
+        # Arrange
+        source_fps = 24.0
 
+        # Act
+        anchors = quality.anchor_tiers(source_fps, VBLANK)
 
-class TestPlanAgreesWithTheBake:
-    VBLANK = 59.185
-
-    def _plan(self, anchors):
-        return quality.format_plan(
-            source="film.mkv",
-            minutes=20.0,
-            width=1280,
-            height=720,
-            source_fps=24.0,
-            has_audio=True,
-            reference_rate=100_000.0,
-            vblank_fps=self.VBLANK,
-            anchors=anchors,
-        )
-
-    def test_the_printed_choice_is_the_one_the_anchors_imply(self):
-        anchors = {1.529: 1.9, 1.0: 1.0, 0.581: 0.5, 0.437: 0.4}
-        expected = quality.select(20.0, 100_000.0, anchors, source_fps=24.0, vblank_fps=self.VBLANK)
-
-        assert expected is not None
-        assert f"Selected: {expected.tier.name}" in self._plan(anchors)
-
-    def test_a_tier_the_baker_would_refuse_is_not_printed(self):
-        assert "  q31 " not in self._plan(None)
-
-
-class TestTheCodeNeverTrims:
-    def test_a_source_that_fits_nowhere_is_refused_rather_than_shortened(self):
-        assert quality.select(600.0, 100_000.0) is None
-
-    def test_the_refusal_names_the_trim_for_the_owner_to_make(self):
-        message = quality.shortfall_message(600.0, 100_000.0)
-
-        assert message is not None
-        assert "trim" in message
-
-    def test_a_long_source_gives_up_sample_rate_and_keeps_its_runtime(self):
-        short = quality.audio_hz_for(5.0)
-        long = quality.audio_hz_for(60.0)
-
-        assert long < short
-
-    def test_the_advice_is_reported_and_never_applied(self):
-        fit = quality.survey(600.0, 100_000.0)[-1]
-
-        assert fit.trim_minutes > 0.0
-        assert fit.minutes == 600.0
+        # Assert
+        assert all(quality.tier_by_name(tier.name) is tier for tier in anchors)

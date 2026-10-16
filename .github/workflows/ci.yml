@@ -1,3 +1,4 @@
+---
 name: CI
 
 on:
@@ -51,7 +52,7 @@ jobs:
               bad=1
             fi
             if [ "$author" != "$bot" ] && [ "${#subject}" -gt "$limit" ]; then
-              echo "subject longer than $limit characters (${#subject}): $subject"
+              echo "subject over $limit characters (${#subject}): $subject"
               bad=1
             fi
           done < <(git log --format='%an%x09%s' "$BASE..$HEAD")
@@ -203,6 +204,7 @@ jobs:
           docker run --rm --platform linux/amd64 --user "$(id -u):$(id -g)" \
             -v "$PWD:/work" -w /work neogeo-media-player-toolchain \
             bash examples/cutscene/check_audio.sh build/example-audio
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: cartridge

@@ -1,3 +1,4 @@
+---
 name: Release
 
 on:
@@ -51,20 +52,25 @@ jobs:
       - name: The gate the baker job runs
         env:
           NEOGEOMEDIA_CLIPS_REQUIRED: "1"
+          NEOGEOMEDIA_FFMPEG_REQUIRED: "1"
         run: |
           set -euo pipefail
           uv --project tools sync --all-groups
-          uv --project tools run python tools/scripts/fetch_clips.py
           uv --project tools run ruff format --check tools/
           uv --project tools run ruff check tools/
           uv --project tools run mypy tools/neogeomedia tools/scripts
+          uv --project tools run python tools/scripts/fetch_clips.py
           uv --project tools run python -m pytest tools/tests \
             --cov=neogeomedia \
             --cov=tools/scripts \
             --cov-config=tools/pyproject.toml \
+            --cov-report=term-missing \
             --cov-fail-under=95
+          git diff --exit-code -- neogeomedia-tiers.json
 
       - name: The gate the cartridge job runs
+        env:
+          NEOGEOMEDIA_ROM_REQUIRED: "1"
         run: |
           set -euo pipefail
           make image
@@ -76,7 +82,26 @@ jobs:
           uv --project tools run python -m neogeomedia.cartridge ci-source.mp4 \
             --quality q17 --build-dir build
           make timing
+          uv --project tools run python -m pytest \
+            tools/tests/test_sound_on_z80.py
           test -s build/neogeomedia.neo
+          test -s build/neogeomedia.zip
+          size=$(wc -c < build/neogeomedia.neo)
+          echo "neogeomedia.neo is $size bytes"
+          test "$size" -ge 1048576
+          uv --project tools run python -m neogeomedia.bake \
+            --source ci-source.mp4 --quality q17 --duration 4 \
+            --build-dir build --bundle build/bundle
+          make example
+          rom=build/example/cutscene/build/rom
+          test -s "$rom/ngdevkit.zip"
+          test -s "$rom/ngdevkit-p1.p1"
+          test -s "$rom/ngdevkit-p2.p2"
+          echo "the example cartridge is $(wc -c < "$rom/ngdevkit.zip") bytes"
+          make example EXAMPLE=build/example-audio FMV_AUDIO=yes
+          docker run --rm --platform linux/amd64 --user "$(id -u):$(id -g)" \
+            -v "$PWD:/work" -w /work neogeo-media-player-toolchain \
+            bash examples/cutscene/check_audio.sh build/example-audio
 
   publish:
     name: Publish

@@ -1,0 +1,42 @@
+---
+name: Core pin
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  freshness:
+    name: Pin freshness
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: true
+
+      - name: How far the core pin is behind the core's head
+        run: |
+          set -euo pipefail
+          core=fmv-core-python
+          git -C "$core" fetch --quiet origin main
+          pinned=$(git -C "$core" rev-parse HEAD)
+          head=$(git -C "$core" rev-parse origin/main)
+          behind=$(git -C "$core" rev-list --count "$pinned..$head")
+          {
+            echo "## fmv-core-python pin"
+            echo
+            echo "Pinned at \`$pinned\`, head \`$head\`."
+            echo
+            echo "$behind commit(s) behind."
+            if [ "$behind" -gt 0 ]; then
+              echo
+              echo "Commits not yet taken:"
+              echo
+              git -C "$core" log --format="- \`%h\` %s" "$pinned..$head"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "the pin is $behind commit(s) behind the core's head"

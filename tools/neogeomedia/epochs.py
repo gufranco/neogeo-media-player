@@ -48,13 +48,12 @@ def _moved_share(
 
 def _cut_starts(grids: npt.NDArray[np.uint16], step: int, stride: int, floor: float) -> list[int]:
     grid = palettes.oklab_grid(1.0)
-    starts = [0]
-    for row in range(1, grids.shape[0]):
-        frame = row * stride
-        share = _moved_share(grid, grids[row], grids[row - 1], floor)
-        if share > SCENE_CUT_SHARE and frame - starts[-1] >= step // CUT_SPACING_DIVISOR:
-            starts = [*starts, frame]
-    return starts
+    cuts = [
+        row * stride
+        for row in range(1, grids.shape[0])
+        if _moved_share(grid, grids[row], grids[row - 1], floor) > SCENE_CUT_SHARE
+    ]
+    return _spaced([0, *cuts], step // CUT_SPACING_DIVISOR)
 
 
 def _subdivided(starts: list[int], step: int, total: int) -> list[int]:
@@ -67,11 +66,11 @@ def _subdivided(starts: list[int], step: int, total: int) -> list[int]:
 
 
 def _spaced(starts: list[int], minimum: int) -> list[int]:
-    spaced: list[int] = []
+    kept: list[int] = []
     for start in starts:
-        if not spaced or start - spaced[-1] >= minimum:
-            spaced = [*spaced, start]
-    return spaced
+        if not kept or start - kept[-1] >= minimum:
+            kept.append(start)
+    return kept
 
 
 def epoch_starts(

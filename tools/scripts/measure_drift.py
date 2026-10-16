@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import struct
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 from typing import NamedTuple
 
@@ -64,14 +65,29 @@ def _load(baked: Path) -> Movie:
     )
 
 
-def _prefer(error: float, step: int, found: Search, expected: int) -> bool:
-    if error < found.best_error - _TIE:
+def _prefer(error: float, step: int, best: tuple[float, int | None], expected: int) -> bool:
+    best_error, best_frame = best
+    if error < best_error - _TIE:
         return True
     return (
-        abs(error - found.best_error) <= _TIE
-        and found.best_frame is not None
-        and abs(step - expected) < abs(found.best_frame - expected)
+        abs(error - best_error) <= _TIE
+        and best_frame is not None
+        and abs(step - expected) < abs(best_frame - expected)
     )
+
+
+def _errors(
+    baked: Path, movie: Movie, target: np.ndarray, steps: range, columns: slice
+) -> Iterator[tuple[int, float]]:
+    player = StreamPlayer()
+    for step in range(steps.stop):
+        player.apply(movie.stream, movie.offsets[step])
+        if step < steps.start:
+            continue
+        epoch, colors = vc._epoch_palettes(baked, step, movie.base)
+        painted = player.render(movie.reader, _both_halves(epoch, colors), VIDEO_BASE_BANK)
+        rgb = neocolor.color_index_to_rgb(painted)
+        yield step, float(np.abs(rgb[:, columns, :].astype(np.int16) - target).mean())
 
 
 def _search(
@@ -79,20 +95,12 @@ def _search(
 ) -> Search:
     low = max(0, expected - window)
     high = min(len(movie.offsets) - 1, expected + window)
-    player = StreamPlayer()
-    found = Search(best_error=float("inf"), best_frame=None, scored={})
-    for step in range(high + 1):
-        player.apply(movie.stream, movie.offsets[step])
-        if step < low:
-            continue
-        epoch, colors = vc._epoch_palettes(baked, step, movie.base)
-        painted = player.render(movie.reader, _both_halves(epoch, colors), VIDEO_BASE_BANK)
-        rgb = neocolor.color_index_to_rgb(painted)
-        error = float(np.abs(rgb[:, columns, :].astype(np.int16) - target).mean())
-        found.scored[step] = error
-        if _prefer(error, step, found, expected):
-            found = Search(min(found.best_error, error), step, found.scored)
-    return found
+    scored = dict(_errors(baked, movie, target, range(low, high + 1), columns))
+    best: tuple[float, int | None] = (float("inf"), None)
+    for step, error in scored.items():
+        if _prefer(error, step, best, expected):
+            best = (min(best[0], error), step)
+    return Search(best_error=best[0], best_frame=best[1], scored=scored)
 
 
 def _ambiguous(found: Search, best_frame: int, separation: float) -> bool:

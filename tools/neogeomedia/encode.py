@@ -363,6 +363,10 @@ class _Encoder:
         updates = self._updates(current, targets, keyframe)
         self._append(updates, keyframe)
         self.updates_per_frame[index] = len(updates)
+        self._record(index, incoming)
+        return _should_stop(self.dictionary, self.options)
+
+    def _record(self, index: int, incoming: npt.NDArray[np.uint16]) -> None:
         _record_frame(
             self.screen,
             incoming,
@@ -372,7 +376,6 @@ class _Encoder:
             options=self.options,
             on_render=self.on_render,
         )
-        return _should_stop(self.dictionary, self.options)
 
     def _stats(self, updates_per_frame: npt.NDArray[np.int32]) -> EncodeStats:
         movie, totals, options = self.movie, self.totals, self.options

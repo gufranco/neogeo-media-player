@@ -82,6 +82,12 @@ and false positives, and it starts full screen on macOS.
   no window and no RetroArch, and saves the last frame of the run as a PNG.
   `--hold FRAME:BUTTON` presses buttons on chosen frames and `--save FRAME`
   keeps more frames.
+- **Against the source**: [`tools/scripts/compare_capture.py`](tools/scripts/compare_capture.py)
+  plays the cartridge the same way, decodes the source window the bake used,
+  and reports the picture error, the share of torn frames and the lag, with
+  the rows under the transport panel left out. On the 6-second Sintel window
+  it reads 0.015 Oklab error a frame, 0.0094 blurred, no torn frames and a
+  median lag of one frame.
   It boots the Universe BIOS from `~/Documents/RetroArch/system`.
 - **MAME**: every scripted run sets `SDL_VIDEODRIVER=dummy` and passes
   `-window -video none -sound none`, as

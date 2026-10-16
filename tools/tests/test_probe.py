@@ -6,147 +6,159 @@ from neogeomedia import probe, quality
 
 BUDGET = 1_048_576
 MINUTES = 10.0
+DOUBLING_BRACKET = ("q01", "q02", "q03", "q05", "q09", "q17", "q33", "q35")
 
 
-def measurer(true_rates, log, *, exhausted_above=None):
+class Measurer:
+    def __init__(self, tiles_per_minute: float, *, exhausted_above: int | None = None) -> None:
+        self.tiles_per_minute = tiles_per_minute
+        self.exhausted_above = exhausted_above
+        self.calls: tuple[str, ...] = ()
 
-    def measure(tier: quality.Tier) -> probe.Reading:
-        log.append(tier.name)
-        rate = true_rates * tier.relative_cost
-        tiles = rate * MINUTES
-        strained = exhausted_above is not None and tiles > exhausted_above
+    def __call__(self, tier: quality.Tier) -> probe.Reading:
+        self.calls = (*self.calls, tier.name)
+        tiles = self.tiles_per_minute * tier.relative_cost * MINUTES
+        strained = self.exhausted_above is not None and tiles > self.exhausted_above
         if tiles > BUDGET:
             return probe.Reading(tier=tier, tiles=BUDGET, capped=True)
         return probe.Reading(tier=tier, tiles=int(tiles), capped=False, exhausted=strained)
 
-    return measure
 
-
-def walk(rates, budget=BUDGET):
-    for tier in quality.LADDER:
-        if rates * tier.relative_cost * MINUTES <= budget:
-            return tier.name
-    return None
+def search(measure: Measurer, known: dict[str, float | None] | None = None) -> probe.Outcome:
+    return probe.search(measure=measure, minutes=MINUTES, budget=BUDGET, known=known or {})
 
 
 class TestSearching:
-    def test_it_finds_the_best_rung_that_actually_fits(self):
-        log: list[str] = []
-        found = probe.search(
-            measure=measurer(100_000.0, log), minutes=MINUTES, budget=BUDGET, known={}
-        )
+    @pytest.mark.parametrize(
+        ("rate", "expected"),
+        [
+            (60_000.0, "q01"),
+            (100_000.0, "q16"),
+            (140_000.0, "q25"),
+            (250_000.0, "q33"),
+            (400_000.0, None),
+        ],
+    )
+    def test_it_finds_the_best_rung_a_plain_walk_down_the_ladder_would(self, rate, expected):
+        # Arrange
+        measure = Measurer(rate)
 
-        assert found.tier is not None
-        cost = 100_000.0 * found.tier.relative_cost * MINUTES
-        assert cost <= BUDGET
-        better = quality.LADDER[quality.LADDER.index(found.tier) - 1]
-        assert 100_000.0 * better.relative_cost * MINUTES > BUDGET
+        # Act
+        found = search(measure)
 
-    def test_it_reaches_the_same_rung_a_plain_walk_would(self):
-        for rate in (60_000.0, 100_000.0, 140_000.0, 250_000.0, 400_000.0):
-            log: list[str] = []
-            found = probe.search(
-                measure=measurer(rate, log), minutes=MINUTES, budget=BUDGET, known={}
-            )
-            reached = found.tier.name if found.tier else None
-
-            assert reached == walk(rate)
+        # Assert
+        assert (found.tier.name if found.tier else None) == expected
 
     def test_a_source_that_can_afford_the_best_rung_costs_one_bake(self):
-        log: list[str] = []
-        found = probe.search(
-            measure=measurer(60_000.0, log), minutes=MINUTES, budget=BUDGET, known={}
-        )
+        # Arrange
+        measure = Measurer(60_000.0)
 
-        assert found.tier is not None
-        assert found.tier.name == "q01"
-        assert log == ["q01"]
+        # Act
+        found = search(measure)
 
-    def test_a_source_that_settles_deep_costs_far_fewer_bakes_than_rungs(self):
-        log: list[str] = []
-        probe.search(measure=measurer(400_000.0, log), minutes=MINUTES, budget=BUDGET, known={})
+        # Assert
+        assert found.tier == quality.tier_by_name("q01")
+        assert measure.calls == ("q01",)
 
-        assert len(log) < len(quality.LADDER) // 2
+    def test_a_source_that_settles_deep_brackets_by_doubling_instead_of_walking(self):
+        # Arrange
+        measure = Measurer(400_000.0)
 
-    def test_it_always_tries_the_richest_rung_first(self):
-        for rate in (60_000.0, 250_000.0, 400_000.0):
-            log: list[str] = []
-            probe.search(measure=measurer(rate, log), minutes=MINUTES, budget=BUDGET, known={})
+        # Act
+        search(measure)
 
-            assert log[0] == "q01"
+        # Assert
+        assert measure.calls == DOUBLING_BRACKET
+        assert len(measure.calls) < len(quality.LADDER) // 2
+
+    @pytest.mark.parametrize("rate", [60_000.0, 250_000.0, 400_000.0])
+    def test_it_always_tries_the_richest_rung_first(self, rate):
+        # Arrange
+        measure = Measurer(rate)
+
+        # Act
+        search(measure)
+
+        # Assert
+        assert measure.calls[0] == "q01"
 
     def test_it_never_bakes_the_same_rung_twice(self):
-        log: list[str] = []
-        probe.search(measure=measurer(250_000.0, log), minutes=MINUTES, budget=BUDGET, known={})
+        # Arrange
+        measure = Measurer(250_000.0)
 
-        assert len(log) == len(set(log))
+        # Act
+        search(measure)
+
+        # Assert
+        assert len(measure.calls) == len(set(measure.calls))
 
     def test_a_rung_that_overran_is_remembered_as_such(self):
-        log: list[str] = []
-        found = probe.search(
-            measure=measurer(400_000.0, log), minutes=MINUTES, budget=BUDGET, known={}
-        )
+        # Arrange
+        measure = Measurer(400_000.0)
 
-        assert found.too_expensive
-        for name in found.too_expensive:
-            assert found.rates[name] is None
+        # Act
+        found = search(measure)
+
+        # Assert
+        assert found.too_expensive == list(DOUBLING_BRACKET)
+        assert found.rates == dict.fromkeys(DOUBLING_BRACKET)
 
     def test_a_capped_bake_never_becomes_a_rate(self):
-        log: list[str] = []
-        found = probe.search(
-            measure=measurer(100_000.0, log), minutes=MINUTES, budget=BUDGET, known={}
-        )
+        # Arrange
+        measure = Measurer(100_000.0)
 
-        for name, rate in found.rates.items():
-            if rate is None:
-                continue
-            tier = quality.tier_by_name(name)
-            assert rate == pytest.approx(100_000.0 * tier.relative_cost, rel=1e-6)
-            assert rate * MINUTES <= BUDGET
+        # Act
+        found = search(measure)
+
+        # Assert
+        assert {name: rate for name, rate in found.rates.items() if rate is not None} == {
+            "q17": pytest.approx(100_000.0),
+            "q16": pytest.approx(103_000.0),
+        }
 
     def test_a_fully_settled_source_bakes_nothing(self):
-        log: list[str] = []
+        # Arrange
+        measure = Measurer(100_000.0)
         known: dict[str, float | None] = {
             t.name: (None if t.relative_cost > 1.0 else 100_000.0 * t.relative_cost)
             for t in quality.LADDER
         }
 
-        found = probe.search(
-            measure=measurer(100_000.0, log), minutes=MINUTES, budget=BUDGET, known=known
-        )
+        # Act
+        found = search(measure, known)
 
-        assert log == []
-        assert found.tier is not None
-        assert found.tier.name == "q17"
+        # Assert
+        assert measure.calls == ()
+        assert found.tier == quality.tier_by_name("q17")
 
     def test_settled_failures_are_not_baked_again(self):
-        log: list[str] = []
-        known: dict[str, float | None] = {t.name: None for t in quality.LADDER[:10]}
+        # Arrange
+        measure = Measurer(100_000.0)
+        settled = {t.name for t in quality.LADDER[:10]}
 
-        probe.search(measure=measurer(100_000.0, log), minutes=MINUTES, budget=BUDGET, known=known)
+        # Act
+        search(measure, dict.fromkeys(settled))
 
-        assert not set(log) & {t.name for t in quality.LADDER[:10]}
-
-    def test_an_impossible_source_reports_nothing_rather_than_guessing(self):
-        log: list[str] = []
-        found = probe.search(
-            measure=measurer(50_000_000.0, log), minutes=MINUTES, budget=BUDGET, known={}
-        )
-
-        assert found.tier is None
+        # Assert
+        assert set(measure.calls) & settled == set()
 
     def test_every_bake_it_ran_is_reported(self):
-        log: list[str] = []
-        found = probe.search(
-            measure=measurer(100_000.0, log), minutes=MINUTES, budget=BUDGET, known={}
-        )
+        # Arrange
+        measure = Measurer(100_000.0)
 
-        assert found.baked == log
+        # Act
+        found = search(measure)
+
+        # Assert
+        assert found.baked == list(measure.calls)
 
     def test_a_tier_the_baker_would_refuse_is_never_measured(self):
-        log: list[str] = []
+        # Arrange
+        measure = Measurer(3_000_000.0)
+
+        # Act
         probe.search(
-            measure=measurer(3_000_000.0, log),
+            measure=measure,
             minutes=MINUTES,
             budget=BUDGET,
             known={},
@@ -154,64 +166,72 @@ class TestSearching:
             vblank_fps=59.185,
         )
 
-        assert "q31" not in log
+        # Assert
+        assert "q31" not in measure.calls
+        assert measure.calls[-2:] == ("q34", "q35")
 
 
 class TestItNeverTrims:
     def test_it_reports_no_fit_rather_than_shortening_the_source(self):
-        log: list[str] = []
-        found = probe.search(
-            measure=measurer(50_000_000.0, log), minutes=MINUTES, budget=BUDGET, known={}
-        )
+        # Arrange
+        measure = Measurer(50_000_000.0)
 
+        # Act
+        found = search(measure)
+
+        # Assert
         assert found.tier is None
         assert found.minutes == MINUTES
 
 
 class TestARescuedRungDoesNotCount:
     def test_a_rung_that_only_fits_because_rate_control_gave_up_is_refused(self):
-        log: list[str] = []
-        plain = probe.search(
-            measure=measurer(100_000.0, log), minutes=MINUTES, budget=BUDGET, known={}
-        )
+        # Arrange
+        measure = Measurer(100_000.0, exhausted_above=700_000)
 
-        strained: list[str] = []
-        found = probe.search(
-            measure=measurer(100_000.0, strained, exhausted_above=700_000),
-            minutes=MINUTES,
-            budget=BUDGET,
-            known={},
-        )
+        # Act
+        found = search(measure)
 
-        assert plain.tier is not None
-        assert found.tier is not None
-        assert found.tier.relative_cost < plain.tier.relative_cost
+        # Assert
+        assert found.tier == quality.tier_by_name("q27")
 
     def test_an_exhausted_reading_never_becomes_a_rate(self):
-        log: list[str] = []
-        found = probe.search(
-            measure=measurer(100_000.0, log, exhausted_above=700_000),
-            minutes=MINUTES,
-            budget=BUDGET,
-            known={},
+        # Arrange
+        measure = Measurer(100_000.0, exhausted_above=700_000)
+
+        # Act
+        found = search(measure)
+
+        # Assert
+        assert {name: rate for name, rate in found.rates.items() if rate is not None} == {
+            "q33": pytest.approx(35_700.0),
+            "q29": pytest.approx(61_300.0),
+            "q27": pytest.approx(68_000.0),
+        }
+
+    @pytest.mark.parametrize(
+        ("capped", "exhausted", "fits"),
+        [(False, False, True), (True, False, False), (False, True, False)],
+        ids=["clean", "capped", "exhausted"],
+    )
+    def test_only_a_reading_that_finished_cleanly_fits(self, capped, exhausted, fits):
+        # Arrange
+        reading = probe.Reading(
+            tier=quality.tier_by_name("q17"), tiles=10, capped=capped, exhausted=exhausted
         )
 
-        for rate in found.rates.values():
-            if rate is None:
-                continue
-            assert rate * MINUTES <= 700_000
+        # Act
+        verdict = reading.fits(100)
 
-    def test_a_reading_that_finished_cleanly_fits(self):
-        tier = quality.tier_by_name("q17")
+        # Assert
+        assert verdict is fits
 
-        assert probe.Reading(tier=tier, tiles=10, capped=False).fits(100)
+    def test_a_reading_over_the_budget_does_not_fit(self):
+        # Arrange
+        reading = probe.Reading(tier=quality.tier_by_name("q17"), tiles=101, capped=False)
 
-    def test_a_capped_reading_does_not_fit(self):
-        tier = quality.tier_by_name("q17")
+        # Act
+        verdict = reading.fits(100)
 
-        assert not probe.Reading(tier=tier, tiles=10, capped=True).fits(100)
-
-    def test_an_exhausted_reading_does_not_fit(self):
-        tier = quality.tier_by_name("q17")
-
-        assert not probe.Reading(tier=tier, tiles=10, capped=False, exhausted=True).fits(100)
+        # Assert
+        assert verdict is False

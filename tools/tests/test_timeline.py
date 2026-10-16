@@ -12,6 +12,9 @@ SOURCE = Path(__file__).resolve().parents[2] / "src" / "fmv" / "timeline.c"
 FPS_NUM = 24
 FPS_DEN = 1
 SUBTITLE_STRIDE = 8 + 40 * 2
+BAR_SPAN = 26
+FILM_FRAMES = 1_000
+KEYFRAMES = [0, 90, 180, 270]
 
 
 @pytest.fixture(scope="session")
@@ -20,22 +23,8 @@ def timeline(tmp_path_factory):
     if compiler is None:
         pytest.skip("no host C compiler")
     library = tmp_path_factory.mktemp("timeline") / "libtimeline.so"
-    subprocess.run(
-        [
-            compiler,
-            "-std=c99",
-            "-O2",
-            "-Wall",
-            "-Wextra",
-            "-Werror",
-            "-shared",
-            "-fPIC",
-            str(SOURCE),
-            "-o",
-            str(library),
-        ],
-        check=True,
-    )
+    flags = ["-std=c99", "-O2", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC"]
+    subprocess.run([compiler, *flags, str(SOURCE), "-o", str(library)], check=True)
     loaded = ctypes.CDLL(str(library))
     loaded.timeline_clamp_frame.restype = ctypes.c_uint32
     loaded.timeline_keyframe_at_or_before.restype = ctypes.c_uint32
@@ -61,150 +50,210 @@ def cue_table(cues):
 
 
 class TestSeekingLandsOnAKeyframe:
-    def test_a_frame_between_keyframes_lands_on_the_one_before_it(self, timeline):
-        table, count = keyframe_table([0, 90, 180, 270])
+    @pytest.mark.parametrize(
+        ("table", "frame", "landing"),
+        [
+            (KEYFRAMES, 200, 180),
+            (KEYFRAMES, 180, 180),
+            ([10, 90, 180], 0, 10),
+            ([0, 90, 180], 10_000, 180),
+        ],
+        ids=["between-keyframes", "on-a-keyframe", "before-the-first", "past-the-last"],
+    )
+    def test_a_seek_lands_on_the_keyframe_at_or_before_it(self, timeline, table, frame, landing):
+        # Arrange
+        keyframes, count = keyframe_table(table)
 
-        assert timeline.timeline_keyframe_at_or_before(table, count, 200) == 180
+        # Act
+        found = timeline.timeline_keyframe_at_or_before(keyframes, count, frame)
 
-    def test_a_frame_exactly_on_a_keyframe_lands_on_it(self, timeline):
-        table, count = keyframe_table([0, 90, 180, 270])
-
-        assert timeline.timeline_keyframe_at_or_before(table, count, 180) == 180
-
-    def test_a_frame_before_the_first_keyframe_lands_on_the_first(self, timeline):
-        table, count = keyframe_table([10, 90, 180])
-
-        assert timeline.timeline_keyframe_at_or_before(table, count, 0) == 10
-
-    def test_a_frame_past_the_last_keyframe_lands_on_the_last(self, timeline):
-        table, count = keyframe_table([0, 90, 180])
-
-        assert timeline.timeline_keyframe_at_or_before(table, count, 10_000) == 180
+        # Assert
+        assert found == landing
 
     def test_every_frame_in_a_span_lands_on_the_same_keyframe(self, timeline):
-        table, count = keyframe_table([0, 90, 180, 270])
+        # Arrange
+        keyframes, count = keyframe_table(KEYFRAMES)
 
+        # Act
         landings = {
-            timeline.timeline_keyframe_at_or_before(table, count, f) for f in range(90, 180)
+            timeline.timeline_keyframe_at_or_before(keyframes, count, f) for f in range(90, 180)
         }
 
+        # Assert
         assert landings == {90}
 
     def test_an_empty_table_does_not_read_off_the_end(self, timeline):
-        table, _ = keyframe_table([0])
+        # Arrange
+        keyframes, _ = keyframe_table([0])
 
-        assert timeline.timeline_keyframe_at_or_before(table, 0, 500) == 0
+        # Act
+        found = timeline.timeline_keyframe_at_or_before(keyframes, 0, 500)
+
+        # Assert
+        assert found == 0
 
 
 class TestClampingASeek:
-    def test_a_target_past_the_end_lands_on_the_last_frame(self, timeline):
-        assert timeline.timeline_clamp_frame(5_000, 1_000) == 999
+    @pytest.mark.parametrize(
+        ("target", "count", "landing"),
+        [(5_000, 1_000, 999), (400, 1_000, 400), (999, 1_000, 999), (0, 0, 0)],
+        ids=["past-the-end", "inside-the-film", "the-last-frame", "an-empty-film"],
+    )
+    def test_a_seek_is_clamped_to_the_film(self, timeline, target, count, landing):
+        # Arrange
+        film = (target, count)
 
-    def test_a_target_inside_the_film_is_left_alone(self, timeline):
-        assert timeline.timeline_clamp_frame(400, 1_000) == 400
+        # Act
+        clamped = timeline.timeline_clamp_frame(*film)
 
-    def test_the_last_frame_is_reachable(self, timeline):
-        assert timeline.timeline_clamp_frame(999, 1_000) == 999
-
-    def test_an_empty_film_does_not_wrap_around(self, timeline):
-        assert timeline.timeline_clamp_frame(0, 0) == 0
+        # Assert
+        assert clamped == landing
 
 
 class TestWhichCueIsShowing:
-    def test_a_frame_inside_a_cue_finds_it(self, timeline):
-        table, count = cue_table([(0, 50), (100, 150), (200, 250)])
+    @pytest.mark.parametrize(
+        ("cues", "frame", "showing"),
+        [
+            ([(0, 50), (100, 150), (200, 250)], 120, 1),
+            ([(0, 50), (100, 150)], 75, 2),
+            ([(100, 150)], 100, 0),
+            ([(100, 150)], 150, 1),
+            ([(100, 150)], 10, 1),
+            ([(100, 150)], 9_999, 1),
+        ],
+        ids=[
+            "inside-a-cue",
+            "in-the-gap",
+            "on-the-first-frame",
+            "on-the-end-frame",
+            "before-every-cue",
+            "after-every-cue",
+        ],
+    )
+    def test_it_finds_the_cue_on_screen_or_reports_none(self, timeline, cues, frame, showing):
+        # Arrange
+        table, count = cue_table(cues)
 
-        assert timeline.timeline_subtitle_at(table, count, SUBTITLE_STRIDE, 120) == 1
+        # Act
+        found = timeline.timeline_subtitle_at(table, count, SUBTITLE_STRIDE, frame)
 
-    def test_a_frame_in_the_gap_between_cues_finds_nothing(self, timeline):
-        table, count = cue_table([(0, 50), (100, 150)])
-
-        assert timeline.timeline_subtitle_at(table, count, SUBTITLE_STRIDE, 75) == count
-
-    def test_a_cue_starts_on_its_first_frame(self, timeline):
-        table, count = cue_table([(100, 150)])
-
-        assert timeline.timeline_subtitle_at(table, count, SUBTITLE_STRIDE, 100) == 0
-
-    def test_a_cue_is_gone_on_its_end_frame(self, timeline):
-        table, count = cue_table([(100, 150)])
-
-        assert timeline.timeline_subtitle_at(table, count, SUBTITLE_STRIDE, 150) == count
-
-    def test_a_frame_before_every_cue_finds_nothing(self, timeline):
-        table, count = cue_table([(100, 150)])
-
-        assert timeline.timeline_subtitle_at(table, count, SUBTITLE_STRIDE, 10) == count
-
-    def test_a_frame_after_every_cue_finds_nothing(self, timeline):
-        table, count = cue_table([(100, 150)])
-
-        assert timeline.timeline_subtitle_at(table, count, SUBTITLE_STRIDE, 9_999) == count
+        # Assert
+        assert found == showing
 
     def test_back_to_back_cues_never_leave_a_hole(self, timeline):
+        # Arrange
         table, count = cue_table([(0, 100), (100, 200)])
 
+        # Act
         showing = [
             timeline.timeline_subtitle_at(table, count, SUBTITLE_STRIDE, f) for f in range(200)
         ]
 
-        assert set(showing[:100]) == {0}
-        assert set(showing[100:]) == {1}
+        # Assert
+        assert showing == [0] * 100 + [1] * 100
 
     def test_a_film_with_no_cues_finds_nothing(self, timeline):
+        # Arrange
         table, _ = cue_table([(0, 100)])
 
-        assert timeline.timeline_subtitle_at(table, 0, SUBTITLE_STRIDE, 50) == 0
+        # Act
+        found = timeline.timeline_subtitle_at(table, 0, SUBTITLE_STRIDE, 50)
+
+        # Assert
+        assert found == 0
 
 
-class TestTheClockAndTheBar:
-    def test_a_second_of_frames_reads_as_a_second(self, timeline):
-        assert timeline.timeline_frame_to_seconds(FPS_NUM, FPS_NUM, FPS_DEN) == 1
+class TestTheClock:
+    @pytest.mark.parametrize(
+        ("frames", "seconds"),
+        [(24, 1), (2_232, 93), (240_000, 10_000)],
+        ids=["a-second", "a-minute-and-a-half", "a-long-film"],
+    )
+    def test_frames_read_as_whole_seconds(self, timeline, frames, seconds):
+        # Arrange
+        rate = (FPS_NUM, FPS_DEN)
 
-    def test_seconds_and_frames_round_trip(self, timeline):
-        frames = timeline.timeline_seconds_to_frames(93, FPS_NUM, FPS_DEN)
+        # Act
+        shown = timeline.timeline_frame_to_seconds(frames, *rate)
 
-        assert timeline.timeline_frame_to_seconds(frames, FPS_NUM, FPS_DEN) == 93
+        # Assert
+        assert shown == seconds
 
-    def test_a_long_film_does_not_overflow_the_clock(self, timeline):
-        frames = timeline.timeline_seconds_to_frames(10_000, FPS_NUM, FPS_DEN)
+    @pytest.mark.parametrize(
+        ("seconds", "frames"),
+        [(93, 2_232), (10_000, 240_000)],
+        ids=["a-minute-and-a-half", "a-long-film-without-overflow"],
+    )
+    def test_seconds_convert_to_frames(self, timeline, seconds, frames):
+        # Arrange
+        rate = (FPS_NUM, FPS_DEN)
 
-        assert frames == 240_000
-        assert timeline.timeline_frame_to_seconds(frames, FPS_NUM, FPS_DEN) == 10_000
+        # Act
+        converted = timeline.timeline_seconds_to_frames(seconds, *rate)
 
-    def test_the_bar_starts_empty(self, timeline):
-        assert timeline.timeline_bar_fill(0, 1_000, 26) == 0
+        # Assert
+        assert converted == frames
 
-    def test_the_bar_ends_full(self, timeline):
-        assert timeline.timeline_bar_fill(999, 1_000, 26) == 26
 
-    def test_the_bar_never_runs_past_its_end(self, timeline):
-        assert timeline.timeline_bar_fill(5_000, 1_000, 26) == 26
+class TestTheBar:
+    @pytest.mark.parametrize(
+        ("frame", "total", "fill"),
+        [
+            (0, FILM_FRAMES, 0),
+            (999, FILM_FRAMES, BAR_SPAN),
+            (5_000, FILM_FRAMES, BAR_SPAN),
+            (0, 1, 0),
+        ],
+        ids=["starts-empty", "ends-full", "never-runs-past-its-end", "single-frame-film"],
+    )
+    def test_the_bar_fills_in_proportion_to_the_film(self, timeline, frame, total, fill):
+        # Arrange
+        position = (frame, total, BAR_SPAN)
+
+        # Act
+        filled = timeline.timeline_bar_fill(*position)
+
+        # Assert
+        assert filled == fill
 
     def test_the_bar_only_ever_moves_forward(self, timeline):
-        seen = [timeline.timeline_bar_fill(f, 1_000, 26) for f in range(1_000)]
+        # Arrange
+        frames = range(FILM_FRAMES)
 
+        # Act
+        seen = [timeline.timeline_bar_fill(f, FILM_FRAMES, BAR_SPAN) for f in frames]
+
+        # Assert
         assert seen == sorted(seen)
-
-    def test_a_single_frame_film_does_not_divide_by_zero(self, timeline):
-        assert timeline.timeline_bar_fill(0, 1, 26) == 0
+        assert (seen[0], seen[-1]) == (0, BAR_SPAN)
 
 
 class TestWhichAudioPage:
-    def test_the_first_frame_starts_at_the_first_page(self, timeline):
-        assert timeline.timeline_audio_page(0, 1, 100) == 0
+    @pytest.mark.parametrize(
+        ("frame", "num", "den", "page"),
+        [
+            (0, 1, 100, 0),
+            (1_000, 3, 100, 30),
+            (2_000, 3, 100, 60),
+            (1, 1, 2, 1),
+            (1_000_000, 4_000, 1_000_000, 4_000),
+            (5_000, 0, 100, 0),
+        ],
+        ids=[
+            "first-frame-first-page",
+            "pages-advance-early",
+            "pages-advance-late",
+            "rounds-to-nearest",
+            "past-32-bits",
+            "a-silent-film",
+        ],
+    )
+    def test_the_audio_page_scales_with_the_film(self, timeline, frame, num, den, page):
+        # Arrange
+        scale = (num, den)
 
-    def test_pages_advance_with_the_film(self, timeline):
-        early = timeline.timeline_audio_page(1_000, 3, 100)
-        late = timeline.timeline_audio_page(2_000, 3, 100)
+        # Act
+        found = timeline.timeline_audio_page(frame, *scale)
 
-        assert late > early
-
-    def test_it_rounds_to_the_nearest_page_rather_than_down(self, timeline):
-        assert timeline.timeline_audio_page(1, 1, 2) == 1
-
-    def test_a_film_long_enough_to_overflow_32_bits_still_scales(self, timeline):
-        assert timeline.timeline_audio_page(1_000_000, 4_000, 1_000_000) == 4_000
-
-    def test_a_silent_film_asks_for_no_page(self, timeline):
-        assert timeline.timeline_audio_page(5_000, 0, 100) == 0
+        # Assert
+        assert found == page

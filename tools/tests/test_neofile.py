@@ -3,10 +3,12 @@ from __future__ import annotations
 import struct
 
 import pytest
+from fmvcore.testing import seeded
 
 from neogeomedia import neofile
 
 HEADER_BYTES = 4096
+fake = seeded()
 
 
 def write_regions(directory, *, p=b"", s=b"", m=b"", v1=b"", v2=None, c1=b"", c2=b""):
@@ -23,11 +25,10 @@ def write_regions(directory, *, p=b"", s=b"", m=b"", v1=b"", v2=None, c1=b"", c2
 
 def read_header(path):
     data = path.read_bytes()[:HEADER_BYTES]
-    tag = data[:4]
     sizes = struct.unpack_from("<6I", data, 4)
     year, genre, screenshot, ngh = struct.unpack_from("<4I", data, 28)
     return {
-        "tag": tag,
+        "tag": data[:4],
         "psz": sizes[0],
         "ssz": sizes[1],
         "msz": sizes[2],
@@ -43,203 +44,261 @@ def read_header(path):
     }
 
 
+def sample_regions():
+    return {
+        "p": fake.binary(length=64),
+        "s": fake.binary(length=32),
+        "m": fake.binary(length=16),
+        "v1": fake.binary(length=8),
+        "c1": fake.binary(length=4),
+        "c2": fake.binary(length=4),
+    }
+
+
+def metadata():
+    return {
+        "name": fake.pystr(min_chars=1, max_chars=32),
+        "manufacturer": fake.pystr(min_chars=1, max_chars=16),
+        "year": fake.random_int(1990, 2099),
+        "ngh": fake.random_int(0, 0xFFFF),
+    }
+
+
 @pytest.fixture
-def cart(tmp_path):
-    rom = write_regions(
-        tmp_path,
-        p=bytes(range(64)),
-        s=bytes(range(32)),
-        m=bytes(range(16)),
-        v1=bytes(range(8)),
-        c1=bytes([0x11, 0x22, 0x33, 0x44]),
-        c2=bytes([0xAA, 0xBB, 0xCC, 0xDD]),
-    )
-    out = tmp_path / "cart.neo"
-    neofile.write_neo(
-        rom_dir=rom, output=out, name="Test Cart", manufacturer="tester", year=2026, ngh=0x1234
-    )
-    return out
+def regions():
+    return sample_regions()
+
+
+@pytest.fixture
+def rom_dir(tmp_path, regions):
+    directory = tmp_path / "rom"
+    directory.mkdir()
+    return write_regions(directory, **regions)
 
 
 class TestHeader:
-    def test_the_magic_identifies_a_neo_container(self, cart):
-        assert read_header(cart)["tag"] == b"NEO\x01"
+    def test_the_magic_identifies_a_neo_container(self, rom_dir, tmp_path):
+        # Arrange
+        output = tmp_path / "cart.neo"
 
-    def test_region_sizes_match_the_inputs(self, cart):
-        header = read_header(cart)
+        # Act
+        out = neofile.write_neo(rom_dir=rom_dir, output=output)
 
-        assert (header["psz"], header["ssz"], header["msz"]) == (64, 32, 16)
+        # Assert
+        assert read_header(out)["tag"] == b"NEO\x01"
 
-    def test_the_second_voice_region_is_absent_by_default(self, cart):
-        assert read_header(cart)["v2sz"] == 0
+    def test_the_region_sizes_match_the_inputs(self, rom_dir, tmp_path):
+        # Arrange
+        output = tmp_path / "cart.neo"
 
-    def test_the_character_region_is_both_halves_together(self, cart):
-        assert read_header(cart)["csz"] == 8
+        # Act
+        out = neofile.write_neo(rom_dir=rom_dir, output=output)
 
-    def test_metadata_round_trips(self, cart):
-        header = read_header(cart)
+        # Assert
+        header = read_header(out)
+        sizes = (header["psz"], header["ssz"], header["msz"], header["v1sz"], header["v2sz"])
+        assert sizes == (64, 32, 16, 8, 0)
 
-        assert header["name"] == "Test Cart"
-        assert header["manufacturer"] == "tester"
-        assert header["year"] == 2026
-        assert header["ngh"] == 0x1234
+    def test_the_character_region_is_both_halves_together(self, rom_dir, tmp_path):
+        # Arrange
+        output = tmp_path / "cart.neo"
 
-    def test_the_header_occupies_exactly_four_kibibytes(self, cart):
-        header = read_header(cart)
-        payload = header["psz"] + header["ssz"] + header["msz"] + header["v1sz"] + header["csz"]
+        # Act
+        out = neofile.write_neo(rom_dir=rom_dir, output=output)
 
-        assert cart.stat().st_size == HEADER_BYTES + payload
+        # Assert
+        assert read_header(out)["csz"] == 8
+
+    def test_metadata_round_trips(self, rom_dir, tmp_path):
+        # Arrange
+        given = metadata()
+
+        # Act
+        out = neofile.write_neo(rom_dir=rom_dir, output=tmp_path / "cart.neo", **given)
+
+        # Assert
+        header = read_header(out)
+        assert {key: header[key] for key in given} == given
+
+    def test_the_header_occupies_exactly_four_kibibytes(self, rom_dir, tmp_path):
+        # Arrange
+        output = tmp_path / "cart.neo"
+
+        # Act
+        out = neofile.write_neo(rom_dir=rom_dir, output=output)
+
+        # Assert
+        assert out.stat().st_size == HEADER_BYTES + 64 + 32 + 16 + 8 + 8
 
 
 class TestPayload:
-    def test_regions_follow_the_documented_order(self, cart):
-        data = cart.read_bytes()
-        header = read_header(cart)
-        offset = HEADER_BYTES
+    def test_regions_follow_the_documented_order(self, rom_dir, regions, tmp_path):
+        # Arrange
+        output = tmp_path / "cart.neo"
 
-        assert data[offset : offset + header["psz"]] == bytes(range(64))
-        offset += header["psz"]
-        assert data[offset : offset + header["ssz"]] == bytes(range(32))
-        offset += header["ssz"]
-        assert data[offset : offset + header["msz"]] == bytes(range(16))
+        # Act
+        out = neofile.write_neo(rom_dir=rom_dir, output=output)
 
-    def test_the_character_region_interleaves_the_two_halves(self, cart):
-        data = cart.read_bytes()
-        header = read_header(cart)
-        offset = HEADER_BYTES + header["psz"] + header["ssz"] + header["msz"] + header["v1sz"]
+        # Assert
+        payload = out.read_bytes()[HEADER_BYTES : HEADER_BYTES + 120]
+        assert payload == regions["p"] + regions["s"] + regions["m"] + regions["v1"]
 
-        assert data[offset : offset + 8] == bytes([0x11, 0xAA, 0x22, 0xBB, 0x33, 0xCC, 0x44, 0xDD])
+    def test_the_character_region_interleaves_the_two_halves(self, tmp_path):
+        # Arrange
+        rom = write_regions(tmp_path, c1=bytes([0x11, 0x22, 0x33, 0x44]), c2=b"\xaa\xbb\xcc\xdd")
+
+        # Act
+        out = neofile.write_neo(rom_dir=rom, output=tmp_path / "cart.neo")
+
+        # Assert
+        assert out.read_bytes()[HEADER_BYTES:] == bytes(
+            [0x11, 0xAA, 0x22, 0xBB, 0x33, 0xCC, 0x44, 0xDD]
+        )
 
 
 class TestValidation:
     def test_mismatched_character_halves_are_rejected(self, tmp_path):
-        rom = write_regions(tmp_path, c1=b"\x01\x02\x03", c2=b"\x01\x02")
+        # Arrange
+        rom = write_regions(tmp_path, c1=fake.binary(length=3), c2=fake.binary(length=2))
 
-        with pytest.raises(ValueError, match="same size"):
+        # Act
+        with pytest.raises(ValueError, match="same size") as refused:
             neofile.write_neo(rom_dir=rom, output=tmp_path / "x.neo")
 
-    def test_a_missing_region_file_is_rejected(self, tmp_path):
-        (tmp_path / "p1.p1").write_bytes(b"\x00")
+        # Assert
+        assert str(refused.value) == "character halves must be the same size, got 3 and 2"
 
-        with pytest.raises(FileNotFoundError, match=r"s1\.s1"):
+    def test_a_missing_region_file_is_rejected(self, tmp_path):
+        # Arrange
+        (tmp_path / "p1.p1").write_bytes(fake.binary(length=1))
+
+        # Act
+        with pytest.raises(FileNotFoundError, match=r"s1\.s1") as refused:
             neofile.write_neo(rom_dir=tmp_path, output=tmp_path / "x.neo")
 
-    def test_an_overlong_name_is_rejected(self, tmp_path):
-        rom = write_regions(tmp_path, c1=b"\x01", c2=b"\x02")
+        # Assert
+        assert str(refused.value) == f"missing cart region s1.s1 in {tmp_path}"
 
-        with pytest.raises(ValueError, match="name"):
-            neofile.write_neo(rom_dir=rom, output=tmp_path / "x.neo", name="x" * 40)
+    @pytest.mark.parametrize(
+        ("field", "limit"),
+        [("name", 33), ("manufacturer", 17)],
+    )
+    def test_an_overlong_text_field_is_rejected(self, tmp_path, field, limit):
+        # Arrange
+        rom = write_regions(tmp_path, c1=fake.binary(length=1), c2=fake.binary(length=1))
+        text = fake.pystr(min_chars=limit, max_chars=limit + 8)
 
-    def test_an_overlong_manufacturer_is_rejected(self, tmp_path):
-        rom = write_regions(tmp_path, c1=b"\x01", c2=b"\x02")
+        # Act
+        with pytest.raises(ValueError, match=field) as refused:
+            neofile.write_neo(rom_dir=rom, output=tmp_path / "x.neo", **{field: text})
 
-        with pytest.raises(ValueError, match="manufacturer"):
-            neofile.write_neo(rom_dir=rom, output=tmp_path / "x.neo", manufacturer="y" * 40)
+        # Assert
+        assert str(refused.value).startswith(f"{field} must be shorter than {limit} bytes")
 
 
 class TestStreaming:
     def test_a_large_character_region_is_written_without_holding_it_all(self, tmp_path):
+        # Arrange
         half = bytes(256) * 4096
         rom = write_regions(tmp_path, c1=half, c2=half)
-        out = tmp_path / "big.neo"
 
-        neofile.write_neo(rom_dir=rom, output=out, chunk_bytes=4096)
+        # Act
+        out = neofile.write_neo(rom_dir=rom, output=tmp_path / "big.neo", chunk_bytes=4096)
 
-        assert read_header(out)["csz"] == len(half) * 2
+        # Assert
+        assert read_header(out)["csz"] == 2 * 1024 * 1024
 
     def test_chunked_interleaving_matches_a_direct_interleave(self, tmp_path):
-        c1 = bytes(range(256)) * 8
-        c2 = bytes(range(255, -1, -1)) * 8
+        # Arrange
+        c1 = fake.binary(length=2048)
+        c2 = fake.binary(length=2048)
         rom = write_regions(tmp_path, c1=c1, c2=c2)
-        out = tmp_path / "chunked.neo"
 
-        neofile.write_neo(rom_dir=rom, output=out, chunk_bytes=7)
+        # Act
+        out = neofile.write_neo(rom_dir=rom, output=tmp_path / "chunked.neo", chunk_bytes=7)
 
-        expected = bytearray(len(c1) * 2)
-        expected[0::2] = c1
-        expected[1::2] = c2
-        assert out.read_bytes()[HEADER_BYTES:] == bytes(expected)
+        # Assert
+        written = out.read_bytes()[HEADER_BYTES:]
+        assert (written[0::2], written[1::2]) == (c1, c2)
 
 
 class TestSecondVoiceRegion:
     def test_the_second_voice_region_is_declared_when_present(self, tmp_path):
+        # Arrange
         rom = write_regions(tmp_path, v1=b"\x01\x02", v2=b"\x0a\x0b\x0c", c1=b"\x01", c2=b"\x02")
-        out = tmp_path / "voice.neo"
 
-        neofile.write_neo(rom_dir=rom, output=out)
+        # Act
+        out = neofile.write_neo(rom_dir=rom, output=tmp_path / "voice.neo")
 
+        # Assert
         assert read_header(out)["v2sz"] == 3
 
     def test_the_second_voice_region_follows_the_first(self, tmp_path):
+        # Arrange
         rom = write_regions(tmp_path, v1=b"\x01\x02", v2=b"\x0a\x0b\x0c", c1=b"\x01", c2=b"\x02")
-        out = tmp_path / "voice.neo"
 
-        neofile.write_neo(rom_dir=rom, output=out)
+        # Act
+        out = neofile.write_neo(rom_dir=rom, output=tmp_path / "voice.neo")
 
-        header = read_header(out)
-        offset = HEADER_BYTES + header["psz"] + header["ssz"] + header["msz"]
-        assert out.read_bytes()[offset : offset + 5] == b"\x01\x02\x0a\x0b\x0c"
+        # Assert
+        assert out.read_bytes()[HEADER_BYTES : HEADER_BYTES + 5] == b"\x01\x02\x0a\x0b\x0c"
 
     def test_the_character_region_still_follows_both_voices(self, tmp_path):
+        # Arrange
         rom = write_regions(tmp_path, v1=b"\x01", v2=b"\x0a", c1=b"\xf0", c2=b"\x0f")
-        out = tmp_path / "voice.neo"
 
-        neofile.write_neo(rom_dir=rom, output=out)
+        # Act
+        out = neofile.write_neo(rom_dir=rom, output=tmp_path / "voice.neo")
 
-        header = read_header(out)
-        offset = (
-            HEADER_BYTES
-            + header["psz"]
-            + header["ssz"]
-            + header["msz"]
-            + header["v1sz"]
-            + header["v2sz"]
-        )
-        assert out.read_bytes()[offset : offset + 2] == b"\xf0\x0f"
-
-
-@pytest.fixture
-def rom_dir(tmp_path):
-    return write_regions(
-        tmp_path,
-        p=bytes(range(64)),
-        s=bytes(range(32)),
-        m=bytes(range(16)),
-        v1=bytes(range(8)),
-        c1=bytes([0x11, 0x22, 0x33, 0x44]),
-        c2=bytes([0xAA, 0xBB, 0xCC, 0xDD]),
-    )
+        # Assert
+        assert out.read_bytes()[HEADER_BYTES:] == b"\x01\x0a\xf0\x0f"
 
 
 class TestTheCommandLine:
     def test_it_writes_the_container_the_build_script_asks_for(self, rom_dir, tmp_path, capsys):
+        # Arrange
         output = tmp_path / "out" / "cart.neo"
 
+        # Act
         code = neofile.main(["--rom-dir", str(rom_dir), "--output", str(output)])
 
+        # Assert
         assert code == 0
-        assert output.is_file()
-        assert str(output) in capsys.readouterr().out
+        assert read_header(output)["tag"] == b"NEO\x01"
+        assert f"wrote {output} ({HEADER_BYTES + 128} bytes)" in capsys.readouterr().out
 
     def test_the_name_reaches_the_header(self, rom_dir, tmp_path):
+        # Arrange
         output = tmp_path / "cart.neo"
+        name = fake.pystr(min_chars=1, max_chars=32)
 
-        neofile.main(
-            ["--rom-dir", str(rom_dir), "--output", str(output), "--name", "SOMETHING ELSE"]
-        )
+        # Act
+        neofile.main(["--rom-dir", str(rom_dir), "--output", str(output), "--name", name])
 
-        assert b"SOMETHING ELSE" in output.read_bytes()[:4096]
+        # Assert
+        assert read_header(output)["name"] == name
 
     def test_the_ngh_accepts_hexadecimal(self, rom_dir, tmp_path):
+        # Arrange
         output = tmp_path / "cart.neo"
 
+        # Act
         code = neofile.main(["--rom-dir", str(rom_dir), "--output", str(output), "--ngh", "0x1234"])
 
+        # Assert
         assert code == 0
+        assert read_header(output)["ngh"] == 4660
 
     def test_a_missing_region_stops_it_rather_than_writing_half_a_cart(self, tmp_path):
+        # Arrange
         empty = tmp_path / "empty"
         empty.mkdir()
+        output = tmp_path / "cart.neo"
 
-        with pytest.raises((FileNotFoundError, SystemExit)):
-            neofile.main(["--rom-dir", str(empty), "--output", str(tmp_path / "cart.neo")])
+        # Act
+        with pytest.raises(FileNotFoundError) as refused:
+            neofile.main(["--rom-dir", str(empty), "--output", str(output)])
+
+        # Assert
+        assert str(refused.value) == f"missing cart region p1.p1 in {empty}"
+        assert not output.exists()

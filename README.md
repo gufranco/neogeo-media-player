@@ -111,36 +111,51 @@ Play, pause, fast forward at 2x, 5x and 10x, rewind and seek, with audio re-poin
 </tr>
 </table>
 
+### Where it stands
+
+The whole path runs: preprocessing, the encoder, the quality ladder, the ROM containers, the 68000 player and the transport.
+
+| Piece | State |
+|---|---|
+| Encoder and quality ladder | Working. 35 rungs, settled by baking the film rather than by pricing it against a table |
+| Picture | 320x224, the whole raster. A source of another shape is cropped to fill it |
+| 68000 player | Working. A build gate disassembles it and fails on any VRAM write pair under the documented minimum |
+| Sound | ADPCM-B on the YM2610, up to 55,555 Hz. `--silent` leaves it out |
+| Subtitles | A SubRip `.srt` named with `--subtitles`, or one beside the source under the same name, drawn on the fix layer, at most two lines of 40 columns. Down switches them off and on |
+| Controls | The transport in [Running it](#running-it): play, pause, fast forward, rewind, seek, mute, subtitles, stop and the diagnostics, with a menu that shows for three seconds after any press |
+| Field rate | 59.185 Hz on every board, so a cartridge plays at the same speed in every region |
+| Regression set | Six clips of different kinds baked on every test run |
+| Hardware run | Done on a real AES and a real MVS from a NeoSD. The changes made since are listed in [AGENTS.md](AGENTS.md) as waiting for a board run |
+
 ## What every player does
 
 Both players are built to the same feature list, set in [FAMILY.md](FAMILY.md),
 and this table is the same in both READMEs. "Planned" is work not done yet. A
-feature a console cannot carry would say "Not possible" with the hardware reason;
-none does today.
+feature a console cannot carry says "Not possible" with the hardware reason.
 
 | Feature | Neo Geo | Master System |
 |---|---|---|
 | One command from a video file to a cartridge | Yes | Yes |
-| The picture fills the screen, scaled to cover and cropped | Yes. `--fit letterbox` still exists and is due to go | Yes |
+| The picture fills the screen, scaled to cover and cropped | Yes | Yes |
 | Black bars baked into a source are found and cropped | Yes | Yes |
 | Picture and sound step down from the best until the film fits | Yes. `--quality search` bakes down a 35-rung ladder, and sound takes the highest rate that still fits | Yes. A bake that overruns the cartridge steps the frame rate down through the same search, and sound goes last |
 | The largest standard cartridge, no added hardware | Yes, 128 MiB of character ROM | Yes, 1 MB, the most any Sega mapper revision decodes |
-| Ordered dithering | Yes, `--dither` | Yes, on by default |
+| Ordered dithering | Yes, `--dither`, off by default | Yes, `--dither`, on by default |
 | Palettes refit as the film changes | Yes, per scene | Yes, per frame, kept while they still fit |
 | Sound with no added hardware | Yes, ADPCM-B on the YM2610 | Yes, tone synthesis on the PSG |
-| A silent build that gives sound's room to the picture | Partly. A library bundle can leave sound out; sound has its own ROM, so leaving it out frees no picture room | Yes, `--silent` |
+| A silent build that gives sound's room to the picture | Yes, `--silent`. Sound has its own ROM, so leaving it out frees no picture room | Yes, `--silent` |
 | Subtitles from a SubRip file | Yes | Yes, burned into the picture, so they cannot be switched off |
 | Play and pause | Yes | Yes. Pause on the console, Start on a Game Gear |
-| Fast forward and rewind | Yes, forward at 2x, 5x and 10x | Not possible: the replay already spends about 90% of every field moving one frame, so it cannot move two; Left and Right jump between seek points instead |
-| Seek | Yes, 10 seconds back or forward | Yes, Left and Right jump between points 10 seconds apart |
-| A position bar with elapsed and total time | Yes | Yes, while paused |
+| Fast forward and rewind | Yes, forward at 2x, 5x and 10x | Not possible: moving one frame already takes up to 54,000 of a field's 59,736 T-states, so the replay cannot move two; Left and Right jump between seek points instead |
+| Seek | Yes, C and D jump between points 10 seconds apart, `--seek-every` to change | Yes, Left and Right jump between points 10 seconds apart, `--seek-every` to change |
+| A position bar with elapsed and total time | Yes, for three seconds after any press | Yes, for three seconds after any press, and while paused |
 | Restart and stop | Yes | Yes |
 | Sound on and off | Yes | Yes, Up |
 | The film loops at the end | Yes | Yes |
-| A diagnostics overlay | Yes | Yes, button 1 while paused |
+| A diagnostics overlay | Yes, Select | Yes, Down |
 | A fault screen for a corrupt stream | Yes | Yes |
 | A film inside your own game | Yes, `--bundle` emits a drop-in library | Yes, `--bundle` emits a drop-in library and `examples/cutscene` builds a game from it |
-| A preview of what the console will draw | Yes, a video | Yes, a video, or four frames beside their source |
+| A preview of what the console will draw | Yes, a video, or four frames beside their source | Yes, a video, or four frames beside their source |
 | A write-timing gate on every build | Yes | Yes |
 | A regression set of films baked on every test run | Yes, six films | Yes, six films |
 | Run on the original hardware | Yes, AES and MVS | Not yet. A Game Gear run is pending |
@@ -177,7 +192,33 @@ A 24 fps source shown on a 59.185 Hz raster repeats each frame about 2.47 times,
 
 Keyframes rewrite all 280 slots and act as seek targets. The transport jumps anywhere by finding the nearest keyframe in an index and replaying from there. A ten minute movie carries 913 of them.
 
+### The constraint that shapes everything
+
+This player and the Master System's [`sms-media-player`](https://github.com/gufranco/sms-media-player) are members of one family, and the two machines differ in the one dimension the design leans on.
+
+The Neo Geo holds **1,048,576 tiles resident in character ROM**, so the player writes tile numbers into sprite control blocks and does nothing else at runtime. The Master System addresses 512 patterns in 16 KB of VRAM, so its player has to page the film's patterns in while it plays.
+
+| | Neo Geo | Master System |
+|---|---|---|
+| Binding constraint | Character ROM | Cartridge bytes |
+| Per-frame work | Write tile numbers | Upload patterns, then write name table entries |
+| New component | none | A working-set policy deciding what to evict |
+
 Picture quality is dictionary richness, and dictionary richness is character ROM. That fact shapes every design decision below.
+
+### The picture is the whole screen
+
+All 320 by 224 pixels, with nothing framing it. A source of another shape is scaled until it covers the raster and then cropped to it, so a 16:9 film loses about a fifth of its width and every pixel the console draws carries film. Bars would be tiles like any other, interned into the dictionary and drawn every frame, so there is no option to add them.
+
+### Sound
+
+Sound is ADPCM-B on the YM2610, streamed from its own voice ROM. The baker encodes the soundtrack at the chip's ceiling of 55,555 Hz when the film is short enough, and a longer film gets the highest rate whose last sample still lands on an addressable page of the 16 MiB voice ROM, which comes to about ten minutes at the ceiling. The player starts the stream after frame 0 and re-points it to the matching page on every seek, rewind and fast forward. `--silent` leaves sound out; it lives in its own ROM, so the picture gains nothing from it.
+
+### Prior art
+
+- **Resident Evil 2 on the Nintendo 64.** Angel Studios fit 15 minutes of video into a 24 MiB budget, decoded in software with no video hardware. Chroma subsampling is the technique the family carries, as the chroma weight on the shared Oklab metric. [Angel Studios postmortem](https://www.gamedeveloper.com/programming/postmortem-angel-studios-i-resident-evil-2-i-n64-version-)
+- **RoQ**, used by The 11th Hour and Quake III: a vector quantizer with per-frame codebooks capped at 256 entries, so a bounded number of new fragments enter per frame. This is the shape of the baker's tile dictionary with a per-frame cap. [MultimediaWiki](https://wiki.multimedia.cx/index.php/RoQ)
+- **Bad Apple on the Neo Geo** by HPMAN: 320x224, 13,167 frames, about four minutes in roughly 3 MB. One bit and one palette, so tile deduplication is at its best case, but it shows tile-streamed video with synced audio on real hardware. [yAronet](https://www.yaronet.com/topics/188010-bad-apple-demo-datlibdatimageneosoundbuilder)
 
 ## Hardware ceilings
 
@@ -261,7 +302,7 @@ That measures the source, settles the highest quality rung that fits a cartridge
 | `--start 90 --duration 300` | Take five minutes starting at 1:30 rather than the whole file |
 | `--preview out.mp4` | Also render what the cartridge will show, for checking by eye. A `.png` holds four frames beside their source instead |
 | `--silent` | Leave sound out. Sound has its own ROM, so the picture gains no room |
-| `--seek-every 10` | Seconds between the points C and D jump to. `0` leaves only the start |
+| `--seek-every 10` | Seconds between the points C and D jump to. At least one frame |
 | `--dither 0.5` | An ordered dither strength from 0 to 1. Default: 0, no dither |
 | `--bundle DIR` | A folder to write a drop-in copy of the player library and this film into |
 | `--bake-only` | Stop before the ROM build |
@@ -354,16 +395,7 @@ game_redraw();
 
 Tile cost is a property of the content rather than of the running time. Dense animation can cost several times what a dialogue scene costs, so a ladder indexed by duration alone would over-compress easy sources and under-compress hard ones. The baker measures the source instead.
 
-The same four clips at `q17`, as tiles per minute and as the runtime a full 128 MiB C-ROM would hold:
-
-| Clip | Tiles per minute | Fits |
-|:-----|-----------------:|-----:|
-| Big Buck Bunny, animation | 56,622 | 18.5 min |
-| blue_sky, live action | 287,279 | 3.7 min |
-| mobcal, live action | 409,600 | 2.6 min |
-| parkrun, live action | 616,623 | 1.7 min |
-
-Flat-shaded animation is the best case for a tile dictionary by a wide margin. A feature shot on film wants a rung far down the ladder, and `search` is how to find which one.
+### How the picture is judged
 
 `--quality search` is the default and consults no table. It bakes `q01` first, and when that does not fit it doubles its stride, `q02`, `q04`, `q08`, until something fits, then bisects the span that doubling just proved. Cost falls strictly from each rung to the next, so the rungs that fit are a block at the bottom of the ladder and only its boundary has to be found. A film settling deep costs about nine bakes rather than thirty.
 
@@ -378,6 +410,45 @@ uv --project tools run python -m neogeomedia.plan --source film.mkv
 ```
 
 [`docs/quality-ladder.md`](docs/quality-ladder.md) lists all 35 rungs with their settings, and covers per-scene palettes, rate control and the colour model.
+
+A number decides cost and a person decides quality. `displayed_error` once ranked frame blending the strongest lever available, and on the cartridge it read as a smear, so every change to the picture is also judged by eye on a rendered frame.
+
+### Measured and rejected
+
+Each of these was built and measured before being turned off. [`CHANGELOG.md`](CHANGELOG.md) has the full account.
+
+- **Frame blending**: error from 23.33 to 9.11 at a fixed hold, and a visible smear on the cartridge. The metric scores an average of neighbouring frames as closer to the source than a stale frame, and the eye does not
+- **Motion masking**: across factors from 20 to 3000 the tile count did not move by one entry while error rose fourfold. A deferred correction still points at a tile, interned later regardless
+- **A narrower raster**: blanking the outer 16 pixels each side raised the tile count from 35,136 to 35,779. Cost follows novel detail, and framing puts detail in the middle
+- **Flip deduplication**: 67 tiles saved out of 81,044. Exact 16x16 mirrors do not occur in filmed or rendered material
+- **Compressing the command stream, and auto-animation**: both save stream bytes, and the stream used 4.5 MB of 8 MiB
+- **Palette-only fades**: 35.7% of frames change at all, and only 4.6% of those are one global brightness scale
+- **Sprite-position motion compensation**: the grid tiles the raster, so moving a sprite shifts a whole 16-pixel column, and content almost never pans by exactly one tile
+- **Near-duplicate merging in the dictionary**: 1% to 3% at thresholds fine enough to be invisible; only signatures coarse enough to destroy detail reach 48%
+- **A richer rung than `q17` on the reference film**: `q16` fits at 82% of the C-ROM and returns the same `displayed_error` to six decimals for 12,697 more tiles. The rate controller's ceiling binds at the top of the ladder, not the C-ROM
+- **Dithering the source before quantisation**: no measurable effect. The banding comes from the 15 colours a tile may use, not from the colour word
+
+### Kept
+
+- **Settling the rung by baking**: the ladder's own price table was wrong in both directions, 53% too dear on animation and 13% too cheap on live action, so `--quality search` bakes and never consults it. A deep film settles in about nine bakes rather than thirty
+- **Palettes refit per scene**: 240 CRAM banks refit per epoch and double-buffered, for about 6% less error at 1.5% more tiles
+- **A calibration anchor on a frame-hold rung**: the hold rungs had been extrapolated, up to 26% optimistic; a fourth anchor measures them
+- **24 short calibration windows**: window count, not sample length, sets the accuracy. 3 windows read 0.62 of the true rate and 12 read 0.91; 24 land within a percent for 72 seconds of sampling
+- **Measured denoise per film**: a two-second window at 0, 1, 2 and 4, scored against the undenoised source on the blurred error. It picks 1 for the Popeye cartoon, 1.7% lower error with fewer tiles, and 0 for the other five films
+- **Ordered dithering, off by default**: an 8x8 threshold inside palette assignment, which keeps identical tiles interning as one, 54,250 tiles to 54,192 on a 30-second window. It loses on all six films, displayed error 5% to 33% higher, so it ships off and waits on the owner's verdict
+
+### What a cartridge costs
+
+The same four clips at `q17`, as tiles per minute and as the runtime a full 128 MiB C-ROM would hold:
+
+| Clip | Tiles per minute | Fits |
+|:-----|-----------------:|-----:|
+| Big Buck Bunny, animation | 56,622 | 18.5 min |
+| blue_sky, live action | 287,279 | 3.7 min |
+| mobcal, live action | 409,600 | 2.6 min |
+| parkrun, live action | 616,623 | 1.7 min |
+
+Flat-shaded animation is the best case for a tile dictionary by a wide margin. A feature shot on film wants a rung far down the ladder, and `search` is how to find which one. Nothing shortens a film to make it fit: a source that fits on no rung is refused with the `--duration` that would fit.
 
 ### The reference cartridge
 
@@ -434,7 +505,7 @@ The [cutscene example](examples/cutscene) has run on a board too and came back t
 | [`src/player/`](src/player) | The movie cartridge, built on the library. Transport, menu, subtitles, diagnostics |
 | [`examples/cutscene/`](examples/cutscene) | A game that plays a cutscene and carries on, built from an emitted bundle |
 | [`tools/neogeomedia/`](tools/neogeomedia) | The baker: decode, colour, palettes, dictionary, encoder, quality ladder, audio, ROM containers, bundle emission |
-| [`tools/tests/`](tools/tests) | 974 tests, including the emulator transcriptions used as oracles |
+| [`tools/tests/`](tools/tests) | The test suite, including the emulator transcriptions used as oracles |
 | [`tools/clips.manifest.json`](tools/clips.manifest.json) | The regression films: identity, credit and licence, never the films |
 | [`tools/DESIGN.md`](tools/DESIGN.md) | Why each baker module, script and test is shaped as it is, with the measurements behind it |
 | [`tools/scripts/`](tools/scripts) | Capture, verification, timing and ladder-sweep helpers |
@@ -449,7 +520,7 @@ The [cutscene example](examples/cutscene) has run on a board too and came back t
 # Install the baker and its dev tools
 uv --project tools sync --all-groups
 
-# Run the 974 tests
+# Run the tests
 uv --project tools run python -m pytest tools/tests
 
 # Format gate
@@ -486,7 +557,21 @@ their identity and the script above fetches and verifies them. Without them
 only the committed synthetic clip runs, and the gate is much weaker. Every
 credit and licence is in [`tools/clips.manifest.json`](tools/clips.manifest.json).
 
-Coverage is gated at 95% in [CI](.github/workflows/ci.yml), which also builds a cartridge end to end and builds the cutscene example twice, once video-only and once with the movie's own sound driver.
+Coverage is gated at 95% in [CI](.github/workflows/ci.yml), which also builds a cartridge end to end and builds the example twice, once video-only and once with the movie's own sound driver.
+
+### Documentation
+
+| File | Contents |
+|---|---|
+| [`AGENTS.md`](AGENTS.md) | The engineering contract: the hardware's binding numbers with their sources, the gates, and what is not done |
+| [`FAMILY.md`](FAMILY.md) | The standard shared with sms-media-player and fmv-core-python, identical in each |
+| [`tools/DESIGN.md`](tools/DESIGN.md) | Why each baker module, script and test is shaped as it is, with the measurements behind it |
+| [`docs/hardware.md`](docs/hardware.md) | The bit layouts read out of both emulators and what the timing gate checks |
+| [`docs/quality-ladder.md`](docs/quality-ladder.md) | All 35 rungs with their settings |
+| [`CHANGELOG.md`](CHANGELOG.md) | What was tried, measured and rejected, and what each failure cost |
+| [`RELEASES.md`](RELEASES.md) | Version history, generated from commit subjects |
+| [`Dockerfile`](Dockerfile) | The toolchain image, with every package pinned by version and the ngdevkit packages by SHA-256 |
+| [`tools/clips.manifest.json`](tools/clips.manifest.json) | The regression films: identity, credit and licence, never the films |
 
 ### Conventions
 
@@ -506,7 +591,7 @@ From 2.0 these are a promise. Anything that would break them is a major version.
 |:--------|:--------|
 | `python -m neogeomedia.cartridge <source>` | The one command. Its flags keep their names and meanings |
 | `python -m neogeomedia.plan --source <file>` | Prints the ladder as an estimate and bakes nothing |
-| `python -m neogeomedia.bake --bundle DIR` | Emits a drop-in folder. Its shape keeps its names: `DIR/src/`, `DIR/movie/`, `DIR/package/`, `DIR/fmv.mk`, `DIR/README.md` |
+| `python -m neogeomedia.cartridge <source> --bundle DIR` | Emits a drop-in folder. Its shape keeps its names: `DIR/src/`, `DIR/movie/`, `DIR/package/`, `DIR/fmv.mk`, `DIR/README.md` |
 | Rung names `q01` to `q35` | A name always means the same settings. Rungs are never renumbered |
 | [`neogeomedia-tiers.json`](neogeomedia-tiers.json) | Readable, diffable, and safe to commit. Its `version` field guards the shape |
 | `build/neogeomedia.neo` and `build/neogeomedia.zip` | Where the cartridge lands, and what it is called |

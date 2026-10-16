@@ -247,8 +247,8 @@ tiles quantise alike, and film grain perturbs almost every tile whatever the
 palette precision, so there is far less to collapse. The saving is a property
 of the content, not of the setting.
 
-Two things follow. `--quality auto` says this about itself now, in the plan it
-prints, rather than presenting a number it cannot support. And a bake that
+Two things followed. `--quality auto`, since removed, said this about itself in
+the plan it printed, rather than presenting a number it could not support. And a bake that
 overruns fails instead of shipping a cartridge that silently stops tracking the
 source, so the optimistic direction costs a wasted bake rather than a bad cart.
 
@@ -436,7 +436,7 @@ turning it on, and a knob that is on by default should have evidence behind it.
   derives its mask from the ROM size and allows up to 8 bits. A stream
   needing more than 8 banks works in geolith and reads the wrong bank on
   hardware, so the baker enforces MAME's limit.
-- **C-ROM banking does not exist**, as the ceilings table above records.
+- **C-ROM banking does not exist**, as the README's [ceilings table](README.md#hardware-ceilings) records.
   Both emulators agree by omission: neither implements it on any board.
 
 </details>
@@ -476,9 +476,11 @@ it is written up with its limits under
 
 ## What is left
 
-Nothing on the list. Gradient blocking was the last entry and it is now
-answered, though not the way the entry expected. What the ordered threshold
-turned out to be is written up under [What did not work](#what-did-not-work).
+Gradient blocking was answered, though not the way the entry expected; what
+the ordered threshold turned out to be is written up under
+[What did not work](#what-did-not-work). Two things remain: a board run of the
+changes [AGENTS.md](AGENTS.md) lists as unverified on hardware, and the
+owner's verdict on the dither default.
 
 ## Standing rules for this project
 
@@ -486,8 +488,8 @@ Requests that outlive any single change.
 
 - **Nothing hardcoded that the source can decide.** Hardware limits are
   fixed; anything else is measured. The audit of which is which is under
-  [The quality system](README.md#the-quality-system), and the values the current bake
-  derived are in the table above.
+  [How the picture is judged](README.md#how-the-picture-is-judged), and the values the
+  reference bake derived are under [The reference cartridge](README.md#the-reference-cartridge).
 - **The code never trims.** Shortening a film is the owner's decision and
   not the baker's. A source that fits nowhere is refused with the exact
   figure that would have to come out, and a source too long for the voice
@@ -505,6 +507,6 @@ Requests that outlive any single change.
 - **Judge picture quality by eye, not by the metric.** `displayed_error`
   ranked frame blending the strongest lever available and it looked awful on
   the cartridge. Numbers decide cost; a person decides quality.
-- **Verify deep frames from the on-screen counters.** See the warning about
-  `measure_drift.py` above. Reporting a regression that a stale capture
+- **Verify deep frames from the on-screen counters.** See
+  [A verification gate that was guessing](#a-verification-gate-that-was-guessing). Reporting a regression that a stale capture
   invented happened twice in one session.

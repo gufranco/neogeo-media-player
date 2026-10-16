@@ -290,7 +290,10 @@ real bakes rather than paging patterns, and its sound is ADPCM-B samples in
 their own V-ROM. It decodes, scores, verifies films and measures captures
 through `fmv-core-python`.
 
-Gaps against "What every player does" (as of 2026-10-16): none known.
+Gaps against "What every player does" (as of 2026-10-16):
+
+- `--dither` is off by default here and on by default on the Master
+  System. The default waits on the owner's dither verdict.
 
 Differences the hardware forces:
 

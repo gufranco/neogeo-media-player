@@ -342,8 +342,8 @@ underscore is the convention, not a typo.
 
 What one slot update costs in `apply_frame`'s inner loop.
 
-Read off the compiled loop rather than assumed, and the same six
-instructions the project README walks through: 12 for the port address
+Read off the compiled loop rather than assumed, six instructions in all:
+12 for the port address
 reload, 12 and 16 for the two data writes, 8 for the pointer bump, 6 for
 the compare and 10 for the taken branch. It counts the per-tile loop
 only. A frame also pays a setup per run, twenty of them on a full
@@ -857,9 +857,9 @@ Decode a clip window into vblank-rate RGB frames.
 
 Yield decoded frames in chunks instead of all at once.
 
-A cart filled to the 128 MiB character-ROM ceiling is about four and
-a half minutes of video, which is roughly 15,600 frames. Holding
-those as RGB would be over three gigabytes before the encoder has
+The reference film fills 81% of the 128 MiB character ROM with 35,274
+frames, over ten minutes at 59.2 fps. Holding those as RGB would be
+over seven gigabytes before the encoder has
 allocated anything, so a full-capacity bake is only possible if the
 frames arrive a chunk at a time.
 
@@ -1108,8 +1108,8 @@ With 256 banks and 16 reserved for the fix layer, the video draws from
 240 banks, or 3600 simultaneous colors, and the encoder's job is to pick
 banks that let every tile in the movie land close to its source colors.
 
-The approach follows the tiled-palette-quantizer family cited in
-`references.md`: describe each tile compactly, cluster tiles into as many
+The approach follows the tiled-palette-quantizer family: describe each
+tile compactly, cluster tiles into as many
 groups as there are banks, fit a palette per group, then assign every
 tile to whichever bank quantizes it best. Clustering uses a nine
 dimensional descriptor, the Oklab mean plus the darkest and brightest
@@ -1336,7 +1336,7 @@ Three ceilings bound a bake. Character ROM holds the tile dictionary and
 binds first at every tier measured. Program ROM carries the command
 stream and keeps around half its space spare throughout. The ADPCM-B
 voice ROM holds the soundtrack and only constrains anything past about
-25 minutes, where the sample rate has to come down to fit.
+ten minutes, where the sample rate has to come down to fit.
 
 The relative costs below were measured on dense animation. They set the
 shape of the ladder, never its absolute position, which calibration
@@ -2536,7 +2536,7 @@ to go, or give up a different budget.
 
 Exercise the player's pure core as compiled C, not as a reimplementation.
 
-`src/timeline.c` holds every lookup and every piece of arithmetic the
+`src/fmv/timeline.c` holds every lookup and every piece of arithmetic the
 68000 player does that has no hardware in it: which keyframe a seek
 lands on, which cue covers a frame, which ADPCM page the audio wants,
 how far along the seek bar sits, and which seek point C and D jump to.

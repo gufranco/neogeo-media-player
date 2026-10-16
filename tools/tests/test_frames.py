@@ -66,7 +66,7 @@ class TestFillGeometry:
         width, height = source
 
         # Act
-        geometry = frames.plan_geometry(width, height, 320, 224, fit="fill")
+        geometry = frames.plan_geometry(width, height, 320, 224)
 
         # Assert
         assert geometry.crop == crop
@@ -78,69 +78,22 @@ class TestFillGeometry:
         width, height = 1280, 720
 
         # Act
-        geometry = frames.plan_geometry(width, height, 320, 224, fit="fill")
+        geometry = frames.plan_geometry(width, height, 320, 224)
 
         # Assert
         assert geometry.image == (320, 224)
-        assert geometry.pad_top == 0
 
     def test_crop_dimensions_stay_even(self):
         # Arrange
         width, height = 1281, 721
 
         # Act
-        geometry = frames.plan_geometry(width, height, 320, 224, fit="fill")
+        geometry = frames.plan_geometry(width, height, 320, 224)
 
         # Assert
         assert geometry.crop == (960, 720)
         assert geometry.crop[0] % 2 == 0
         assert geometry.crop[1] % 2 == 0
-
-
-class TestLetterboxGeometry:
-    def test_a_sixteen_by_nine_source_lands_on_ten_tile_rows(self):
-        # Arrange
-        width, height = 1280, 720
-
-        # Act
-        geometry = frames.plan_geometry(width, height, 320, 224, fit="letterbox")
-
-        # Assert
-        assert geometry.image == (320, 160)
-
-    def test_letterbox_bars_are_tile_aligned_and_symmetric(self):
-        # Arrange
-        width, height = 1280, 720
-
-        # Act
-        geometry = frames.plan_geometry(width, height, 320, 224, fit="letterbox")
-
-        # Assert
-        assert geometry.pad_top == 32
-        assert geometry.pad_top % 16 == 0
-        assert geometry.pad_top * 2 + geometry.image[1] == 224
-
-    def test_a_matching_aspect_needs_no_bars(self):
-        # Arrange
-        width, height = 640, 480
-
-        # Act
-        geometry = frames.plan_geometry(width, height, 320, 224, fit="letterbox")
-
-        # Assert
-        assert geometry.pad_top == 0
-        assert geometry.image == (320, 224)
-
-    def test_an_unknown_fit_mode_is_rejected(self):
-        # Arrange
-        fit = "stretch"
-
-        # Act
-        with pytest.raises(ValueError, match="fit") as raised:
-            frames.plan_geometry(1280, 720, 320, 224, fit=fit)
-
-        # Assert
-        assert repr(fit) in str(raised.value)
 
 
 class TestFrameHoldPlanning:
@@ -219,16 +172,6 @@ class TestDisplayAspect:
 
         # Assert
         assert geometry.crop[0] / geometry.crop[1] < raster_ratio
-
-    def test_letterboxing_keeps_the_source_shape_too(self):
-        # Arrange
-        width, height = 1280, 720
-
-        # Act
-        geometry = frames.plan_geometry(width, height, fit="letterbox")
-
-        # Assert
-        assert displayed_aspect(geometry) == pytest.approx(16 / 9, rel=0.05)
 
     def test_the_pixel_aspect_follows_from_a_four_by_three_screen(self):
         # Arrange

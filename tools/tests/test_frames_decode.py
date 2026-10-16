@@ -91,17 +91,6 @@ class TestDecode:
         assert len(clip) == 59
         assert repeated_frames(clip) == 59 - 24
 
-    def test_letterboxed_output_has_black_bars(self, widescreen_clip):
-        # Arrange
-        fit: frames.FitMode = "letterbox"
-
-        # Act
-        clip = frames.decode(widescreen_clip, start=0.0, duration=0.2, fit=fit)
-
-        # Assert
-        assert int(clip[0, :32].max()) == 0
-        assert int(clip[0, -32:].max()) == 0
-
     def test_decoding_a_missing_file_is_rejected(self, tmp_path):
         # Arrange
         missing = tmp_path / "absent.mp4"

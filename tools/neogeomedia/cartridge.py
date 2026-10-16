@@ -3,18 +3,31 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 from fmvcore import arguments, ffmpeg
 
-from neogeomedia import bake, denoise, frames, limits, probe, quality, tiercache
+from neogeomedia import (
+    bake,
+    bakeargs,
+    denoise,
+    frames,
+    limits,
+    probe,
+    quality,
+    shortfall,
+    tiercache,
+)
 
 BUILD_SCRIPT = Path(__file__).resolve().parents[2] / "toolchain" / "build-in-docker.sh"
 CARTRIDGE_NAME = "neogeomedia.neo"
 ARCHIVE_NAME = "neogeomedia.zip"
 NO_TIER_FITS = 3
+REPORT_NAME = "report.json"
+PREVIEW_HELP = "a .mp4 or .mkv of every frame the console draws, or a .png for four frames"
 
 
 def _add_source_args(parser: argparse.ArgumentParser) -> None:
@@ -54,12 +67,12 @@ def _add_bake_args(parser: argparse.ArgumentParser) -> None:
         help="seconds to take; defaults to the whole film",
     )
     parser.add_argument("--build-dir", type=Path, default=Path("build"))
-    parser.add_argument("--preview", type=Path, default=None)
-    parser.add_argument("--fit", choices=("fill", "letterbox"), default="fill")
+    parser.add_argument("--preview", type=Path, default=None, help=PREVIEW_HELP)
     parser.add_argument(
         "--dither",
-        action="store_true",
-        help="ordered threshold across palette entries, to break up banding",
+        type=arguments.number(low=0.0, high=limits.MAX_DITHER, name="--dither"),
+        default=limits.DEFAULT_DITHER,
+        help=bakeargs.DITHER_HELP,
     )
     parser.add_argument(
         "--denoise",
@@ -72,6 +85,23 @@ def _add_bake_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_output_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--silent", action="store_true", help=bakeargs.SILENT_HELP)
+    parser.add_argument("--bundle", type=Path, default=None, help=bakeargs.BUNDLE_HELP)
+    parser.add_argument(
+        "--seek-every",
+        type=arguments.number(low=0.0, high=limits.MAX_SOURCE_SECONDS, name="--seek-every"),
+        default=limits.SEEK_EVERY_SECONDS,
+        help=bakeargs.SEEK_EVERY_HELP,
+    )
+    parser.add_argument(
+        "--report",
+        type=Path,
+        default=None,
+        help=f"where the figures go, refused bake or not; defaults to {REPORT_NAME} in --build-dir",
+    )
+
+
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="neogeomedia",
@@ -79,6 +109,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     )
     _add_source_args(parser)
     _add_bake_args(parser)
+    _add_output_args(parser)
     return parser.parse_args(argv)
 
 
@@ -107,8 +138,10 @@ def bake_argv(args: argparse.Namespace) -> list[str]:
         str(float(args.start)),
         "--build-dir",
         str(args.build_dir),
-        "--fit",
-        str(args.fit),
+        "--dither",
+        str(float(args.dither)),
+        "--seek-every",
+        str(float(args.seek_every)),
     ]
     if args.duration is not None:
         argv += ["--duration", str(float(args.duration))]
@@ -116,8 +149,8 @@ def bake_argv(args: argparse.Namespace) -> list[str]:
         argv += ["--subtitles", str(args.subtitles)]
     if args.preview is not None:
         argv += ["--preview", str(args.preview)]
-    if args.dither:
-        argv += ["--dither"]
+    if args.silent:
+        argv += ["--silent"]
     if args.denoise not in (None, arguments.AUTO):
         argv += ["--denoise", str(args.denoise)]
     return argv
@@ -182,15 +215,13 @@ def _measured_tier(args: argparse.Namespace) -> quality.Tier | None:
     info = ffmpeg.probe(args.source)
     span = _span(args, info)
     store = args.tier_cache or tiercache.default_store()
-    params = tiercache.Params(
-        start=float(args.start), duration=span, fit=args.fit, denoise=0.0, frame_hold=1
-    )
+    params = tiercache.Params(start=float(args.start), duration=span, denoise=0.0, frame_hold=1)
     key = tiercache.key_for(args.source, params)
     tiercache.describe(store, key, source=args.source, params=params)
     known = tiercache.recall(store, key)
     if known:
         print(f"{len(known)} tier cost(s) already measured for this source", file=sys.stderr)
-    scratch = args.build_dir.parent / f"{args.build_dir.name}-probe"
+    scratch = _scratch(args, "probe")
     outcome = probe.search(
         measure=lambda tier: _probe_bake(args, scratch, tier),
         minutes=span / quality.SECONDS_PER_MINUTE,
@@ -207,15 +238,57 @@ def _measured_tier(args: argparse.Namespace) -> quality.Tier | None:
     return outcome.tier
 
 
+def _scratch(args: argparse.Namespace, kind: str) -> Path:
+    return Path(args.build_dir.parent / f"{args.build_dir.name}-{kind}")
+
+
+def _report_path(args: argparse.Namespace) -> Path:
+    return Path(args.report or args.build_dir / REPORT_NAME)
+
+
+def _outputs(args: argparse.Namespace) -> list[str]:
+    bundled = [] if args.bundle is None else ["--bundle", str(args.bundle)]
+    return ["--report-json", str(_report_path(args)), *bundled]
+
+
+def _reach(args: argparse.Namespace, tier: quality.Tier) -> tuple[float, Path]:
+    scratch = _scratch(args, "reach")
+    report = scratch / f"{tier.name}.json"
+    report.unlink(missing_ok=True)
+    _probe_bake(args, scratch, tier)
+    if not report.is_file():
+        return 0.0, report
+    frames_held = float(json.loads(report.read_text())["frames"])
+    return frames_held / float(frames.VBLANK_FPS), report
+
+
+def _cheapest(rungs: list[quality.Tier]) -> quality.Tier:
+    return min(rungs or quality.LADDER, key=lambda tier: tier.relative_cost)
+
+
+def _suggest_duration(args: argparse.Namespace, tier: quality.Tier) -> str:
+    seconds, _ = _reach(args, tier)
+    cheapest = tier == _cheapest(list(quality.LADDER))
+    return shortfall.shortfall(seconds=seconds, rung=tier.name, cheapest=cheapest)
+
+
+def _refuse_search(args: argparse.Namespace) -> int:
+    info = ffmpeg.probe(args.source)
+    tier = _cheapest(probe.candidates(float(info.fps), float(frames.VBLANK_FPS)))
+    seconds, measured = _reach(args, tier)
+    if measured.is_file():
+        _report_path(args).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(measured, _report_path(args))
+    advice = shortfall.shortfall(seconds=seconds, rung=tier.name, cheapest=True)
+    print(f"this source fits no tier; {advice}", file=sys.stderr)
+    return NO_TIER_FITS
+
+
 def _settle_quality(args: argparse.Namespace) -> int | None:
     if args.quality == "search":
         tier = _measured_tier(args)
         if tier is None:
-            print(
-                "this source fits no tier; trim it yourself or lower the runtime",
-                file=sys.stderr,
-            )
-            return NO_TIER_FITS
+            return _refuse_search(args)
         print(f"measured choice: {tier.name}", file=sys.stderr)
         args.quality = tier.name
         args.denoise = arguments.AUTO if args.denoise is None else args.denoise
@@ -245,7 +318,9 @@ def main(argv: list[str] | None = None) -> int:
     if unsettled is not None:
         return unsettled
     print(f"baking {args.source}", file=sys.stderr)
-    status = bake.main(bake_argv(args))
+    status = bake.main([*bake_argv(args), *_outputs(args)])
+    if status == bake.OVERRAN:
+        print(_suggest_duration(args, quality.tier_by_name(args.quality)), file=sys.stderr)
     if status != 0:
         return status
     if args.bake_only:

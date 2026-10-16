@@ -21,3 +21,6 @@ MAX_FRACTION: Final = 1.0
 MAX_TILES: Final = quality.CROM_TILES
 MAX_PALETTES: Final = palettes.CRAM_BANKS
 MAX_SEED: Final = 2**32 - 1
+MAX_DITHER: Final = palettes.MAX_DITHER
+DEFAULT_DITHER: Final = palettes.NO_DITHER
+SEEK_EVERY_SECONDS: Final = 10.0

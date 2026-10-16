@@ -5,8 +5,9 @@ import subprocess
 
 import pytest
 
-from neogeomedia import bake, bundle
+from neogeomedia import bake, bundle, soundtrack
 from tests.bakehelp import SYNTHETIC_FILM, small_argv, tone_clip
+from tests.cartridgehelp import last_report
 
 pytestmark = pytest.mark.ffmpeg
 
@@ -45,17 +46,130 @@ class TestCommandLine:
         assert (drop_in / bundle.LIBRARY_DIR_NAME / "fmv.h").is_file()
         assert "drop-in bundle" in capsys.readouterr().err
 
-    def test_main_honours_the_letterbox_fit(self, synthetic_clip, tmp_path):
+    def test_the_fit_flag_is_gone_because_the_picture_always_fills(self, synthetic_clip, tmp_path):
         # Arrange
-        build = tmp_path / "build"
-        argv = small_argv(synthetic_clip, build, "--fit", "letterbox")
+        argv = small_argv(synthetic_clip, tmp_path / "build", "--fit", "fill")
 
         # Act
-        code = bake.main(argv)
+        with pytest.raises(SystemExit) as refused:
+            bake.main(argv)
+
+        # Assert
+        assert refused.value.code == 2
+
+
+class TestSilent:
+    def test_silent_leaves_the_soundtrack_out(self, tone, tmp_path, capsys):
+        # Arrange
+        build = tmp_path / "build"
+
+        # Act
+        code = bake.main(small_argv(tone, build, "--silent"))
 
         # Assert
         assert code == 0
-        assert (build / "baked" / "stream.bin").is_file()
+        assert last_report(capsys.readouterr().out)["has_audio"] is False
+        assert not (build / "baked" / soundtrack.VOICE_FILE).exists()
+
+    def test_a_film_asked_to_be_silent_is_not_announced_as_soundless(self, tmp_path, capsys):
+        # Arrange
+        argv = small_argv(SYNTHETIC_FILM, tmp_path / "build", "--silent")
+
+        # Act
+        bake.main(argv)
+
+        # Assert
+        assert "carries no audio track" not in capsys.readouterr().err
+
+
+class TestSeekEvery:
+    @pytest.mark.parametrize(
+        ("extra", "frames"), [((), 592), (("--seek-every", "4"), 237), (("--seek-every", "0"), 0)]
+    )
+    def test_the_spacing_reaches_the_header_in_frames(
+        self, synthetic_clip, tmp_path, extra, frames
+    ):
+        # Arrange
+        build = tmp_path / "build"
+
+        # Act
+        bake.main(small_argv(synthetic_clip, build, *extra))
+
+        # Assert
+        header = (build / "generated" / "movie_data.h").read_text()
+        assert f"#define MOVIE_SEEK_FRAMES {frames}u\n" in header
+
+    def test_a_negative_spacing_is_refused(self, synthetic_clip, tmp_path):
+        # Arrange
+        argv = small_argv(synthetic_clip, tmp_path / "build", "--seek-every", "-1")
+
+        # Act
+        with pytest.raises(SystemExit) as refused:
+            bake.main(argv)
+
+        # Assert
+        assert refused.value.code == 2
+
+
+class TestDitherStrength:
+    def test_a_strength_reaches_the_report(self, synthetic_clip, tmp_path, capsys):
+        # Arrange
+        argv = small_argv(synthetic_clip, tmp_path / "build", "--dither", "0.5")
+
+        # Act
+        bake.main(argv)
+
+        # Assert
+        assert last_report(capsys.readouterr().out)["dither"] == 0.5
+
+    def test_the_default_is_no_dither(self, synthetic_clip, tmp_path, capsys):
+        # Arrange
+        argv = small_argv(synthetic_clip, tmp_path / "build")
+
+        # Act
+        bake.main(argv)
+
+        # Assert
+        assert last_report(capsys.readouterr().out)["dither"] == 0.0
+
+    def test_a_strength_past_the_maximum_is_refused(self, synthetic_clip, tmp_path):
+        # Arrange
+        argv = small_argv(synthetic_clip, tmp_path / "build", "--dither", "1.5")
+
+        # Act
+        with pytest.raises(SystemExit) as refused:
+            bake.main(argv)
+
+        # Assert
+        assert refused.value.code == 2
+
+
+class TestReportNames:
+    def test_shared_facts_carry_the_family_names(self, synthetic_clip, tmp_path, capsys):
+        # Arrange
+        argv = small_argv(synthetic_clip, tmp_path / "build")
+
+        # Act
+        bake.main(argv)
+
+        # Assert
+        report = last_report(capsys.readouterr().out)
+        assert {"banks", "bytes", "fps", "bars", "seconds", "has_audio"} <= set(report)
+        assert not {"stream_banks", "stream_bytes"} & set(report)
+        assert report["fps"] == pytest.approx(59.185, abs=0.001)
+        assert report["bars"] is None
+
+    def test_an_overrun_writes_no_bundle(self, tmp_path):
+        # Arrange
+        drop_in = tmp_path / "drop-in"
+        argv = small_argv(SYNTHETIC_FILM, tmp_path / "build", "--tile-budget", "1")
+
+        # Act
+        code = bake.main([*argv, "--bundle", str(drop_in)])
+
+        # Assert
+        assert code == bake.OVERRAN
+        assert not drop_in.exists()
 
 
 class TestBundleFromABake:

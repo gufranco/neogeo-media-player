@@ -17,6 +17,8 @@ TABLE_DIMS: Final = 2
 _KMEANS_ITERATIONS: Final = 24
 _ASSIGN_CHUNK_BYTES: Final = 64 << 20
 _MIX_SCALE: Final = 255.0
+NO_DITHER: Final = 0.0
+MAX_DITHER: Final = 1.0
 
 DEFAULT_CHROMA_WEIGHT: Final = 1.0
 
@@ -104,7 +106,7 @@ class Assignment:
 
 
 def _two_nearest(
-    distance: npt.NDArray[np.float32],
+    distance: npt.NDArray[np.float32], strength: float
 ) -> tuple[npt.NDArray[np.uint8], npt.NDArray[np.uint8], npt.NDArray[np.uint8]]:
     pair = np.argpartition(distance, 1, axis=1)[:, :2]
     picked = np.take_along_axis(distance, pair, axis=1)
@@ -118,7 +120,7 @@ def _two_nearest(
     return (
         nearest.astype(np.uint8),
         runner.astype(np.uint8),
-        np.rint(share * _MIX_SCALE).astype(np.uint8),
+        np.rint(share * _MIX_SCALE * strength).astype(np.uint8),
     )
 
 
@@ -264,25 +266,33 @@ def build_palette_set(
     )
 
 
+def _check_dither(strength: float) -> None:
+    if not NO_DITHER <= strength <= MAX_DITHER:
+        msg = f"a dither strength lies between {NO_DITHER:g} and {MAX_DITHER:g}, got {strength:g}"
+        raise ValueError(msg)
+
+
 class PaletteAssigner:
     def __init__(
-        self, palette_set: PaletteSet, *, candidates: int = 0, dither: bool = False
+        self, palette_set: PaletteSet, *, candidates: int = 0, dither: float = NO_DITHER
     ) -> None:
+        _check_dither(dither)
         self._palette_set = palette_set
         self._candidates = min(candidates if candidates > 0 else len(palette_set), len(palette_set))
         grid = oklab_grid(palette_set.chroma_weight)
         total = len(palette_set)
         self._slot = np.zeros((total, grid.shape[0]), dtype=np.uint8)
         self._error = np.zeros((total, grid.shape[0]), dtype=np.float32)
-        self._second = np.zeros((total, grid.shape[0]), dtype=np.uint8) if dither else None
-        self._mix = np.zeros((total, grid.shape[0]), dtype=np.uint8) if dither else None
+        dithered = dither > NO_DITHER
+        self._second = np.zeros((total, grid.shape[0]), dtype=np.uint8) if dithered else None
+        self._mix = np.zeros((total, grid.shape[0]), dtype=np.uint8) if dithered else None
         for index in range(total):
             palette_lab = grid[palette_set.colors[index]]
             distance = ((grid[:, None, :] - palette_lab[None, :, :]) ** 2).sum(axis=2)
             self._slot[index] = np.argmin(distance, axis=1).astype(np.uint8)
             self._error[index] = np.min(distance, axis=1).astype(np.float32)
             if self._second is not None and self._mix is not None:
-                nearest, runner, share = _two_nearest(distance)
+                nearest, runner, share = _two_nearest(distance, dither)
                 self._slot[index] = nearest
                 self._second[index] = runner
                 self._mix[index] = share

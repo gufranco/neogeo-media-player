@@ -42,13 +42,10 @@ def windowed_clip(
     windows: list[tuple[float, float]],
     *,
     start: float = 0.0,
-    fit: frames.FitMode = "fill",
 ) -> npt.NDArray[np.uint8]:
     return np.concatenate(
         [
-            np.concatenate(
-                list(frames.stream(source, start=start + offset, duration=span, fit=fit))
-            )
+            np.concatenate(list(frames.stream(source, start=start + offset, duration=span)))
             for offset, span in windows
         ]
     )
@@ -60,7 +57,6 @@ def _source_clip(
     *,
     count: int,
     seconds: float,
-    fit: frames.FitMode,
     start: float,
     duration: float | None,
 ) -> npt.NDArray[np.uint8]:
@@ -68,7 +64,7 @@ def _source_clip(
     if duration is not None:
         span_total = min(span_total, duration)
     windows = sample_windows(span_total, count=count, seconds=seconds)
-    return windowed_clip(source, windows, start=start, fit=fit)
+    return windowed_clip(source, windows, start=start)
 
 
 def _minutes(clip: npt.NDArray[np.uint8]) -> float:
@@ -81,7 +77,6 @@ def measure_reference_rate(
     *,
     count: int = DEFAULT_SAMPLE_COUNT,
     seconds: float = DEFAULT_SAMPLE_SECONDS,
-    fit: frames.FitMode = "fill",
     seed: int = 0,
     start: float = 0.0,
     duration: float | None = None,
@@ -92,7 +87,6 @@ def measure_reference_rate(
         ffmpeg.probe(source),
         count=count,
         seconds=seconds,
-        fit=fit,
         start=start,
         duration=duration,
     )
@@ -106,16 +100,13 @@ def measure_anchors(
     *,
     count: int = DEFAULT_SAMPLE_COUNT,
     seconds: float = DEFAULT_SAMPLE_SECONDS,
-    fit: frames.FitMode = "fill",
     seed: int = 0,
     start: float = 0.0,
     duration: float | None = None,
 ) -> tuple[float, dict[float, float]]:
     source = Path(source)
     info = ffmpeg.probe(source)
-    clip = _source_clip(
-        source, info, count=count, seconds=seconds, fit=fit, start=start, duration=duration
-    )
+    clip = _source_clip(source, info, count=count, seconds=seconds, start=start, duration=duration)
     minutes = _minutes(clip)
     anchors = quality.anchor_tiers(float(info.fps), float(frames.VBLANK_FPS))
     rates = [(tier, _encode_rate(clip, tier, seed=seed) / minutes) for tier in anchors]

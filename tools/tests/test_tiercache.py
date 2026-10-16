@@ -25,7 +25,7 @@ def movie(tmp_path, fake):
 
 @pytest.fixture
 def params():
-    return tiercache.Params(start=0.0, duration=600.0, fit="fill", denoise=0.0, frame_hold=1)
+    return tiercache.Params(start=0.0, duration=600.0, denoise=0.0, frame_hold=1)
 
 
 @pytest.fixture
@@ -88,7 +88,7 @@ class TestTheKeyFollowsTheContent:
         # Assert
         assert after != before
 
-    @pytest.mark.parametrize("change", [{"fit": "letterbox"}, {"start": 30.0}])
+    @pytest.mark.parametrize("change", [{"frame_hold": 2}, {"start": 30.0}])
     def test_a_parameter_that_changes_cost_or_window_changes_the_key(self, movie, params, change):
         # Arrange
         before = tiercache.key_for(movie, params)
@@ -293,3 +293,43 @@ class TestWhatIsSettled:
 
         # Assert
         assert tier is None
+
+    def test_an_unreachable_rung_is_skipped_rather_than_stopping_the_walk(self):
+        # Arrange
+        rates: dict[str, float | None] = {
+            tier.name: None for tier in quality.LADDER if tier.frame_hold == 1
+        }
+        known = {**rates, "q35": 90_000.0}
+
+        # Act
+        tier = tiercache.best_known_fit(known, source_fps=10.0, vblank_fps=59.185)
+
+        # Assert
+        assert tier is not None
+        assert tier.name == "q35"
+
+    def test_every_rung_refused_means_none_fits(self):
+        # Arrange
+        rates: dict[str, float | None] = dict.fromkeys(tier.name for tier in quality.LADDER)
+
+        # Act
+        tier = tiercache.best_known_fit(rates)
+
+        # Assert
+        assert tier is None
+
+
+class TestALargeFile:
+    def test_a_change_past_the_first_mebibyte_changes_the_digest(self, tmp_path, fake):
+        # Arrange
+        path = tmp_path / "long.mkv"
+        body = fake.binary(length=tiercache.SAMPLE_BYTES * 2)
+        path.write_bytes(body)
+        before = tiercache.content_digest(path)
+        path.write_bytes(body[:-1] + bytes([body[-1] ^ 0xFF]))
+
+        # Act
+        after = tiercache.content_digest(path)
+
+        # Assert
+        assert after != before

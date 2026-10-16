@@ -69,7 +69,7 @@ def preview_pixels(path: Path) -> np.ndarray:
 
 
 def cache_key(source: Path, duration: float) -> str:
-    params = tiercache.Params(start=0.0, duration=duration, fit="fill", denoise=0.0, frame_hold=1)
+    params = tiercache.Params(start=0.0, duration=duration, denoise=0.0, frame_hold=1)
     return tiercache.key_for(source, params)
 
 

@@ -241,6 +241,7 @@ uv --project tools run python -m neogeomedia.cartridge ~/Movies/my-film.mkv
 | `build/neogeomedia.zip` | 相同的 ROM，以 MAME 軟件清單封存檔形式提供 |
 | `build/mame-hash/neogeo.xml` | MAME 尋找該封存檔所需的軟件清單項目 |
 | `build/baked/` | 中間 ROM 映像，保留下來以便無需重新烘焙即可重建 ROM |
+| `build/report.json` | 烘焙的各項數據，影片被拒絕時也會寫出 |
 | `build/preview.mp4` | 只在指定了 `--preview` 時產生 |
 
 #### 常用旗標
@@ -252,8 +253,11 @@ uv --project tools run python -m neogeomedia.cartridge ~/Movies/my-film.mkv
 | `--quality q17` | 指定一個級別，略過測量 |
 | `--denoise 1` | 降噪強度。預設的搜尋會在影片上量度它，指定級別時用 `auto` 亦會量度 |
 | `--start 90 --duration 300` | 從 1:30 開始取五分鐘，而不是整個檔案 |
-| `--fit letterbox` | 加上黑邊，而不是填滿 320x224 光柵 |
-| `--preview out.mp4` | 另外渲染卡帶將顯示的畫面，供肉眼檢查 |
+| `--preview out.mp4` | 另外渲染卡帶將顯示的畫面，供肉眼檢查。使用 `.png` 時改為儲存四幀，並與來源畫面並排 |
+| `--silent` | 不加入聲音。聲音有自己的 ROM，所以畫面不會多出空間 |
+| `--seek-every 10` | C 和 D 跳轉的定位點之間相隔的秒數。`0` 表示只保留開頭 |
+| `--dither 0.5` | 有序抖動強度，範圍 0 到 1。預設 0，即不抖動 |
+| `--bundle DIR` | 寫入一份可直接放入專案的播放器程式庫和本影片副本的資料夾 |
 | `--bake-only` | 在建置 ROM 前停止 |
 | `--build-dir DIR` | 把所有輸出放到 `build/` 以外的位置 |
 
@@ -269,7 +273,7 @@ uv --project tools run python -m neogeomedia.cartridge ~/Movies/my-film.mkv
 | B | 以正常速度播放 |
 | 右 | 快進，依次為 2 倍、5 倍、10 倍 |
 | 左 | 倒帶 |
-| C、D | 後退或前進 10 秒 |
+| C、D | 跳到前一個或後一個定位點，預設相隔 10 秒。在定位點之後 2 秒內，C 跳到再前一個 |
 | 上 | 開關聲音 |
 | 下 | 開關字幕 |
 | Start | 停止並顯示黑畫面。之後按 Start、A 或 B 由頭播放 |

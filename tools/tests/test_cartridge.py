@@ -222,7 +222,7 @@ class TestSearchingFromRememberedRungs:
 
         # Assert
         assert code == cartridge.NO_TIER_FITS
-        assert not (tmp_path / "out").exists()
+        assert not (tmp_path / "out" / cartridge.CARTRIDGE_NAME).exists()
         assert "this source fits no tier" in capsys.readouterr().err
 
     def test_the_first_reachable_fitting_rung_is_baked_and_unreachable_ones_never_are(

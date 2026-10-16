@@ -8,8 +8,8 @@ FILL_CHAIN = "crop=960:720,scale=320:224:flags=lanczos,fps=15625/264,format=rgb2
 DENOISER = "hqdn3d=4:3:6:4.5"
 
 
-def widescreen(fit: frames.FitMode = "fill") -> frames.Geometry:
-    return frames.plan_geometry(1280, 720, 320, 224, fit=fit)
+def widescreen() -> frames.Geometry:
+    return frames.plan_geometry(1280, 720, 320, 224)
 
 
 class TestFilterChain:
@@ -44,16 +44,6 @@ class TestFilterChain:
         # Assert
         assert "pad=" not in chain
 
-    def test_a_letterboxed_chain_pads_to_the_raster(self):
-        # Arrange
-        geometry = widescreen("letterbox")
-
-        # Act
-        chain = frames.build_filter(geometry)
-
-        # Assert
-        assert "pad=320:224:0:32" in chain
-
 
 class TestDenoise:
     def test_the_chain_has_no_denoiser_by_default(self):
@@ -85,16 +75,6 @@ class TestDenoise:
 
         # Assert
         assert chain.index("scale=") < chain.index("hqdn3d") < chain.index("fps=")
-
-    def test_the_denoiser_runs_before_letterbox_padding(self):
-        # Arrange
-        geometry = widescreen("letterbox")
-
-        # Act
-        chain = frames.build_filter(geometry, denoise=1.0)
-
-        # Assert
-        assert chain.index("hqdn3d") < chain.index("pad=")
 
     @pytest.mark.parametrize(
         ("strength", "expected"),

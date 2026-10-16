@@ -15,7 +15,6 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         description="Measure a source and report which quality tiers fit a cartridge.",
     )
     parser.add_argument("--source", type=Path, required=True)
-    parser.add_argument("--fit", choices=("fill", "letterbox"), default="fill")
     parser.add_argument("--samples", type=int, default=calibrate.DEFAULT_SAMPLE_COUNT)
     parser.add_argument("--sample-seconds", type=float, default=calibrate.DEFAULT_SAMPLE_SECONDS)
     parser.add_argument("--seed", type=int, default=0)
@@ -38,7 +37,6 @@ def _calibrate(
         args.source,
         count=args.samples,
         seconds=args.sample_seconds,
-        fit=args.fit,
         seed=args.seed,
     )
 

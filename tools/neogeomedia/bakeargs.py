@@ -17,6 +17,10 @@ DEFAULT_TOLERANCE: Final = 0.0005
 DEFAULT_SCENE_CUT_RATIO: Final = 0.90
 DEFAULT_CANDIDATES: Final = 12
 PROFILE_SECONDS: Final = 30.0
+DITHER_HELP: Final = "ordered dither strength across palette entries, 0 for none. Default: 0"
+BUNDLE_HELP: Final = "a folder to write a drop-in copy of the player library and this film into"
+SILENT_HELP: Final = "leave sound out; it has its own ROM, so the picture gains no room"
+SEEK_EVERY_HELP: Final = "seconds between the points C and D jump to; 0 leaves only the start"
 
 _AUTO_REFUSAL: Final = (
     "'auto' is gone: it guessed the tier from a sample and the guess was wrong "
@@ -57,7 +61,6 @@ def _add_source_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--subtitles", type=Path, default=None)
     parser.add_argument("--build-dir", type=Path, default=Path("build"))
-    parser.add_argument("--fit", choices=("fill", "letterbox"), default="fill")
 
 
 def _add_picture_args(parser: argparse.ArgumentParser) -> None:
@@ -93,8 +96,9 @@ def _add_picture_args(parser: argparse.ArgumentParser) -> None:
 def _add_colour_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--dither",
-        action="store_true",
-        help="ordered threshold across palette entries, to break up banding",
+        type=arguments.number(low=0.0, high=limits.MAX_DITHER, name="--dither"),
+        default=limits.DEFAULT_DITHER,
+        help=DITHER_HELP,
     )
     parser.add_argument(
         "--chroma-weight",
@@ -175,7 +179,14 @@ def _add_encoder_args(parser: argparse.ArgumentParser) -> None:
 def _add_output_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--preview", type=Path, default=None)
     parser.add_argument("--report-json", type=Path, default=None)
-    parser.add_argument("--bundle", type=Path, default=None)
+    parser.add_argument("--bundle", type=Path, default=None, help=BUNDLE_HELP)
+    parser.add_argument("--silent", action="store_true", help=SILENT_HELP)
+    parser.add_argument(
+        "--seek-every",
+        type=arguments.number(low=0.0, high=limits.MAX_SOURCE_SECONDS, name="--seek-every"),
+        default=limits.SEEK_EVERY_SECONDS,
+        help=SEEK_EVERY_HELP,
+    )
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:

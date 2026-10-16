@@ -100,6 +100,11 @@ which of the two applies depends entirely on how long the movie is.
 
 Sizes measured on this clip and what they project to.
 
+A fact both players report carries the name the Master System player
+gives it: `banks`, `bytes`, `fps`, `dither`, `bars`, `displayed_error`.
+The figures only this player has, such as `tile_count` and the
+projections, keep their own names.
+
 #### `write_movie_bundle`
 
 Emit the drop-in folder for a bake that has already run.
@@ -115,6 +120,8 @@ Decode, encode, and write every cart artifact.
 #### `_overran`
 
 Whether the encoder ran out of room rather than finishing the film.
+A bake that overran writes no `--bundle`, so no game can ship a film
+that stops tracking its source.
 
 Rate control degrades quality to stay inside the budget, and that is
 the healthy path. When even its ceiling is not enough the dictionary
@@ -289,6 +296,16 @@ under a matching name.
 #### `_measured_tier`
 
 Resolve a tier by baking rather than by sampling, remembering the result.
+
+#### `_reach`
+
+How much of the film a rung holds, measured by a bake that stops when
+the cartridge is full. A refusal turns it into the `--duration` that
+would fit, through [`shortfall.py`](neogeomedia/shortfall.py), and never
+trims the film itself.
+
+Every bake writes `report.json`, a refused one included, so the figures
+of a film that did not fit are still on disk to read.
 
 
 ### [`neogeomedia/codegen.py`](neogeomedia/codegen.py)
@@ -813,19 +830,16 @@ The frame size after black bars are removed.
 
 #### `plan_geometry`
 
-Work out the crop, scale, and pad that map a source onto the raster.
+Work out the crop and scale that fill the raster with a source.
+
+The picture always fills the screen and a wide film loses its sides.
+There is no letterbox mode: bars cost tiles like any other picture.
 
 The raster is not square. An AES drives a 4:3 television with 320 by
 224 pixels, so a pixel is 0.9333 as wide as it is tall, and a crop
 aimed at the raster's own ratio arrives on screen squashed by that
 much. Aspect decisions are therefore made in display space and only
 converted to pixels at the end.
-
-A source that exactly fills the screen lands on a whole row count
-
-that binary floating point renders a hair under it, which would
-
-letterbox a 4:3 source for no reason. Compare with a tolerance.
 
 #### `build_filter`
 
@@ -1192,6 +1206,11 @@ Choose a palette per tile and quantize its pixels.
 
 Pixel indices for a chunk of tiles, dithered when asked for.
 
+The dither is a strength from 0 to 1, as on the Master System player.
+It scales how far a pixel leans toward its runner-up entry, so 1 is the
+full ordered threshold and 0 is none. The default stays at 0 until the
+dither is judged by eye on the board.
+
 
 ### [`neogeomedia/plan.py`](neogeomedia/plan.py)
 
@@ -1222,6 +1241,12 @@ verification path writes FFV1 and only the shareable copy is h264.
 #### `PreviewWriter`
 
 Feeds rendered frames to ffmpeg as they are produced.
+
+#### `StillWriter`
+
+A `.png` preview: four frames spread across the film, each console frame
+beside the source frame it was made from, the same comparison the Master
+System player writes. Only the four picked frames are kept in memory.
 
 A full-capacity bake renders more frames than fit in memory, so the
 preview cannot be assembled at the end. Frames go down the pipe as
@@ -2514,7 +2539,8 @@ Exercise the player's pure core as compiled C, not as a reimplementation.
 `src/timeline.c` holds every lookup and every piece of arithmetic the
 68000 player does that has no hardware in it: which keyframe a seek
 lands on, which cue covers a frame, which ADPCM page the audio wants,
-how far along the seek bar sits. A mistake in any of them is silent,
+how far along the seek bar sits, and which seek point C and D jump to.
+A mistake in any of them is silent,
 because the picture still appears and only the wrong part of it does.
 
 These build the real translation unit with the host compiler and call

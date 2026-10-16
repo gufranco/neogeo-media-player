@@ -6,7 +6,7 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Final
 
-from neogeomedia import crom, encode, epochs, fixtiles, frames, subtitles
+from neogeomedia import crom, encode, epochs, fixtiles, frames, limits, subtitles
 from neogeomedia import stream as stream_mod
 
 CROM_BANK_BYTES: Final = 128 << 20
@@ -25,6 +25,7 @@ BLANK_LINES: Final = 40
 VBLANK_CYCLES: Final = (BLANK_LINES - 1) * CYCLES_PER_LINE
 
 GENERATED_DIR: Final = "generated"
+SEEK_FRAMES: Final = round(limits.SEEK_EVERY_SECONDS * float(frames.VBLANK_FPS))
 
 _ASM_BLOBS: Final = (
     ("movie_index", "index"),
@@ -106,6 +107,7 @@ _HEADER_TEMPLATE: Final = """#ifndef MOVIE_DATA_H
 #define MOVIE_SUBTITLE_COUNT {subtitle_count}
 #define MOVIE_SUBTITLE_COLUMNS {subtitle_columns}
 #define MOVIE_SUBTITLE_LINES {subtitle_lines}
+#define MOVIE_SEEK_FRAMES {seek_frames}u
 
 #define FIX_PALETTE {fix_palette}
 {fix_defines}
@@ -175,6 +177,7 @@ class SourceSettings:
     frame_hold: int
     audio_pages: Fraction = Fraction(0)
     audio_hz: float = 0.0
+    seek_frames: int = SEEK_FRAMES
 
 
 def baker_version() -> tuple[int, int]:
@@ -274,6 +277,7 @@ def _settings_fields(settings: SourceSettings, artifacts: dict[str, Path]) -> di
         "chroma_percent": round(settings.chroma_weight * PERCENT),
         "audio_hz": round(settings.audio_hz),
         "frame_hold": settings.frame_hold,
+        "seek_frames": settings.seek_frames,
         "audio_page_num": settings.audio_pages.numerator,
         "audio_page_den": settings.audio_pages.denominator or 1,
         "subtitle_count": _subtitle_count(artifacts),

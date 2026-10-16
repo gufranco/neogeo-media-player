@@ -17,7 +17,6 @@ STORE_NAME = "neogeomedia-tiers.json"
 class Params:
     start: float
     duration: float
-    fit: str
     denoise: float
     frame_hold: int
 

@@ -290,9 +290,11 @@ real bakes rather than paging patterns, and its sound is ADPCM-B samples in
 their own V-ROM. It decodes, scores, verifies films and measures captures
 through `fmv-core-python`.
 
-Gaps against "What every player does" (as of 2026-10-16):
+Gaps against "What every player does" (as of 2026-10-16): none known.
 
-- The cartridge command has no silent build. A library bundle can leave sound
-  out with `FMV_AUDIO=no`, and sound lives in its own V-ROM, so leaving it out
-  frees no character ROM for the picture.
-- `--fit letterbox` still adds bars, which the picture rule forbids.
+Differences the hardware forces:
+
+- A silent build gives the picture nothing. `--silent` leaves sound out of
+  the cartridge and `FMV_AUDIO=no` leaves it out of a library bundle, but
+  sound lives in its own V-ROM, so leaving it out frees no character ROM for
+  the picture.

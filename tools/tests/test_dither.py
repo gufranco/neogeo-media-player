@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from neogeomedia import palettes
 
@@ -129,3 +130,45 @@ class TestItActuallyDithers:
 
         # Assert
         assert np.array_equal(before.nibbles, after.nibbles)
+
+
+def swapped_pixels(strength: float) -> int:
+    tiles = a_ramp_tile(0, 0x7FFF)[None, :, :]
+    palette = a_palette_set(THREE_ENTRIES)
+    plain = palettes.PaletteAssigner(palette).assign(tiles)
+    mixed = palettes.PaletteAssigner(palette, dither=strength).assign(tiles)
+    return int(np.count_nonzero(plain.nibbles != mixed.nibbles))
+
+
+class TestStrength:
+    def test_a_weaker_dither_swaps_fewer_pixels_than_a_full_one(self):
+        # Arrange
+        half, full = 0.5, palettes.MAX_DITHER
+
+        # Act
+        swapped = (swapped_pixels(half), swapped_pixels(full))
+
+        # Assert
+        assert 0 < swapped[0] < swapped[1]
+
+    def test_strength_zero_is_no_dither(self):
+        # Arrange
+        strength = palettes.NO_DITHER
+
+        # Act
+        swapped = swapped_pixels(strength)
+
+        # Assert
+        assert swapped == 0
+
+    @pytest.mark.parametrize("strength", [-0.1, 1.1], ids=["negative", "past-the-maximum"])
+    def test_a_strength_outside_the_range_is_refused(self, strength):
+        # Arrange
+        palette = a_palette_set(THREE_ENTRIES)
+
+        # Act
+        with pytest.raises(ValueError, match="dither strength") as raised:
+            palettes.PaletteAssigner(palette, dither=strength)
+
+        # Assert
+        assert f"{strength:g}" in str(raised.value)

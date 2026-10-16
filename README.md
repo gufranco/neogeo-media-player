@@ -247,6 +247,7 @@ That measures the source, settles the highest quality rung that fits a cartridge
 | `build/neogeomedia.zip` | The same ROMs as a MAME software-list archive |
 | `build/mame-hash/neogeo.xml` | The software-list entry MAME needs to find that archive |
 | `build/baked/` | Intermediate ROM images, kept so the ROM can be rebuilt without re-baking |
+| `build/report.json` | The bake's figures, written even when the film is refused |
 | `build/preview.mp4` | Only when `--preview` was asked for |
 
 #### Common flags
@@ -258,8 +259,11 @@ That measures the source, settles the highest quality rung that fits a cartridge
 | `--quality q17` | Name a rung and skip the measuring |
 | `--denoise 1` | A denoise strength. With the default search it is measured on the film, and `auto` measures it for a named rung too |
 | `--start 90 --duration 300` | Take five minutes starting at 1:30 rather than the whole file |
-| `--fit letterbox` | Letterbox instead of filling the 320x224 raster |
-| `--preview out.mp4` | Also render what the cartridge will show, for checking by eye |
+| `--preview out.mp4` | Also render what the cartridge will show, for checking by eye. A `.png` holds four frames beside their source instead |
+| `--silent` | Leave sound out. Sound has its own ROM, so the picture gains no room |
+| `--seek-every 10` | Seconds between the points C and D jump to. `0` leaves only the start |
+| `--dither 0.5` | An ordered dither strength from 0 to 1. Default: 0, no dither |
+| `--bundle DIR` | A folder to write a drop-in copy of the player library and this film into |
 | `--bake-only` | Stop before the ROM build |
 | `--build-dir DIR` | Put everything somewhere other than `build/` |
 
@@ -275,7 +279,7 @@ The film starts playing on its own. The controls show on any press and step out 
 | B | Play at normal speed |
 | Right | Fast forward, 2x, then 5x, then 10x |
 | Left | Rewind |
-| C, D | Seek 10 seconds back, or forward |
+| C, D | Jump to the seek point before or after, 10 seconds apart by default. Within 2 seconds of a point, C goes to the one before |
 | Up | Sound on and off |
 | Down | Subtitles on and off |
 | Start | Stop on a black screen. Start, A or B then plays from the beginning |

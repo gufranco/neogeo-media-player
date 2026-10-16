@@ -241,6 +241,7 @@ uv --project tools run python -m neogeomedia.cartridge ~/Movies/my-film.mkv
 | `build/neogeomedia.zip` | 同じROMをMAMEのソフトウェアリスト用アーカイブにしたものです |
 | `build/mame-hash/neogeo.xml` | MAMEがそのアーカイブを見つけるために必要なソフトウェアリストのエントリーです |
 | `build/baked/` | 中間ROMイメージです。再ベイクせずにROMをビルドし直せるよう保持します |
+| `build/report.json` | ベイクの数値です。フィルムが拒否された場合も書き出されます |
 | `build/preview.mp4` | `--preview`を指定した場合のみ生成されます |
 
 #### よく使うフラグ
@@ -252,8 +253,11 @@ uv --project tools run python -m neogeomedia.cartridge ~/Movies/my-film.mkv
 | `--quality q17` | 段を指定し、計測を省きます |
 | `--denoise 1` | ノイズ除去の強さです。既定の探索では映像で計測し、段を指定した場合も`auto`で計測します |
 | `--start 90 --duration 300` | ファイル全体ではなく、1:30から5分間を使います |
-| `--fit letterbox` | 320x224のラスターを埋める代わりにレターボックスにします |
-| `--preview out.mp4` | カートリッジの表示内容も描画し、目視で確認できるようにします |
+| `--preview out.mp4` | カートリッジの表示内容も描画し、目視で確認できるようにします。`.png`にすると、4つのフレームをソースと並べて保存します |
+| `--silent` | サウンドを入れません。サウンドは専用のROMにあるため、映像に回る容量は増えません |
+| `--seek-every 10` | CとDで移動するシークポイントの間隔を秒で指定します。`0`にすると先頭だけになります |
+| `--dither 0.5` | 0から1までの組織的ディザの強さです。既定値は0で、ディザなしです |
+| `--bundle DIR` | プレーヤーライブラリとこのフィルムをそのまま組み込めるコピーとして書き出すフォルダです |
 | `--bake-only` | ROMのビルドの前で停止します |
 | `--build-dir DIR` | すべての出力を`build/`以外の場所に置きます |
 
@@ -269,7 +273,7 @@ uv --project tools run python -m neogeomedia.cartridge ~/Movies/my-film.mkv
 | B | 通常速度で再生 |
 | 右 | 早送り。2倍、5倍、10倍の順 |
 | 左 | 巻き戻し |
-| C、D | 10秒戻る、または10秒進む |
+| C、D | 前後のシークポイントへ移動します。間隔は既定で10秒です。ポイントから2秒以内なら、Cはその前のポイントへ戻ります |
 | 上 | サウンドのオンとオフ |
 | 下 | 字幕のオンとオフ |
 | Start | 黒い画面で停止します。その後Start、A、Bのいずれかで最初から再生します |

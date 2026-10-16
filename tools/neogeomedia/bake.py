@@ -10,7 +10,7 @@ from typing import Any, Final, TypedDict
 
 import numpy as np
 import numpy.typing as npt
-from fmvcore import ffmpeg
+from fmvcore import ffmpeg, source
 
 from neogeomedia import (
     bakeargs,
@@ -21,6 +21,7 @@ from neogeomedia import (
     encode,
     epochs,
     frames,
+    limits,
     neocolor,
     preview,
     quality,
@@ -39,7 +40,6 @@ class BakeRequest:
     start: float
     duration: float
     build_dir: Path
-    fit: frames.FitMode = "fill"
     palette_count: int = bakeargs.DEFAULT_PALETTE_COUNT
     base_bank: int = bakeargs.DEFAULT_BASE_BANK
     keyframe_interval: int = bakeargs.DEFAULT_KEYFRAME_INTERVAL
@@ -54,7 +54,7 @@ class BakeRequest:
     frame_hold: int = 1
     motion_blur: int = 0
     motion_masking: float = 0.0
-    dither: bool = False
+    dither: float = limits.DEFAULT_DITHER
     chroma_weight: float = 1.0
     scene_cut_floor: float = 0.01
     palette_epoch_seconds: float = 5.0
@@ -64,6 +64,7 @@ class BakeRequest:
     audio_rate_hz: float | None = None
     subtitles: Path | None = None
     audio: bool = True
+    seek_every: float = limits.SEEK_EVERY_SECONDS
 
 
 class TierKnobs(TypedDict):
@@ -83,10 +84,16 @@ class BakeOutcome:
     result: encode.EncodeResult
     build_dir: Path
     artifacts: dict[str, Path] = field(default_factory=dict)
+    bars: source.Bars | None = None
 
     def report(self) -> dict[str, Any]:
         seconds = self.result.stats.frames / float(frames.VBLANK_FPS)
-        head = {"frames": self.result.stats.frames, "seconds": round(seconds, 3)}
+        fps = float(frames.VBLANK_FPS) / self.request.frame_hold
+        head = {
+            "frames": self.result.stats.frames,
+            "seconds": round(seconds, 3),
+            "fps": round(fps, 3),
+        }
         minutes = seconds / SECONDS_PER_MINUTE
         return {**head, **self._settings(), **self._sizes(), **self._projections(minutes)}
 
@@ -104,6 +111,7 @@ class BakeOutcome:
             "palette_epochs": len(self.result.palette_sets),
             "has_audio": "voice" in self.artifacts,
             "tile_budget": request.tile_budget,
+            "bars": list(self.bars) if self.bars is not None else None,
         }
 
     def _sizes(self) -> dict[str, Any]:
@@ -113,13 +121,13 @@ class BakeOutcome:
             "dictionary_full": stats.dictionary_full,
             "crom_payload_bytes": stats.crom_payload_bytes,
             "crom_rom_bytes": stats.crom_rom_bytes,
-            "stream_bytes": stats.stream_bytes,
+            "bytes": stats.stream_bytes,
             "stream_rom_bytes": stats.stream_rom_bytes,
             "keyframe_bytes": stats.keyframe_bytes,
             "delta_bytes": stats.delta_bytes,
             "index_bytes": stats.index_bytes,
             "keyframe_count": stats.keyframe_count,
-            "stream_banks": self.result.stream.bank_count(),
+            "banks": self.result.stream.bank_count(),
             "max_updates": stats.max_updates,
             "mean_updates": round(stats.mean_updates, 2),
             "mean_error": stats.mean_error,
@@ -173,7 +181,6 @@ def _palette_sample(
         start=request.start,
         duration=request.duration,
         stride=max(1, request.sample_stride),
-        fit=request.fit,
         denoise=request.denoise,
         motion_blur=request.motion_blur,
     )
@@ -216,21 +223,21 @@ def _encode_options(request: BakeRequest) -> encode.EncodeOptions:
 
 def _encode(request: BakeRequest) -> encode.EncodeResult:
     epoch_samples, sample_tiles = _palette_sample(request)
-    writer = preview.PreviewWriter(request.preview) if request.preview else None
+    total = frames.frame_count(seconds=request.duration)
+    writer = preview.open_writer(request.preview, total) if request.preview else None
     chunks = frames.stream(
         request.source,
         start=request.start,
         duration=request.duration,
-        fit=request.fit,
         denoise=request.denoise,
         motion_blur=request.motion_blur,
     )
     result = encode.encode_stream(
-        chunks,
+        writer.watch(chunks) if writer else chunks,
         _encode_options(request),
         sample_tiles=sample_tiles,
         epoch_samples=epoch_samples,
-        total_frames=frames.frame_count(seconds=request.duration),
+        total_frames=total,
         on_render=writer.write if writer else None,
     )
     if writer:
@@ -276,6 +283,7 @@ def _write_cart_data(request: BakeRequest, result: encode.EncodeResult) -> dict[
         frame_hold=request.frame_hold,
         audio_pages=voice.pages,
         audio_hz=rate_hz,
+        seek_frames=round(request.seek_every * float(frames.VBLANK_FPS)),
     )
     asm, header = codegen.write_sources(request.build_dir, voiced, result, settings)
     return {**voiced, "asm": asm, "header": header}
@@ -294,6 +302,7 @@ def run(request: BakeRequest) -> BakeOutcome:
         result=result,
         build_dir=request.build_dir,
         artifacts={**artifacts, **banks, **previewed},
+        bars=frames.bars(request.source, start=request.start, duration=request.duration),
     )
 
 
@@ -305,8 +314,8 @@ def _overran(report: dict[str, object]) -> bool:
     )
 
 
-def _announce_silence(source: Path) -> None:
-    if source.is_file() and not ffmpeg.has_audio(source):
+def _announce_silence(source: Path, *, silent: bool) -> None:
+    if not silent and source.is_file() and not ffmpeg.has_audio(source):
         print(
             f"{source} carries no audio track, so the cartridge will be silent. "
             "Nothing is wrong with the video; there is simply no soundtrack to encode.",
@@ -349,7 +358,8 @@ def _request_from(
         duration=args.duration,
         build_dir=args.build_dir,
         subtitles=args.subtitles,
-        fit=args.fit,
+        audio=not args.silent,
+        seek_every=args.seek_every,
         motion_blur=args.motion_blur,
         motion_masking=args.motion_masking,
         dither=args.dither,
@@ -379,7 +389,7 @@ def _finish(args: argparse.Namespace, outcome: BakeOutcome) -> int:
             "--quality search to measure one.",
             file=sys.stderr,
         )
-    if args.bundle is not None:
+    if args.bundle is not None and not _overran(report):
         layout = write_movie_bundle(args.bundle, outcome)
         print(f"wrote a drop-in bundle to {layout.root}", file=sys.stderr)
     if args.report_json is not None:
@@ -392,7 +402,7 @@ def _finish(args: argparse.Namespace, outcome: BakeOutcome) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = bakeargs.parse_args(sys.argv[1:] if argv is None else argv)
     args.duration = bakeargs.resolve_duration(args)
-    _announce_silence(args.source)
+    _announce_silence(args.source, silent=args.silent)
     tier = bakeargs.resolve_quality(args)
     measured = bakeargs.measured_settings(args)
     frame_hold = bakeargs.resolve_frame_hold(args, tier)

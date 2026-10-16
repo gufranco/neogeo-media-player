@@ -36,7 +36,7 @@ def synthetic_clip(tmp_path_factory):
 
 
 def namespace(source, **extra):
-    base = {"quality": None, "source": source, "start": 0.0, "duration": 1.0, "fit": "fill"}
+    base = {"quality": None, "source": source, "start": 0.0, "duration": 1.0}
     return argparse.Namespace(**{**base, **extra})
 
 

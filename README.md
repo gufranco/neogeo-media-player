@@ -129,7 +129,7 @@ none does today.
 | Palettes refit as the film changes | Yes, per scene | Yes, per frame, kept while they still fit |
 | Sound with no added hardware | Yes, ADPCM-B on the YM2610 | Yes, tone synthesis on the PSG |
 | A silent build that gives sound's room to the picture | Partly. A library bundle can leave sound out; sound has its own ROM, so leaving it out frees no picture room | Yes, `--silent` |
-| Subtitles from a SubRip file | Yes | Planned |
+| Subtitles from a SubRip file | Yes | Yes, burned into the picture, so they cannot be switched off |
 | Play and pause | Yes | Yes. Pause on the console, Start on a Game Gear |
 | Fast forward and rewind | Yes, forward at 2x, 5x and 10x | Planned |
 | Seek | Yes, 10 seconds back or forward | Planned |

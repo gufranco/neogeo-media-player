@@ -137,7 +137,7 @@ none does today.
 | Restart and stop | Yes | Yes |
 | Sound on and off | Yes | Yes, Up |
 | The film loops at the end | Yes | Yes |
-| A diagnostics overlay | Yes | Planned |
+| A diagnostics overlay | Yes | Yes, button 1 while paused |
 | A fault screen for a corrupt stream | Yes | Yes |
 | A film inside your own game | Yes, `--bundle` emits a drop-in library | Partly. `--rows` and `--columns` build a smaller picture; there is no drop-in bundle yet |
 | A preview of what the console will draw | Yes, a video | Yes, a video, or four frames beside their source |

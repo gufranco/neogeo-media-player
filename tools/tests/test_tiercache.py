@@ -1,16 +1,25 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 
 import pytest
+from fmvcore.testing import seeded
 
 from neogeomedia import quality, tiercache
 
+FILM_BYTES = 4096
+
 
 @pytest.fixture
-def movie(tmp_path):
+def fake():
+    return seeded()
+
+
+@pytest.fixture
+def movie(tmp_path, fake):
     path = tmp_path / "film.mkv"
-    path.write_bytes(b"a" * 4096)
+    path.write_bytes(fake.binary(length=FILM_BYTES))
     return path
 
 
@@ -19,164 +28,268 @@ def params():
     return tiercache.Params(start=0.0, duration=600.0, fit="fill", denoise=0.0, frame_hold=1)
 
 
+@pytest.fixture
+def key(fake):
+    return fake.sha256()
+
+
+@pytest.fixture
+def rate(fake):
+    return fake.pyfloat(min_value=1_000, max_value=200_000)
+
+
+@pytest.fixture
+def store(tmp_path):
+    return tmp_path / "tiers.json"
+
+
 class TestTheKeyFollowsTheContent:
     def test_the_same_file_gives_the_same_key(self, movie, params):
-        assert tiercache.key_for(movie, params) == tiercache.key_for(movie, params)
+        # Arrange
+        first = tiercache.key_for(movie, params)
+
+        # Act
+        second = tiercache.key_for(movie, params)
+
+        # Assert
+        assert second == first
+        assert len(second) == 64
 
     def test_renaming_the_file_does_not_change_the_key(self, movie, params, tmp_path):
+        # Arrange
         before = tiercache.key_for(movie, params)
-        renamed = tmp_path / "different name.mkv"
-        movie.rename(renamed)
+        renamed = movie.rename(tmp_path / "different name.mkv")
 
-        assert tiercache.key_for(renamed, params) == before
+        # Act
+        after = tiercache.key_for(renamed, params)
 
-    def test_editing_the_file_changes_the_key(self, movie, params):
+        # Assert
+        assert after == before
+
+    def test_editing_the_file_changes_the_key(self, movie, params, fake):
+        # Arrange
         before = tiercache.key_for(movie, params)
-        movie.write_bytes(b"b" * 4096)
+        movie.write_bytes(fake.binary(length=FILM_BYTES))
 
-        assert tiercache.key_for(movie, params) != before
+        # Act
+        after = tiercache.key_for(movie, params)
+
+        # Assert
+        assert after != before
 
     def test_a_different_length_changes_the_key(self, movie, params):
+        # Arrange
         before = tiercache.key_for(movie, params)
-        movie.write_bytes(b"a" * 8192)
+        movie.write_bytes(movie.read_bytes() * 2)
 
-        assert tiercache.key_for(movie, params) != before
+        # Act
+        after = tiercache.key_for(movie, params)
 
-    def test_a_parameter_that_changes_cost_changes_the_key(self, movie, params):
+        # Assert
+        assert after != before
+
+    @pytest.mark.parametrize("change", [{"fit": "letterbox"}, {"start": 30.0}])
+    def test_a_parameter_that_changes_cost_or_window_changes_the_key(self, movie, params, change):
+        # Arrange
         before = tiercache.key_for(movie, params)
-        other = tiercache.Params(
-            start=params.start,
-            duration=params.duration,
-            fit="letterbox",
-            denoise=params.denoise,
-            frame_hold=params.frame_hold,
-        )
+        other = dataclasses.replace(params, **change)
 
-        assert tiercache.key_for(movie, other) != before
+        # Act
+        after = tiercache.key_for(movie, other)
 
-    def test_a_window_change_changes_the_key(self, movie, params):
-        before = tiercache.key_for(movie, params)
-        other = tiercache.Params(
-            start=30.0,
-            duration=params.duration,
-            fit=params.fit,
-            denoise=params.denoise,
-            frame_hold=params.frame_hold,
-        )
-
-        assert tiercache.key_for(movie, other) != before
+        # Assert
+        assert after != before
 
 
 class TestStoringMeasurements:
-    def test_a_reading_survives_a_round_trip(self, tmp_path):
-        store = tmp_path / "tiers.json"
-        tiercache.remember(store, "abc", "q17", 95_270.0)
+    def test_a_reading_survives_a_round_trip(self, store, key, rate):
+        # Arrange
+        tiercache.remember(store, key, "q17", rate)
 
-        assert tiercache.recall(store, "abc") == {"q17": 95_270.0}
+        # Act
+        recalled = tiercache.recall(store, key)
 
-    def test_readings_for_one_source_accumulate(self, tmp_path):
-        store = tmp_path / "tiers.json"
-        tiercache.remember(store, "abc", "q17", 95_270.0)
-        tiercache.remember(store, "abc", "q10", 120_000.0)
+        # Assert
+        assert recalled == {"q17": rate}
 
-        assert tiercache.recall(store, "abc") == {"q17": 95_270.0, "q10": 120_000.0}
+    def test_readings_for_one_source_accumulate(self, store, key, rate):
+        # Arrange
+        tiercache.remember(store, key, "q17", rate)
 
-    def test_sources_do_not_bleed_into_each_other(self, tmp_path):
-        store = tmp_path / "tiers.json"
-        tiercache.remember(store, "abc", "q17", 95_270.0)
-        tiercache.remember(store, "xyz", "q17", 10.0)
+        # Act
+        tiercache.remember(store, key, "q10", rate * 2)
 
-        assert tiercache.recall(store, "abc") == {"q17": 95_270.0}
+        # Assert
+        assert tiercache.recall(store, key) == {"q17": rate, "q10": rate * 2}
 
-    def test_an_absent_store_recalls_nothing(self, tmp_path):
-        assert tiercache.recall(tmp_path / "missing.json", "abc") == {}
+    def test_sources_do_not_bleed_into_each_other(self, store, key, rate, fake):
+        # Arrange
+        tiercache.remember(store, key, "q17", rate)
 
-    def test_a_corrupt_store_recalls_nothing_rather_than_raising(self, tmp_path):
-        store = tmp_path / "tiers.json"
+        # Act
+        tiercache.remember(store, fake.sha256(), "q17", rate / 2)
+
+        # Assert
+        assert tiercache.recall(store, key) == {"q17": rate}
+
+    def test_an_absent_store_recalls_nothing(self, store, key):
+        # Arrange
+        missing = store.with_name("missing.json")
+
+        # Act
+        recalled = tiercache.recall(missing, key)
+
+        # Assert
+        assert recalled == {}
+
+    def test_a_corrupt_store_recalls_nothing_rather_than_raising(self, store, key):
+        # Arrange
         store.write_text("{ this is not json")
 
-        assert tiercache.recall(store, "abc") == {}
+        # Act
+        recalled = tiercache.recall(store, key)
 
-    def test_a_corrupt_store_is_replaced_rather_than_appended_to(self, tmp_path):
-        store = tmp_path / "tiers.json"
+        # Assert
+        assert recalled == {}
+
+    def test_a_corrupt_store_is_replaced_rather_than_appended_to(self, store, key, rate):
+        # Arrange
         store.write_text("{ this is not json")
-        tiercache.remember(store, "abc", "q17", 1.0)
 
-        assert tiercache.recall(store, "abc") == {"q17": 1.0}
+        # Act
+        tiercache.remember(store, key, "q17", rate)
 
-    def test_a_store_from_another_version_is_ignored_rather_than_misread(self, tmp_path):
-        store = tmp_path / "tiers.json"
-        store.write_text(json.dumps({"version": 1, "sources": {"abc": {"tiers": {"q17": 1.0}}}}))
+        # Assert
+        assert tiercache.recall(store, key) == {"q17": rate}
 
-        assert tiercache.recall(store, "abc") == {}
+    def test_a_store_from_another_version_is_ignored_rather_than_misread(self, store, key, rate):
+        # Arrange
+        old = {"version": 1, "sources": {key: {"tiers": {"q17": rate}}}}
+        store.write_text(json.dumps(old))
+
+        # Act
+        recalled = tiercache.recall(store, key)
+
+        # Assert
+        assert recalled == {}
 
 
 class TestTheFileIsReadable:
     @pytest.mark.reads_real_store
     def test_it_lives_at_the_top_of_the_project(self):
-        store = tiercache.default_store()
+        # Arrange
+        name = "neogeomedia-tiers.json"
 
-        assert store.name == tiercache.STORE_NAME
-        assert (store.parent / "README.md").is_file()
+        # Act
+        found = tiercache.default_store()
 
-    def test_an_entry_names_the_film_beside_the_readings(self, tmp_path, movie, params):
-        store = tmp_path / "tiers.json"
-        tiercache.remember(store, "abc", "q17", 95_270.0)
-        tiercache.describe(store, "abc", source=movie, params=params, chosen="q17")
+        # Assert
+        assert found.name == name
+        assert (found.parent / "README.md").is_file()
 
-        entry = json.loads(store.read_text())["sources"]["abc"]
+    def test_an_entry_names_the_film_beside_the_readings(self, store, key, rate, movie, params):
+        # Arrange
+        tiercache.remember(store, key, "q17", rate)
 
+        # Act
+        tiercache.describe(store, key, source=movie, params=params, chosen="q17")
+
+        # Assert
+        entry = json.loads(store.read_text())["sources"][key]
         assert entry["file"] == "film.mkv"
         assert entry["quality"] == "q17"
         assert entry["window"]["duration"] == pytest.approx(600.0)
-        assert entry["tiers"] == {"q17": 95_270.0}
+        assert entry["tiers"] == {"q17": rate}
 
-    def test_describing_an_entry_does_not_disturb_its_readings(self, tmp_path, movie, params):
-        store = tmp_path / "tiers.json"
-        tiercache.remember(store, "abc", "q17", 95_270.0)
-        tiercache.describe(store, "abc", source=movie, params=params)
+    def test_describing_an_entry_does_not_disturb_its_readings(
+        self, store, key, rate, movie, params
+    ):
+        # Arrange
+        tiercache.remember(store, key, "q17", rate)
 
-        assert tiercache.recall(store, "abc") == {"q17": 95_270.0}
+        # Act
+        tiercache.describe(store, key, source=movie, params=params)
+
+        # Assert
+        assert tiercache.recall(store, key) == {"q17": rate}
 
     def test_readings_land_under_a_described_entry_rather_than_replacing_it(
-        self, tmp_path, movie, params
+        self, store, key, rate, movie, params
     ):
-        store = tmp_path / "tiers.json"
-        tiercache.describe(store, "abc", source=movie, params=params)
-        tiercache.remember(store, "abc", "q17", 95_270.0)
+        # Arrange
+        tiercache.describe(store, key, source=movie, params=params)
 
-        assert json.loads(store.read_text())["sources"]["abc"]["file"] == "film.mkv"
-        assert tiercache.recall(store, "abc") == {"q17": 95_270.0}
+        # Act
+        tiercache.remember(store, key, "q17", rate)
 
-    def test_the_file_ends_with_a_newline_so_a_diff_stays_quiet(self, tmp_path):
-        store = tmp_path / "tiers.json"
-        tiercache.remember(store, "abc", "q17", 1.0)
+        # Assert
+        assert json.loads(store.read_text())["sources"][key]["file"] == "film.mkv"
+        assert tiercache.recall(store, key) == {"q17": rate}
 
+    def test_the_file_ends_with_a_newline_so_a_diff_stays_quiet(self, store, key, rate):
+        # Arrange
+        tier = "q17"
+
+        # Act
+        tiercache.remember(store, key, tier, rate)
+
+        # Assert
         assert store.read_text().endswith("}\n")
 
 
 class TestWhatIsSettled:
-    def test_a_rung_that_overran_is_settled_but_does_not_fit(self, tmp_path):
-        store = tmp_path / "tiers.json"
-        tiercache.remember(store, "abc", "q01", None)
-        rates = tiercache.recall(store, "abc")
+    @pytest.fixture
+    def overran(self, store, key):
+        tiercache.remember(store, key, "q01", None)
+        return tiercache.recall(store, key)
+
+    def test_a_rung_that_overran_is_settled(self, overran):
+        # Arrange
         q01 = quality.tier_by_name("q01")
 
-        assert tiercache.settled(rates, q01)
-        assert not tiercache.fits(rates, q01)
+        # Act
+        known = tiercache.settled(overran, q01)
+
+        # Assert
+        assert known is True
+
+    def test_a_rung_that_overran_does_not_fit(self, overran):
+        # Arrange
+        q01 = quality.tier_by_name("q01")
+
+        # Act
+        fitting = tiercache.fits(overran, q01)
+
+        # Assert
+        assert fitting is False
 
     def test_the_best_known_fit_walks_from_the_top(self):
+        # Arrange
         rates: dict[str, float | None] = {"q01": None, "q02": None, "q03": 90_000.0}
 
+        # Act
         tier = tiercache.best_known_fit(rates)
 
+        # Assert
         assert tier is not None
         assert tier.name == "q03"
 
     def test_an_unsettled_rung_stops_the_walk_rather_than_being_guessed(self):
+        # Arrange
         rates: dict[str, float | None] = {"q01": None, "q03": 90_000.0}
 
-        assert tiercache.best_known_fit(rates) is None
+        # Act
+        tier = tiercache.best_known_fit(rates)
+
+        # Assert
+        assert tier is None
 
     def test_nothing_settled_means_nothing_known(self):
-        assert tiercache.best_known_fit({}) is None
+        # Arrange
+        rates: dict[str, float | None] = {}
+
+        # Act
+        tier = tiercache.best_known_fit(rates)
+
+        # Assert
+        assert tier is None

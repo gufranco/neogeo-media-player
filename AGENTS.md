@@ -55,6 +55,9 @@ read out of both emulators' decoders.
 | A cartridge comes out end to end | `uv --project tools run python -m neogeomedia.cartridge <source> --quality q17` |
 | It runs on a board | the owner's AES or MVS; nothing on this machine settles it |
 
+Nothing here is verified by compiling. Run the gates and read their output
+before claiming a change is done.
+
 ## Hard rules
 
 1. **Docker for every build.** The toolchain image pins Ubuntu by digest, its
@@ -116,6 +119,12 @@ and false positives, and it starts full screen on macOS.
   macOS.
 - **A Neo Geo BIOS** is needed only to run an emulator, never to build, and is
   never committed or downloaded by a script.
+
+## Capture rather than ask
+
+When something is wrong on screen, capture the emulator, cut the recording
+into frames and read them. Ask only when that loop has run and cannot settle
+the question, and say what it showed.
 
 ## The Power of 10, as applied here
 

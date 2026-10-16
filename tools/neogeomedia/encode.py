@@ -25,6 +25,7 @@ from typing import Final
 
 import numpy as np
 import numpy.typing as npt
+from fmvcore import colour
 
 from neogeomedia import crom, neocolor, palettes, stream
 from neogeomedia.dictionary import TileDictionary, TileRef
@@ -33,6 +34,7 @@ GRID_COLS: Final = stream.GRID_COLS
 GRID_ROWS: Final = stream.GRID_ROWS
 SLOT_COUNT: Final = stream.SLOT_COUNT
 TILE_PX: Final = 16
+BLURRED_EVERY: Final = 8
 FRAME_WIDTH: Final = GRID_COLS * TILE_PX
 FRAME_HEIGHT: Final = GRID_ROWS * TILE_PX
 
@@ -78,6 +80,7 @@ class EncodeStats:
     mean_updates: float
     mean_error: float
     displayed_error: float
+    blurred_error: float
     peak_tolerance: float
     budget_exceeded: bool
     truncated: bool
@@ -336,6 +339,8 @@ class _Totals:
     error_pixels: int = 0
     displayed_error_total: float = 0.0
     displayed_frames: int = 0
+    blurred_error_total: float = 0.0
+    blurred_frames: int = 0
     peak_tolerance: float = 0.0
 
     def track_tolerance(self, tolerance: float) -> float:
@@ -374,6 +379,9 @@ def _build_stats(
             (totals.displayed_error_total / totals.displayed_frames)
             if totals.displayed_frames
             else 0.0
+        ),
+        blurred_error=(
+            (totals.blurred_error_total / totals.blurred_frames) if totals.blurred_frames else 0.0
         ),
         peak_tolerance=totals.peak_tolerance,
         budget_exceeded=bool(budget > 0 and tile_count >= budget),
@@ -615,10 +623,19 @@ def _record_frame(
     """Score this frame and hand the picture to whoever wants it."""
     totals.displayed_error_total += screen.fidelity(incoming)
     totals.displayed_frames += 1
+    if index % BLURRED_EVERY == 0:
+        totals.blurred_error_total += _blurred(screen.render, incoming)
+        totals.blurred_frames += 1
     if options.collect_rendered:
         rendered[index] = from_tiles(screen.render)
     if on_render is not None:
         on_render(from_tiles(screen.render))
+
+
+def _blurred(shown: npt.NDArray[np.uint16], wanted: npt.NDArray[np.uint16]) -> float:
+    shown_rgb = neocolor.color_index_to_rgb(from_tiles(shown))
+    wanted_rgb = neocolor.color_index_to_rgb(from_tiles(wanted))
+    return colour.blurred_error(shown_rgb[None], wanted_rgb[None])
 
 
 def encode_stream(

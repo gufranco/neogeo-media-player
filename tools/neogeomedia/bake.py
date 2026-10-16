@@ -426,6 +426,7 @@ class BakeOutcome:
             "truncated": stats.truncated,
             "rate_control_exhausted": stats.rate_control_exhausted,
             "displayed_error": stats.displayed_error,
+            "blurred_error": stats.blurred_error,
             "projected_crom_bytes_per_minute": round(crom_per_minute),
             "projected_stream_bytes_per_minute": round(stream_per_minute),
             "projected_minutes_per_crom_bank": round(CROM_BANK_BYTES / crom_per_minute, 2),

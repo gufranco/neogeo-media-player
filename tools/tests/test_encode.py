@@ -823,3 +823,26 @@ class TestBudgetIsNotOverspent:
         held = encode.encode(clip, options_for(keyframe_interval=1000, tile_budget=budget))
 
         assert len(held.dictionary) <= budget
+
+
+class TestBlurredError:
+    def test_a_flat_clip_the_palette_holds_exactly_scores_zero(self):
+        # Arrange
+        clip = flat_clip(4, (0, 0, 0))
+
+        # Act
+        result = encode.encode(clip, options())
+
+        # Assert
+        assert result.stats.blurred_error == 0.0
+
+    def test_a_clip_with_more_colours_than_the_palettes_scores_above_zero(self):
+        # Arrange
+        rng = np.random.default_rng(7)
+        clip = rng.integers(0, 256, size=(2, HEIGHT, WIDTH, 3), dtype=np.uint8)
+
+        # Act
+        result = encode.encode(clip, options())
+
+        # Assert
+        assert result.stats.blurred_error > 0.0

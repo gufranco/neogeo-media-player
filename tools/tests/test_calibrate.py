@@ -1,105 +1,142 @@
 from __future__ import annotations
 
 import itertools
-import subprocess
 
 import pytest
 
 from neogeomedia import calibrate, quality
+from tests.bakehelp import lavfi_clip
 
 
 @pytest.fixture(scope="module")
 def synthetic_clip(tmp_path_factory):
     path = tmp_path_factory.mktemp("calibrate") / "source.mp4"
-    subprocess.run(
-        [
-            "ffmpeg",
-            "-v",
-            "error",
-            "-f",
-            "lavfi",
-            "-i",
-            "testsrc=size=640x480:rate=24:duration=12",
-            "-pix_fmt",
-            "yuv420p",
-            str(path),
-        ],
-        check=True,
-    )
-    return path
+    return lavfi_clip(path, "testsrc=size=640x480:rate=24:duration=12")
 
 
 class TestSampleWindows:
     def test_it_returns_the_requested_count(self):
-        windows = calibrate.sample_windows(600.0, count=6, seconds=5.0)
+        # Arrange
+        duration = 600.0
 
+        # Act
+        windows = calibrate.sample_windows(duration, count=6, seconds=5.0)
+
+        # Assert
         assert len(windows) == 6
 
     def test_the_windows_are_spread_across_the_source(self):
-        windows = calibrate.sample_windows(600.0, count=4, seconds=5.0)
-        starts = [start for start, _ in windows]
+        # Arrange
+        duration = 600.0
 
-        assert starts == sorted(starts)
-        assert starts[0] < 150.0
-        assert starts[-1] > 400.0
+        # Act
+        windows = calibrate.sample_windows(duration, count=4, seconds=5.0)
+
+        # Assert
+        assert [start for start, _ in windows] == [72.5, 222.5, 372.5, 522.5]
 
     def test_no_window_runs_past_the_end(self):
-        windows = calibrate.sample_windows(20.0, count=4, seconds=5.0)
+        # Arrange
+        duration = 20.0
 
-        for start, seconds in windows:
-            assert start + seconds <= 20.0
+        # Act
+        windows = calibrate.sample_windows(duration, count=4, seconds=5.0)
+
+        # Assert
+        assert windows == [(0.0, 5.0), (5.0, 5.0), (10.0, 5.0), (15.0, 5.0)]
+        assert all(start + seconds <= duration for start, seconds in windows)
 
     def test_a_source_shorter_than_one_window_yields_the_whole_source(self):
-        windows = calibrate.sample_windows(3.0, count=6, seconds=5.0)
+        # Arrange
+        duration = 3.0
 
+        # Act
+        windows = calibrate.sample_windows(duration, count=6, seconds=5.0)
+
+        # Assert
         assert windows == [(0.0, 3.0)]
 
     def test_windows_do_not_overlap(self):
-        windows = calibrate.sample_windows(60.0, count=6, seconds=5.0)
+        # Arrange
+        duration = 60.0
 
-        for (start, seconds), (next_start, _) in itertools.pairwise(windows):
-            assert start + seconds <= next_start + 1e-9
+        # Act
+        windows = calibrate.sample_windows(duration, count=6, seconds=5.0)
+
+        # Assert
+        assert [start for start, _ in windows] == [2.5, 12.5, 22.5, 32.5, 42.5, 52.5]
+        assert all(
+            start + seconds <= next_start + 1e-9
+            for (start, seconds), (next_start, _) in itertools.pairwise(windows)
+        )
 
 
 class TestMeasureReferenceRate:
     def test_it_reports_a_positive_tile_rate(self, synthetic_clip):
-        rate = calibrate.measure_reference_rate(synthetic_clip, count=2, seconds=1.0)
+        # Arrange
+        source = synthetic_clip
 
+        # Act
+        rate = calibrate.measure_reference_rate(source, count=2, seconds=1.0)
+
+        # Assert
         assert rate > 0.0
 
     def test_the_rate_feeds_tier_selection(self, synthetic_clip):
+        # Arrange
         rate = calibrate.measure_reference_rate(synthetic_clip, count=2, seconds=1.0)
+        tier = quality.tier_by_name("standard")
 
-        assert quality.max_minutes(quality.tier_by_name("standard"), rate) > 0.0
+        # Act
+        minutes = quality.max_minutes(tier, rate)
+
+        # Assert
+        assert minutes > 0.0
 
 
 class TestSampledRange:
     def test_it_measures_only_the_stretch_that_will_be_baked(self, synthetic_clip):
-        whole = calibrate.measure_reference_rate(synthetic_clip, count=2, seconds=1.0)
-        slice_only = calibrate.measure_reference_rate(
-            synthetic_clip, count=2, seconds=1.0, start=8.0, duration=4.0
+        # Arrange
+        source = synthetic_clip
+
+        # Act
+        rate = calibrate.measure_reference_rate(
+            source, count=2, seconds=1.0, start=8.0, duration=4.0
         )
 
-        assert whole > 0.0
-        assert slice_only > 0.0
+        # Assert
+        assert rate > 0.0
 
     def test_a_duration_beyond_the_source_is_clamped(self, synthetic_clip):
+        # Arrange
+        source = synthetic_clip
+
+        # Act
         rate = calibrate.measure_reference_rate(
-            synthetic_clip, count=2, seconds=1.0, start=0.0, duration=9999.0
+            source, count=2, seconds=1.0, start=0.0, duration=9999.0
         )
 
+        # Assert
         assert rate > 0.0
 
 
 class TestSampleWindowValidation:
-    def test_a_non_positive_duration_is_rejected(self):
-        with pytest.raises(ValueError, match="duration must be positive"):
-            calibrate.sample_windows(0.0, count=2, seconds=1.0)
+    @pytest.mark.parametrize(
+        ("duration", "count", "seconds", "message"),
+        [
+            (0.0, 2, 1.0, "duration must be positive, got 0.0"),
+            (10.0, 0, 1.0, "sample count must be at least one, got 0"),
+            (10.0, 2, 0.0, "sample seconds must be positive, got 0.0"),
+        ],
+        ids=["duration", "count", "seconds"],
+    )
+    def test_an_impossible_request_is_rejected(self, duration, count, seconds, message):
+        # Arrange
+        request = {"count": count, "seconds": seconds}
 
-    def test_a_count_below_one_is_rejected(self):
-        with pytest.raises(ValueError, match="at least one"):
-            calibrate.sample_windows(10.0, count=0, seconds=1.0)
+        # Act
+        with pytest.raises(ValueError) as raised:
+            calibrate.sample_windows(duration, **request)
 
-    def test_non_positive_window_seconds_are_rejected(self):
-        with pytest.raises(ValueError, match="seconds must be positive"):
-            calibrate.sample_windows(10.0, count=2, seconds=0.0)
+        # Assert
+        assert str(raised.value) == message

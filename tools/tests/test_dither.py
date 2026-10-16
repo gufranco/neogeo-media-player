@@ -4,6 +4,8 @@ import numpy as np
 
 from neogeomedia import palettes
 
+THREE_ENTRIES = [0, 0x1000, 0x7FFF]
+
 
 def a_ramp_tile(low: int, high: int) -> np.ndarray:
     row = np.linspace(low, high, palettes.TILE_PX, dtype=np.float64)
@@ -17,74 +19,113 @@ def a_palette_set(colors: list[int]) -> palettes.PaletteSet:
     return palettes.PaletteSet(colors=entries, base_bank=16)
 
 
+def dithering() -> palettes.PaletteAssigner:
+    return palettes.PaletteAssigner(a_palette_set(THREE_ENTRIES), dither=True)
+
+
 class TestTheThresholdField:
     def test_it_covers_a_whole_tile(self):
+        # Arrange
+        expected = (16, 16)
+
+        # Act
         field = palettes.bayer_thresholds()
 
-        assert field.shape == (palettes.TILE_PX, palettes.TILE_PX)
+        # Assert
+        assert field.shape == expected
 
     def test_it_stays_inside_the_unit_interval(self):
+        # Arrange
+        low, high = 0.0, 1.0
+
+        # Act
         field = palettes.bayer_thresholds()
 
-        assert field.min() > 0.0
-        assert field.max() < 1.0
+        # Assert
+        assert field.min() > low
+        assert field.max() < high
 
     def test_it_repeats_on_a_period_that_divides_a_tile(self):
+        # Arrange
+        period = 8
+
+        # Act
         field = palettes.bayer_thresholds()
 
-        assert np.array_equal(field[:8, :8], field[8:, 8:])
-        assert np.array_equal(field[:8, :8], field[8:, :8])
+        # Assert
+        assert np.array_equal(field[:period, :period], field[period:, period:])
+        assert np.array_equal(field[:period, :period], field[period:, :period])
 
     def test_every_level_appears_equally_often(self):
-        _, counts = np.unique(palettes.bayer_thresholds(), return_counts=True)
+        # Arrange
+        repeats_per_tile = 4
 
-        assert set(counts.tolist()) == {4}
+        # Act
+        field = palettes.bayer_thresholds()
+
+        # Assert
+        _, counts = np.unique(field, return_counts=True)
+        assert set(counts.tolist()) == {repeats_per_tile}
 
 
 class TestItKeepsTilesInternable:
     def test_two_identical_tiles_still_quantise_identically(self):
+        # Arrange
         tiles = np.stack([a_ramp_tile(0, 0x7FFF)] * 2)
-        assigner = palettes.PaletteAssigner(a_palette_set([0, 0x1000, 0x7FFF]), dither=True)
+        assigner = dithering()
 
+        # Act
         out = assigner.assign(tiles)
 
+        # Assert
         assert np.array_equal(out.nibbles[0], out.nibbles[1])
 
     def test_a_tile_quantises_the_same_wherever_it_sits_in_the_frame(self):
+        # Arrange
         one = a_ramp_tile(0, 0x7FFF)
         other = a_ramp_tile(0x2000, 0x5000)
-        assigner = palettes.PaletteAssigner(a_palette_set([0, 0x1000, 0x7FFF]), dither=True)
+        assigner = dithering()
+        elsewhere = assigner.assign(np.stack([other, one]))
 
+        # Act
         first = assigner.assign(np.stack([one, other, one]))
-        second = assigner.assign(np.stack([other, one]))
 
+        # Assert
         assert np.array_equal(first.nibbles[0], first.nibbles[2])
-        assert np.array_equal(first.nibbles[0], second.nibbles[1])
+        assert np.array_equal(first.nibbles[0], elsewhere.nibbles[1])
 
 
 class TestItActuallyDithers:
     def test_a_gradient_gains_intermediate_levels(self):
+        # Arrange
         tiles = a_ramp_tile(0, 0x7FFF)[None, :, :]
-        palette = a_palette_set([0, 0x1000, 0x7FFF])
+        plain = palettes.PaletteAssigner(a_palette_set(THREE_ENTRIES)).assign(tiles)
 
-        plain = palettes.PaletteAssigner(palette).assign(tiles)
-        mixed = palettes.PaletteAssigner(palette, dither=True).assign(tiles)
+        # Act
+        mixed = dithering().assign(tiles)
 
+        # Assert
         assert len(np.unique(mixed.nibbles)) >= len(np.unique(plain.nibbles))
 
     def test_a_colour_sitting_on_a_palette_entry_is_never_swapped(self):
+        # Arrange
         flat = np.full((1, palettes.TILE_PX, palettes.TILE_PX), 0x1000, dtype=np.uint16)
-        assigner = palettes.PaletteAssigner(a_palette_set([0, 0x1000, 0x7FFF]), dither=True)
+        assigner = dithering()
 
+        # Act
         out = assigner.assign(flat)
 
+        # Assert
         assert len(np.unique(out.nibbles)) == 1
 
     def test_leaving_it_off_changes_nothing(self):
+        # Arrange
         tiles = a_ramp_tile(0, 0x7FFF)[None, :, :]
-        palette = a_palette_set([0, 0x1000, 0x7FFF])
-
+        palette = a_palette_set(THREE_ENTRIES)
         before = palettes.PaletteAssigner(palette).assign(tiles)
+
+        # Act
         after = palettes.PaletteAssigner(palette, dither=False).assign(tiles)
 
+        # Assert
         assert np.array_equal(before.nibbles, after.nibbles)

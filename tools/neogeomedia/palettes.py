@@ -108,13 +108,13 @@ class Assignment:
 def _two_nearest(
     distance: npt.NDArray[np.float32], strength: float
 ) -> tuple[npt.NDArray[np.uint8], npt.NDArray[np.uint8], npt.NDArray[np.uint8]]:
-    pair = np.argpartition(distance, 1, axis=1)[:, :2]
-    picked = np.take_along_axis(distance, pair, axis=1)
-    swapped = picked[:, 0] > picked[:, 1]
-    nearest = np.where(swapped, pair[:, 1], pair[:, 0])
-    runner = np.where(swapped, pair[:, 0], pair[:, 1])
-    near = np.sqrt(np.minimum(picked[:, 0], picked[:, 1]))
-    far = np.sqrt(np.maximum(picked[:, 0], picked[:, 1]))
+    rows = np.arange(distance.shape[0])
+    nearest = np.argmin(distance, axis=1)
+    others = distance.copy()
+    others[rows, nearest] = np.inf
+    runner = np.argmin(others, axis=1)
+    near = np.sqrt(distance[rows, nearest])
+    far = np.sqrt(others[rows, runner])
     total = near + far
     share = np.divide(near, total, out=np.zeros_like(near), where=total > 0.0)
     return (

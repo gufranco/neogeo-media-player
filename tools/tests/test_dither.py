@@ -140,6 +140,30 @@ def swapped_pixels(strength: float) -> int:
     return int(np.count_nonzero(plain.nibbles != mixed.nibbles))
 
 
+class TestTies:
+    def test_a_tie_takes_the_first_entry_as_the_undithered_choice_does(self):
+        # Arrange
+        rng = np.random.default_rng(7)
+        base = rng.random((4096, 8), dtype=np.float32)
+        distance = np.concatenate([base, base], axis=1)[:, rng.permutation(16)]
+
+        # Act
+        nearest, _, _ = palettes._two_nearest(distance, palettes.MAX_DITHER)
+
+        # Assert
+        assert np.array_equal(nearest, np.argmin(distance, axis=1))
+
+    def test_the_runner_up_is_never_the_nearest(self):
+        # Arrange
+        distance = np.array([[1.0, 1.0, 5.0], [3.0, 1.0, 1.0]], dtype=np.float32)
+
+        # Act
+        nearest, runner, _ = palettes._two_nearest(distance, palettes.MAX_DITHER)
+
+        # Assert
+        assert (nearest.tolist(), runner.tolist()) == ([0, 1], [1, 2])
+
+
 class TestStrength:
     def test_a_weaker_dither_swaps_fewer_pixels_than_a_full_one(self):
         # Arrange

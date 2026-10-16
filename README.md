@@ -131,7 +131,7 @@ none does today.
 | A silent build that gives sound's room to the picture | Partly. A library bundle can leave sound out; sound has its own ROM, so leaving it out frees no picture room | Yes, `--silent` |
 | Subtitles from a SubRip file | Yes | Yes, burned into the picture, so they cannot be switched off |
 | Play and pause | Yes | Yes. Pause on the console, Start on a Game Gear |
-| Fast forward and rewind | Yes, forward at 2x, 5x and 10x | Planned |
+| Fast forward and rewind | Yes, forward at 2x, 5x and 10x | Not possible: the replay already spends about 90% of every field moving one frame, so it cannot move two; Left and Right jump between seek points instead |
 | Seek | Yes, 10 seconds back or forward | Yes, Left and Right jump between points 10 seconds apart |
 | A position bar with elapsed and total time | Yes | Yes, while paused |
 | Restart and stop | Yes | Yes |
@@ -139,7 +139,7 @@ none does today.
 | The film loops at the end | Yes | Yes |
 | A diagnostics overlay | Yes | Yes, button 1 while paused |
 | A fault screen for a corrupt stream | Yes | Yes |
-| A film inside your own game | Yes, `--bundle` emits a drop-in library | Partly. `--rows` and `--columns` build a smaller picture; there is no drop-in bundle yet |
+| A film inside your own game | Yes, `--bundle` emits a drop-in library | Yes, `--bundle` emits a drop-in library and `examples/cutscene` builds a game from it |
 | A preview of what the console will draw | Yes, a video | Yes, a video, or four frames beside their source |
 | A write-timing gate on every build | Yes | Yes |
 | A regression set of films baked on every test run | Yes, six films | Yes, six films |

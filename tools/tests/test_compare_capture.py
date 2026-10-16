@@ -1,28 +1,39 @@
 from __future__ import annotations
 
-import importlib.util
-import sys
+import json
 from pathlib import Path
 
 import numpy as np
 import pytest
-from fmvcore.testing import SEED
+from fmvcore.testing import SEED, seeded
 
-SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+from neogeomedia import frames
+from tests.bakehelp import lavfi_clip
+from tests.scripthelp import build_core, load_script
+
 FRAMES = 40
 HEIGHT = 224
 WIDTH = 304
+OVERSCAN_SIDE = 8
 LAG = 3
+FILM_SECONDS = 0.5
+FILM_FRAMES = 29
 
 
 @pytest.fixture(scope="module")
 def compare():
-    spec = importlib.util.spec_from_file_location("compare_capture", SCRIPTS / "compare_capture.py")
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    return load_script("compare_capture")
+
+
+@pytest.fixture(scope="module")
+def film_core(tmp_path_factory):
+    return build_core("filmcore.c", tmp_path_factory.mktemp("filmcore"))
+
+
+@pytest.fixture(scope="module")
+def film(tmp_path_factory):
+    path = tmp_path_factory.mktemp("film") / "film.mkv"
+    return lavfi_clip(path, "testsrc2=size=320x224:rate=15625/264:duration=1")
 
 
 @pytest.fixture
@@ -33,6 +44,22 @@ def source() -> np.ndarray:
 
 def delayed(source: np.ndarray, lag: int) -> np.ndarray:
     return np.concatenate([np.repeat(source[:1], lag, axis=0), source[:-lag]])
+
+
+def late_cartridge(film: Path, out: Path, *, lead: int) -> Path:
+    raster = frames.decode(film, start=0.0, duration=FILM_SECONDS)
+    played = delayed(raster[:, :, OVERSCAN_SIDE : 320 - OVERSCAN_SIDE], LAG)
+    boot = np.zeros((lead, HEIGHT, WIDTH, 3), dtype=np.uint8)
+    out.write_bytes(np.concatenate([boot, played]).tobytes())
+    return out
+
+
+def compare_argv(film: Path, core: Path, cartridge: Path, *, lead: int) -> list[str]:
+    return [
+        *("--rom", str(cartridge), "--source", str(film), "--core", str(core)),
+        *("--system-dir", str(cartridge.parent), "--duration", str(FILM_SECONDS)),
+        *("--film-frame", str(lead)),
+    ]
 
 
 class TestMeasure:
@@ -99,3 +126,47 @@ class TestCrop:
 
         # Assert
         assert str(refused.value) == "a capture 301 pixels wide is not 320 less an even overscan"
+
+
+class TestTheCommand:
+    def test_a_late_cartridge_reports_its_lag_and_no_error(
+        self, compare, film_core, film, tmp_path, capsys
+    ):
+        # Arrange
+        lead = seeded().random_int(1, 20)
+        cartridge = late_cartridge(film, tmp_path / "late.rgb", lead=lead)
+
+        # Act
+        compare.main(compare_argv(film, film_core, cartridge, lead=lead))
+
+        # Assert
+        report = json.loads(capsys.readouterr().out)
+        assert (report["frames"], report["lag_median_frames"]) == (FILM_FRAMES, LAG)
+        assert (report["frame_error"], report["blurred_frame_error"]) == (0.0, 0.0)
+
+    def test_the_report_is_also_written_where_asked(
+        self, compare, film_core, film, tmp_path, capsys
+    ):
+        # Arrange
+        cartridge = late_cartridge(film, tmp_path / "late.rgb", lead=1)
+        written = tmp_path / "report" / "compare.json"
+        written.parent.mkdir()
+        argv = [*compare_argv(film, film_core, cartridge, lead=1), "--json", str(written)]
+
+        # Act
+        compare.main(argv)
+
+        # Assert
+        assert written.read_text() == capsys.readouterr().out
+
+    def test_a_run_without_a_film_frame_is_refused(self, compare, film, capsys):
+        # Arrange
+        argv = ["--source", str(film), "--duration", str(FILM_SECONDS)]
+
+        # Act
+        with pytest.raises(SystemExit) as refused:
+            compare.main(argv)
+
+        # Assert
+        assert refused.value.code == 2
+        assert "the following arguments are required: --film-frame" in capsys.readouterr().err

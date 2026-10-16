@@ -140,7 +140,7 @@ none does today.
 | A diagnostics overlay | Yes | Planned |
 | A fault screen for a corrupt stream | Yes | Yes |
 | A film inside your own game | Yes, `--bundle` emits a drop-in library | Partly. `--rows` and `--columns` build a smaller picture; there is no drop-in bundle yet |
-| A preview of what the console will draw | Yes, a video | Yes, four frames beside their source |
+| A preview of what the console will draw | Yes, a video | Yes, a video, or four frames beside their source |
 | A write-timing gate on every build | Yes | Yes |
 | A regression set of films baked on every test run | Yes, six films | Yes, six films |
 | Run on the original hardware | Yes, AES and MVS | Not yet. A Game Gear run is pending |

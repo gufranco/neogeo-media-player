@@ -56,246 +56,318 @@ def _write(root, **overrides):
     )
 
 
+def _fragment(root, **overrides):
+    return _write(root, **overrides).makefile.read_text()
+
+
+def _guide(root, **overrides):
+    return _write(root, **overrides).guide.read_text()
+
+
+def _script(root):
+    layout = _write(root)
+    return layout.root / bundle.PACKAGER_DIR_NAME / bundle.PACKAGER_SCRIPT
+
+
 class TestLibrarySource:
     def test_it_carries_every_library_source(self, tmp_path):
+        # Arrange
+        names = bundle.LIBRARY_SOURCES
+
+        # Act
         layout = _write(tmp_path)
 
-        for name in bundle.LIBRARY_SOURCES:
-            assert (layout.library / name).is_file(), name
+        # Assert
+        assert [name for name in names if not (layout.library / name).is_file()] == []
 
     def test_it_carries_the_reference_sound_driver(self, tmp_path):
+        # Arrange
+        driver = "sound.s"
+
+        # Act
         layout = _write(tmp_path)
 
-        assert (layout.library / "sound.s").is_file()
+        # Assert
+        assert (layout.library / driver).is_file()
 
     def test_a_missing_library_source_is_an_error(self, tmp_path):
+        # Arrange
         library = _library(tmp_path)
         (library / "fmv.c").unlink()
 
-        with pytest.raises(FileNotFoundError):
+        # Act
+        with pytest.raises(FileNotFoundError) as raised:
             _write(tmp_path, library_root=library)
+
+        # Assert
+        assert "fmv.c" in str(raised.value)
 
 
 class TestMovieData:
     def test_it_carries_the_generated_sources(self, tmp_path):
+        # Arrange
+        names = bundle.GENERATED_SOURCES
+
+        # Act
         layout = _write(tmp_path)
 
-        for name in bundle.GENERATED_SOURCES:
-            assert (layout.movie / name).is_file(), name
+        # Assert
+        assert [name for name in names if not (layout.movie / name).is_file()] == []
 
     def test_it_carries_one_stub_per_stream_bank(self, tmp_path):
-        layout = _write(tmp_path, banks=3, stream_banks=3)
+        # Arrange
+        banks = 3
 
-        stubs = sorted(layout.movie.glob(bundle.STREAM_BANK_GLOB))
+        # Act
+        layout = _write(tmp_path, banks=banks, stream_banks=banks)
 
-        assert len(stubs) == 3
+        # Assert
+        assert len(sorted(layout.movie.glob(bundle.STREAM_BANK_GLOB))) == banks
 
     def test_it_carries_every_baked_asset(self, tmp_path):
+        # Arrange
+        names = bundle.BAKED_ASSETS
+
+        # Act
         layout = _write(tmp_path)
 
-        for name in bundle.BAKED_ASSETS:
-            assert (layout.movie / name).is_file(), name
+        # Assert
+        assert [name for name in names if not (layout.movie / name).is_file()] == []
 
     def test_a_silent_bake_leaves_the_voice_rom_out(self, tmp_path):
-        layout = _write(tmp_path, audio=False)
+        # Arrange
+        audio = False
 
+        # Act
+        layout = _write(tmp_path, audio=audio)
+
+        # Assert
         assert not (layout.movie / "v2.bin").exists()
         assert layout.has_audio is False
 
     def test_a_bake_with_sound_carries_the_voice_rom(self, tmp_path):
-        layout = _write(tmp_path)
+        # Arrange
+        audio = True
 
+        # Act
+        layout = _write(tmp_path, audio=audio)
+
+        # Assert
         assert (layout.movie / "v2.bin").is_file()
         assert layout.has_audio is True
 
     def test_a_missing_asset_is_an_error(self, tmp_path):
+        # Arrange
         build = _build(tmp_path)
         (build / "baked" / "index.bin").unlink()
 
-        with pytest.raises(FileNotFoundError):
+        # Act
+        with pytest.raises(FileNotFoundError) as raised:
             _write(tmp_path, build_dir=build)
 
+        # Assert
+        assert "index.bin" in str(raised.value)
+
     def test_a_bank_count_that_disagrees_with_the_bake_is_an_error(self, tmp_path):
-        with pytest.raises(ValueError, match="stream bank"):
-            _write(tmp_path, banks=1, stream_banks=2)
+        # Arrange
+        emitted, reported = 1, 2
+
+        # Act
+        with pytest.raises(ValueError) as raised:
+            _write(tmp_path, banks=emitted, stream_banks=reported)
+
+        # Assert
+        assert "stream bank" in str(raised.value)
 
 
 class TestMakeFragment:
     def test_it_writes_a_make_fragment(self, tmp_path):
+        # Arrange
+        name = "fmv.mk"
+
+        # Act
         layout = _write(tmp_path)
 
+        # Assert
         assert layout.makefile.is_file()
-        assert layout.makefile.name == "fmv.mk"
+        assert layout.makefile.name == name
 
     def test_the_fragment_accounts_for_every_bank(self, tmp_path):
-        layout = _write(tmp_path, banks=2, stream_banks=2)
+        # Arrange
+        banks = 2
 
-        text = layout.makefile.read_text()
+        # Act
+        text = _fragment(tmp_path, banks=banks, stream_banks=banks)
 
+        # Assert
         assert "FMV_BANK_NUMBERS = 0 1" in text
         assert "FMV_STREAM_BANKS = 2" in text
 
-    def test_the_fragment_builds_an_object_for_each_bank_stub(self, tmp_path):
-        layout = _write(tmp_path)
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "fmv_stream__bank$(bank).o",
+            "fmv_stream__bank%.S",
+            "$(M68KGCC) $(NGCFLAGS) $(CFLAGS)",
+            "SRCDIRS += $(FMV_SRC) $(FMV_MOVIE)",
+            "-DFMV_NO_AUDIO",
+            "fmv_audio.o",
+            "fmv_stream_base",
+            "FMV_FIRST_BANK ?=",
+            "FMV_CROM_BYTES = 4194304",
+            "FMV_FIRST_FREE_TILE = 33142",
+            f"FMV_FREE_TILES = {(4194304 - 33142 * 64) // 64}",
+            f"FMV_VROM_BYTES = {1 << 20}",
+            "FMV_TOTAL_BANKS = $(shell expr $(FMV_FIRST_BANK) + $(FMV_STREAM_BANKS))",
+            "FMV_PROM2_BYTES = $(shell expr $(FMV_TOTAL_BANKS) \\* 1048576)",
+        ],
+    )
+    def test_the_fragment_carries_each_rule_a_project_needs(self, tmp_path, line):
+        # Arrange
+        expected = line
 
-        text = layout.makefile.read_text()
+        # Act
+        text = _fragment(tmp_path)
 
-        assert "fmv_stream__bank$(bank).o" in text
-        assert "fmv_stream__bank%.S" in text
+        # Assert
+        assert expected in text
 
-    def test_the_fragment_supplies_the_assembly_rule_ngdevkit_lacks(self, tmp_path):
-        text = _write(tmp_path).makefile.read_text()
+    def test_a_silent_bake_asks_for_no_voice_rom(self, tmp_path):
+        # Arrange
+        audio = False
 
-        assert "$(M68KGCC) $(NGCFLAGS) $(CFLAGS)" in text
+        # Act
+        text = _fragment(tmp_path, audio=audio)
 
-    def test_the_fragment_adds_its_own_directories_to_the_source_list(self, tmp_path):
-        text = _write(tmp_path).makefile.read_text()
+        # Assert
+        assert "FMV_VROM_BYTES = 0" in text
 
-        assert "SRCDIRS += $(FMV_SRC) $(FMV_MOVIE)" in text
+    def test_a_dictionary_that_fills_the_rom_leaves_no_slack(self, tmp_path):
+        # Arrange
+        full = 4194304
 
-    def test_a_video_only_build_drops_the_audio_object(self, tmp_path):
-        text = _write(tmp_path).makefile.read_text()
+        # Act
+        text = _fragment(tmp_path, crom_payload=full, crom_size=full)
 
-        assert "-DFMV_NO_AUDIO" in text
-        assert "fmv_audio.o" in text
+        # Assert
+        assert "FMV_FREE_TILES = 0" in text
 
-    def test_the_fragment_passes_the_stream_base_to_the_linker(self, tmp_path):
-        layout = _write(tmp_path)
+    def test_the_fragment_reserves_the_banks_the_caller_owns(self, tmp_path):
+        # Arrange
+        rule = "$(foreach bank,$(FMV_ALL_BANK_NUMBERS),$(eval $(PROM2): $(PROM2)_bank$(bank)))"
 
-        assert "fmv_stream_base" in layout.makefile.read_text()
+        # Act
+        text = _fragment(tmp_path, banks=2, stream_banks=2)
 
-    def test_the_fragment_lets_the_caller_choose_the_first_bank(self, tmp_path):
-        layout = _write(tmp_path)
-
-        assert "FMV_FIRST_BANK ?=" in layout.makefile.read_text()
+        # Assert
+        assert "FMV_ALL_BANK_NUMBERS" in text
+        assert rule in text
 
 
 class TestThePackagers:
     def test_it_carries_a_packager_that_can_express_adpcm_b(self, tmp_path):
+        # Arrange
+        names = bundle.PACKAGERS
+
+        # Act
         layout = _write(tmp_path)
 
-        for name in bundle.PACKAGERS:
-            assert (layout.root / bundle.PACKAGER_DIR_NAME / name).is_file(), name
+        # Assert
+        folder = layout.root / bundle.PACKAGER_DIR_NAME
+        assert [name for name in names if not (folder / name).is_file()] == []
 
     def test_it_carries_the_script_that_drives_them(self, tmp_path):
-        layout = _write(tmp_path)
-        script = layout.root / bundle.PACKAGER_DIR_NAME / bundle.PACKAGER_SCRIPT
+        # Arrange
+        executable = 0o111
 
+        # Act
+        script = _script(tmp_path)
+
+        # Assert
         assert script.is_file()
-        assert script.stat().st_mode & 0o111
+        assert script.stat().st_mode & executable
 
     def test_the_script_joins_both_program_roms(self, tmp_path):
-        layout = _write(tmp_path)
-        text = (layout.root / bundle.PACKAGER_DIR_NAME / bundle.PACKAGER_SCRIPT).read_text()
+        # Arrange
+        lines = ("$ROM_DIR/$GAME-p2.p2", '>> "$STAGE/p1.p1"')
 
-        assert "$ROM_DIR/$GAME-p2.p2" in text
-        assert '>> "$STAGE/p1.p1"' in text
+        # Act
+        text = _script(tmp_path).read_text()
+
+        # Assert
+        assert all(line in text for line in lines)
 
     def test_the_script_finds_the_movie_beside_it(self, tmp_path):
-        layout = _write(tmp_path)
-        text = (layout.root / bundle.PACKAGER_DIR_NAME / bundle.PACKAGER_SCRIPT).read_text()
+        # Arrange
+        expected = f'MOVIE="$HERE/../{bundle.MOVIE_DIR_NAME}"'
 
-        assert f'MOVIE="$HERE/../{bundle.MOVIE_DIR_NAME}"' in text
+        # Act
+        text = _script(tmp_path).read_text()
 
-    def test_the_guide_says_why_they_are_there(self, tmp_path):
-        text = _write(tmp_path).guide.read_text()
-
-        assert "ymsnd:adpcmb" in text
-        assert "package.sh" in text
+        # Assert
+        assert expected in text
 
 
 class TestRomImageSizes:
-    def test_a_payload_inside_a_megabyte_still_takes_one(self):
-        assert bundle.rom_image_size(1) == 1 << 20
+    @pytest.mark.parametrize(
+        ("payload", "size"),
+        [(1, 1 << 20), (833536, 1 << 20), ((1 << 20) + 1, 1 << 21), (1 << 22, 1 << 22)],
+    )
+    def test_a_payload_takes_the_next_power_of_two_from_a_megabyte(self, payload, size):
+        # Arrange
+        expected = size
 
-    def test_a_payload_that_overruns_takes_the_next_power_of_two(self):
-        assert bundle.rom_image_size(833536) == 1 << 20
-        assert bundle.rom_image_size((1 << 20) + 1) == 1 << 21
+        # Act
+        image = bundle.rom_image_size(payload)
 
-    def test_a_payload_already_on_a_power_of_two_is_left_alone(self):
-        assert bundle.rom_image_size(1 << 22) == 1 << 22
-
-    def test_the_fragment_sizes_the_voice_rom_for_the_soundtrack(self, tmp_path):
-        text = _write(tmp_path).makefile.read_text()
-
-        assert f"FMV_VROM_BYTES = {1 << 20}" in text
-
-    def test_a_silent_bake_asks_for_no_voice_rom(self, tmp_path):
-        text = _write(tmp_path, audio=False).makefile.read_text()
-
-        assert "FMV_VROM_BYTES = 0" in text
-
-
-class TestSpaceForTheCallersOwnTiles:
-    def test_the_fragment_states_the_sprite_rom_size(self, tmp_path):
-        text = _write(tmp_path).makefile.read_text()
-
-        assert "FMV_CROM_BYTES = 4194304" in text
-
-    def test_the_fragment_states_where_the_callers_tiles_begin(self, tmp_path):
-        text = _write(tmp_path).makefile.read_text()
-
-        assert "FMV_FIRST_FREE_TILE = 33142" in text
-
-    def test_the_fragment_states_how_many_slots_the_slack_is_worth(self, tmp_path):
-        text = _write(tmp_path).makefile.read_text()
-
-        assert f"FMV_FREE_TILES = {(4194304 - 33142 * 64) // 64}" in text
-
-    def test_a_dictionary_that_fills_the_rom_leaves_no_slack(self, tmp_path):
-        layout = _write(tmp_path, crom_payload=4194304, crom_size=4194304)
-
-        assert "FMV_FREE_TILES = 0" in layout.makefile.read_text()
-
-    def test_the_fragment_reserves_the_banks_the_caller_owns(self, tmp_path):
-        text = _write(tmp_path, banks=2, stream_banks=2).makefile.read_text()
-
-        assert "FMV_ALL_BANK_NUMBERS" in text
-        assert (
-            "$(foreach bank,$(FMV_ALL_BANK_NUMBERS),$(eval $(PROM2): $(PROM2)_bank$(bank)))" in text
-        )
-
-    def test_the_second_program_rom_grows_with_the_first_bank(self, tmp_path):
-        text = _write(tmp_path).makefile.read_text()
-
-        assert "FMV_TOTAL_BANKS = $(shell expr $(FMV_FIRST_BANK) + $(FMV_STREAM_BANKS))" in text
-        assert "FMV_PROM2_BYTES = $(shell expr $(FMV_TOTAL_BANKS) \\* 1048576)" in text
-
-    def test_the_guide_shows_the_callers_tiles_listed_after_the_movies(self, tmp_path):
-        text = _write(tmp_path).guide.read_text()
-
-        assert "$(CROM1): $(FMV_MOVIE)/c1.bin $(BUILDDIR)/assets/my-tiles.c1" in text
-        assert "CROMSIZE = $(FMV_CROM_BYTES)" in text
+        # Assert
+        assert image == expected
 
 
 class TestGuide:
+    @pytest.mark.parametrize(
+        "phrase",
+        [
+            "ymsnd:adpcmb",
+            "package.sh",
+            "$(CROM1): $(FMV_MOVIE)/c1.bin $(BUILDDIR)/assets/my-tiles.c1",
+            "CROMSIZE = $(FMV_CROM_BYTES)",
+            "fmv_defaults",
+            "fmv_play",
+            "fmv_open",
+            "fmv_close",
+            "1.0",
+            "280",
+            "16",
+        ],
+    )
+    def test_the_guide_states_what_a_caller_needs(self, tmp_path, phrase):
+        # Arrange
+        expected = phrase
+
+        # Act
+        text = _guide(tmp_path)
+
+        # Assert
+        assert expected in text
+
     def test_it_writes_an_integration_guide(self, tmp_path):
+        # Arrange
+        name = bundle.GUIDE_NAME
+
+        # Act
         layout = _write(tmp_path)
 
+        # Assert
         assert layout.guide.is_file()
-
-    def test_the_guide_names_the_calls_a_caller_makes(self, tmp_path):
-        text = _write(tmp_path).guide.read_text()
-
-        for call in ("fmv_defaults", "fmv_play", "fmv_open", "fmv_close"):
-            assert call in text, call
-
-    def test_the_guide_states_the_version_the_bundle_was_stamped_with(self, tmp_path):
-        text = _write(tmp_path).guide.read_text()
-
-        assert "1.0" in text
-
-    def test_the_guide_states_what_a_frame_costs(self, tmp_path):
-        text = _write(tmp_path).guide.read_text()
-
-        assert "280" in text
+        assert layout.guide.name == name
 
     def test_the_guide_states_which_tiles_the_movie_owns(self, tmp_path):
-        text = _write(tmp_path).guide.read_text()
+        # Arrange
+        spellings = ("33142", "33,142")
 
-        assert "33142" in text or "33,142" in text
+        # Act
+        text = _guide(tmp_path)
 
-    def test_the_guide_states_which_palettes_the_movie_owns(self, tmp_path):
-        text = _write(tmp_path).guide.read_text()
-
-        assert "16" in text
+        # Assert
+        assert any(spelling in text for spelling in spellings)

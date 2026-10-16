@@ -2111,6 +2111,11 @@ exercises the search. A test that writes it corrupts a committed
 artefact and shows up as an unexplained diff rather than as a
 failure, so the redirect is automatic and opting out is explicit.
 
+#### `epoch_clip`
+
+An epoch cannot be shorter than the palette upload it covers, so a
+clip meant to hold several of them has to be several seconds long.
+
 
 ### [`tests/geolith_model.py`](tests/geolith_model.py)
 
@@ -2143,12 +2148,7 @@ encoder's own model.
 The planner lowers the rate for long movies, so every rate it can pick is checked.
 
 
-### [`tests/test_bake.py`](tests/test_bake.py)
-
-#### `epoch_clip`
-
-An epoch cannot be shorter than the palette upload it covers, so a
-clip meant to hold several of them has to be several seconds long.
+### [`tests/test_bake_epochs.py`](tests/test_bake_epochs.py)
 
 #### `cut_clip`
 
@@ -2172,6 +2172,9 @@ The player writes the next epoch's palettes into the other half of
 CRAM a slice per frame. A boundary that arrives before that finishes
 leaves the half holding the epoch before last, and the picture comes
 back as a checkerboard of two scenes.
+
+
+### [`tests/test_bake_run.py`](tests/test_bake_run.py)
 
 #### `TestTheOverlayNamesTheRungActuallyUsed`
 

@@ -133,7 +133,7 @@ none does today.
 | Play and pause | Yes | Yes. Pause on the console, Start on a Game Gear |
 | Fast forward and rewind | Yes, forward at 2x, 5x and 10x | Planned |
 | Seek | Yes, 10 seconds back or forward | Planned |
-| A position bar with elapsed and total time | Yes | Planned |
+| A position bar with elapsed and total time | Yes | Yes, while paused |
 | Restart and stop | Yes | Yes |
 | Sound on and off | Yes | Yes, Up |
 | The film loops at the end | Yes | Yes |

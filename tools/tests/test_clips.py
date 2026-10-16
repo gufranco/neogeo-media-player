@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import os
+import subprocess
+
 import pytest
 
 from neogeomedia import clips
 
+GIT_HOOK_VARIABLES = frozenset({"GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE", "GIT_PREFIX"})
 CONTENT = {"synthetic", "3d-animation", "hand-drawn-cartoon", "live-action", "animals", "people"}
 
 
@@ -94,3 +98,26 @@ class TestLookups:
 
         # Assert
         assert demanded is True
+
+
+class TestCommittedFilms:
+    def test_every_committed_film_is_tracked_by_git(self):
+        # Arrange
+        committed = [clip for clip in clips.load() if clip.committed]
+
+        # Act
+        untracked = [clip.key for clip in committed if not tracked(clips.path_of(clip))]
+
+        # Assert
+        assert untracked == []
+
+
+def tracked(path) -> bool:
+    outside_a_hook = {k: v for k, v in os.environ.items() if k not in GIT_HOOK_VARIABLES}
+    done = subprocess.run(
+        ("git", "-C", str(path.parent), "ls-files", "--error-unmatch", path.name),
+        capture_output=True,
+        check=False,
+        env=outside_a_hook,
+    )
+    return done.returncode == 0

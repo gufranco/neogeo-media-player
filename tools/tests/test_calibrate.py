@@ -7,11 +7,23 @@ import pytest
 from neogeomedia import calibrate, quality
 from tests.bakehelp import lavfi_clip
 
+BUSY_OVER_BLACK = 10.0
+
 
 @pytest.fixture(scope="module")
 def synthetic_clip(tmp_path_factory):
     path = tmp_path_factory.mktemp("calibrate") / "source.mp4"
     return lavfi_clip(path, "testsrc=size=640x480:rate=24:duration=12")
+
+
+@pytest.fixture(scope="module")
+def half_black_clip(tmp_path_factory):
+    path = tmp_path_factory.mktemp("calibrate") / "half-black.mp4"
+    chain = (
+        "testsrc=size=640x480:rate=24:duration=12,"
+        "drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill:enable='lt(t,8)'"
+    )
+    return lavfi_clip(path, chain)
 
 
 class TestSampleWindows:
@@ -95,17 +107,19 @@ class TestMeasureReferenceRate:
 
 
 class TestSampledRange:
-    def test_it_measures_only_the_stretch_that_will_be_baked(self, synthetic_clip):
+    def test_it_measures_only_the_stretch_that_will_be_baked(self, half_black_clip):
         # Arrange
-        source = synthetic_clip
+        black = calibrate.measure_reference_rate(
+            half_black_clip, count=2, seconds=1.0, start=0.0, duration=8.0
+        )
 
         # Act
-        rate = calibrate.measure_reference_rate(
-            source, count=2, seconds=1.0, start=8.0, duration=4.0
+        busy = calibrate.measure_reference_rate(
+            half_black_clip, count=2, seconds=1.0, start=8.0, duration=4.0
         )
 
         # Assert
-        assert rate > 0.0
+        assert busy > BUSY_OVER_BLACK * black
 
     def test_a_duration_beyond_the_source_is_clamped(self, synthetic_clip):
         # Arrange

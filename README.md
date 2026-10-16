@@ -132,7 +132,7 @@ none does today.
 | Subtitles from a SubRip file | Yes | Yes, burned into the picture, so they cannot be switched off |
 | Play and pause | Yes | Yes. Pause on the console, Start on a Game Gear |
 | Fast forward and rewind | Yes, forward at 2x, 5x and 10x | Planned |
-| Seek | Yes, 10 seconds back or forward | Planned |
+| Seek | Yes, 10 seconds back or forward | Yes, Left and Right jump between points 10 seconds apart |
 | A position bar with elapsed and total time | Yes | Yes, while paused |
 | Restart and stop | Yes | Yes |
 | Sound on and off | Yes | Yes, Up |

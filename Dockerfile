@@ -1,15 +1,15 @@
-FROM ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55 AS toolchain
+FROM ubuntu:26.04@sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7 AS toolchain
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN printf 'Acquire::Retries "8";\nAcquire::http::Timeout "60";\nAcquire::https::Timeout "60";\n' > /etc/apt/apt.conf.d/80retries
 
 ARG UBUNTU_SNAPSHOT=20261014T000000Z
-ARG CA_CERTIFICATES=20260601~24.04.1
+ARG CA_CERTIFICATES=20260601~26.04.1
 ARG PPA_POOL=https://ppa.launchpadcontent.net/dciabrin/ngdevkit/ubuntu/pool/main/n
-ARG NGDEVKIT_TOOLCHAIN=ngdevkit-toolchain/ngdevkit-toolchain_0.1%2b202606181616-15%7eubuntu24.04.1_amd64.deb
-ARG NGDEVKIT=ngdevkit/ngdevkit_0.5%2b202607191609-17%7eubuntu24.04.1_amd64.deb
-ARG NGDEVKIT_GNGEO=ngdevkit-gngeo/ngdevkit-gngeo_0.8.1%2b202607271849-11%7eubuntu24.04.1_amd64.deb
+ARG NGDEVKIT_TOOLCHAIN=ngdevkit-toolchain/ngdevkit-toolchain_0.1%2b202606181616-15%7eubuntu26.04.1_amd64.deb
+ARG NGDEVKIT=ngdevkit/ngdevkit_0.5%2b202607191609-17%7eubuntu26.04.1_amd64.deb
+ARG NGDEVKIT_GNGEO=ngdevkit-gngeo/ngdevkit-gngeo_0.8.1%2b202607271849-11%7eubuntu26.04.1_amd64.deb
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends "ca-certificates=${CA_CERTIFICATES}" \

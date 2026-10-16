@@ -393,8 +393,6 @@ class TestReconstruction:
 
 
 class TestStreamingIsBounded:
-    """A feature-length preview must not be held in memory to search it."""
-
     def test_it_yields_frames_one_at_a_time(self, tmp_path):
         preview = tmp_path / "ref.mkv"
         write_lossless(preview, make_frames(4, seed=3))

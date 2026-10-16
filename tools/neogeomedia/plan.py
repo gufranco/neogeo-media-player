@@ -1,12 +1,3 @@
-"""Report what a source can become on a cartridge, without baking it.
-
-Calibrating takes well under a minute while a full bake takes hours, so
-this exists to answer the question that decides the bake: what quality
-is reachable, and what would trimming the source buy. Everything it
-learns is printed rather than acted on, because shortening a film is the
-owner's decision and not the baker's.
-"""
-
 from __future__ import annotations
 
 import argparse

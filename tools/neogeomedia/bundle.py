@@ -1,16 +1,3 @@
-"""Emit a folder a game project drops in to get a movie into its cart.
-
-Everything ships as source. The library is copied rather than installed,
-so the copy a developer holds is pinned to the bake that produced it,
-and a mismatch between the two announces itself at compile time instead
-of misbehaving at runtime.
-
-The layout mirrors what an ngdevkit project already looks like: source
-under one directory, generated data under another, and a make fragment
-to include. Nothing here reaches outside the emitted folder, so dropping
-it in touches only files the developer owns.
-"""
-
 from __future__ import annotations
 
 import shutil
@@ -37,22 +24,14 @@ LIBRARY_SOURCES: Final = (
     "timeline.h",
     "timeline.c",
 )
-"""The video path. `fmv.h` is the only header a caller includes."""
 
 AUDIO_SOURCES: Final = ("sound.s",)
-"""The reference Z80 driver, which a caller hosts or replaces."""
 
 GENERATED_SOURCES: Final = ("movie_data.S", "movie_data.h", "movie_data_value.c")
 
 GENERATED_OPTIONAL: Final = ("audio_params.s",)
 
 PACKAGERS: Final = ("neofile.py", "mamecart.py")
-"""Cartridge packagers that can express an ADPCM-B ROM.
-
-ngdevkit's own romtool declares every voice ROM as ADPCM-A, and
-MAME allocates a delta-T region only when a software list names
-`ymsnd:adpcmb`, so a soundtrack packaged that way is silent. These
-two are standard-library only and travel with the bundle."""
 
 PACKAGER_DIR_NAME: Final = "package"
 PACKAGER_SCRIPT: Final = "package.sh"
@@ -91,12 +70,6 @@ class BundleLayout:
 
 
 def rom_image_size(payload: int) -> int:
-    """Round a payload up to a size a Neo Geo ROM image may take.
-
-    Every ROM in a cartridge is a power of two, because the hardware
-    masks an address with a mask derived from the size. A payload that
-    lands anywhere else is padded by whoever assembles the cartridge.
-    """
     size = 1 << 20
     while size < payload:
         size <<= 1
@@ -137,7 +110,6 @@ def write_bundle(
     version: tuple[int, int],
     library_root: Path = LIBRARY_ROOT,
 ) -> BundleLayout:
-    """Write the drop-in folder and return where each part landed."""
     target = Path(target)
     library = target / LIBRARY_DIR_NAME
     movie = target / MOVIE_DIR_NAME

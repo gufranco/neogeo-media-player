@@ -1,36 +1,3 @@
-"""Neo Geo palette color model and perceptual distance.
-
-The palette word layout and the digital-to-analog mapping are taken from
-the geolith LSPC implementation, `src/geo_lspc.c`, `geo_lspc_palconv` and
-`geo_lspc_palgen_raw`, because geolith is the decoder this project
-verifies against. The word is
-
-    |D0|R1|G1|B1|R5 R4 R3 R2|G5 G4 G3 G2|B5 B4 B3 B2|
-
-Each channel carries five independent bits plus `D0`, a sixth bit shared
-across all three channels. geolith reconstructs a six-bit level per
-channel as `(c5 << 1) | D0`, inverts `D0`, and scales to eight bits with
-the integer form of `value * 255 / 63 + 0.5`.
-
-`D0` is fixed to zero by the baker. It buys half a level per channel,
-roughly 1.6 percent, which is far below the error the fifteen-colors-per
--tile constraint already imposes, and fixing it keeps one color grid
-across every pass.
-
-Two digital-to-analog models exist. `geo_lspc_palgen_raw` treats the
-level as a plain fraction of full scale. `geo_lspc_palgen_resnet` models
-the actual resistor ladder on the board, five resistors per channel at
-3900, 2200, 1000, 470, and 220 ohms, smooths the resulting curve, and
-renormalizes. The resistor model is the default here because it is what
-real hardware does, and because it is the emulator setting this project
-captures against. It also reaches true black at level zero, where the
-raw model bottoms out at 4.
-
-The Oklab matrices are Bjorn Ottosson's reference coefficients, matching
-`rgb_to_oklab` in the DoomNG `tools/doomng_build/bake/palette.py`,
-vectorized over numpy arrays here.
-"""
-
 from __future__ import annotations
 
 from typing import Final
@@ -99,7 +66,6 @@ SRGB8_TO_C5: Final[npt.NDArray[np.uint8]] = _srgb8_to_c5(np.arange(256))
 
 
 def pack_palette_word(r5: int, g5: int, b5: int, *, dark: bool = False) -> int:
-    """Encode one CRAM word from 5-bit channels."""
     for name, value in (("r5", r5), ("g5", g5), ("b5", b5)):
         if not 0 <= value < C5_LEVELS:
             msg = f"{name} out of range: {value}"
@@ -116,14 +82,12 @@ def pack_palette_word(r5: int, g5: int, b5: int, *, dark: bool = False) -> int:
 
 
 def rgb_to_color_index(rgb: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint16]:
-    """Map 8-bit sRGB triples to the 15-bit Neo Geo color grid index."""
     c5 = SRGB8_TO_C5[rgb].astype(np.uint16)
     packed = (c5[..., 0] << 10) | (c5[..., 1] << 5) | c5[..., 2]
     return packed.astype(np.uint16)
 
 
 def color_index_to_c5(index: npt.NDArray[np.integer]) -> npt.NDArray[np.uint8]:
-    """Split a color-grid index back into its three 5-bit channels."""
     idx = index.astype(np.int32)
     return np.stack(
         [(idx >> 10) & 0x1F, (idx >> 5) & 0x1F, idx & 0x1F],
@@ -132,12 +96,10 @@ def color_index_to_c5(index: npt.NDArray[np.integer]) -> npt.NDArray[np.uint8]:
 
 
 def color_index_to_rgb(index: npt.NDArray[np.integer]) -> npt.NDArray[np.uint8]:
-    """Displayed sRGB for each color-grid index."""
     return C5_TO_SRGB8[color_index_to_c5(index)]
 
 
 def color_index_to_palette_word(index: npt.NDArray[np.integer]) -> npt.NDArray[np.uint16]:
-    """Encode CRAM words for a batch of color-grid indices."""
     c5 = color_index_to_c5(index).astype(np.uint16)
     r5, g5, b5 = c5[..., 0], c5[..., 1], c5[..., 2]
     return (
@@ -151,6 +113,5 @@ def color_index_to_palette_word(index: npt.NDArray[np.integer]) -> npt.NDArray[n
 
 
 def build_oklab_grid() -> npt.NDArray[np.float32]:
-    """Oklab coordinates of every color on the 15-bit Neo Geo grid."""
     index = np.arange(COLOR_INDEX_COUNT)
     return colour.srgb_to_oklab(color_index_to_rgb(index) / colour.BYTE_MAX)

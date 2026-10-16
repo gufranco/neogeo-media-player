@@ -1,12 +1,3 @@
-"""Apply the edits the bundle's integration guide asks a developer for.
-
-This is the guide in executable form. Every change lands in the
-project's own `Makefile` and `rom.mk`, the two files an ngdevkit project
-exists to have edited. Nothing here touches a linkscript, and nothing
-touches a file the baker emitted. If that ever stops being true, the
-shape of the bundle is wrong rather than the shape of this module.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -38,13 +29,6 @@ STOCK_CARTRIDGE_ASSETS: Final = (
 
 
 def cartridge_edits(text: str) -> str:
-    """Declare the second program ROM and widen the sprite ROM.
-
-    A stock template leaves the second program ROM commented out and
-    sizes the sprite ROM for a demo logo. A movie needs both, and the
-    size comes from the fragment rather than from anyone measuring a
-    file, so a re-bake carries its own new size with it.
-    """
     if STOCK_PROM2 not in text or STOCK_CROM_SIZE not in text:
         msg = "the stock rom.mk no longer looks the way the guide describes"
         raise SystemExit(msg)
@@ -53,17 +37,6 @@ def cartridge_edits(text: str) -> str:
 
 
 def makefile_edits(text: str, *, audio: bool = False) -> str:
-    """Include the fragment and point the cartridge at the movie.
-
-    The include sits between the cartridge declaration and the build
-    rules, because the fragment adds its own directories to `SRCDIRS`
-    and the build rules read that.
-
-    The lines that name the template's demo assets are replaced rather
-    than added to. A cartridge target takes its content from its first
-    prerequisite, so leaving the stock line in place would build the
-    ROM from the logo the template ships instead of from the movie.
-    """
     for stock in (BUILD_INCLUDE, STOCK_PROGRAM_ROM):
         if stock not in text:
             msg = f"the stock Makefile no longer carries {stock!r}"
@@ -89,7 +62,6 @@ include fmv/fmv.mk
 
 
 def apply(project: Path, *, audio: bool = False) -> None:
-    """Rewrite a stock project's two editable files in place."""
     cartridge = project / "rom.mk"
     cartridge.write_text(cartridge_edits(cartridge.read_text()))
     makefile = project / "Makefile"

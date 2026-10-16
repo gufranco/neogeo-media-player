@@ -1,18 +1,3 @@
-"""Turn a subtitle sidecar into a table the player can read in vblank.
-
-The player has no string handling and no time to do any: it gets one binary
-search per frame and a row of glyph indices to copy. Everything that can be
-decided ahead of time is decided here.
-
-Records are fixed width so the search is an index rather than a walk, and
-the text is already laid out, centred, and translated into fix-layer tile
-numbers. The 68000 copies bytes into VRAM and does nothing else.
-
-Cues are trimmed so that no two overlap, because the fix layer shows one
-thing at a time and a player that had to merge them would need the string
-handling this format exists to avoid.
-"""
-
 from __future__ import annotations
 
 import re
@@ -48,15 +33,12 @@ _PUNCTUATION: Final = {
 
 @dataclass(frozen=True, slots=True)
 class Cue:
-    """One subtitle, in seconds, with its text already split into lines."""
-
     start: float
     end: float
     lines: tuple[str, ...]
 
 
 def sidecar_for(source: Path) -> Path | None:
-    """The `.srt` sitting beside the source under the same name, if there is one."""
     candidate = Path(source).with_suffix(".srt")
     return candidate if candidate.is_file() else None
 
@@ -66,7 +48,6 @@ def _seconds(hours: str, minutes: str, secs: str, millis: str) -> float:
 
 
 def parse(text: str) -> list[Cue]:
-    """Read cues out of SubRip text, dropping anything with no words in it."""
     cues: list[Cue] = []
     for block in re.split(r"\n\s*\n", text.strip()):
         timing = _TIMING.search(block)
@@ -84,11 +65,6 @@ def parse(text: str) -> list[Cue]:
 
 
 def layout(text: str) -> tuple[str, ...]:
-    """Wrap to the raster without splitting words, keeping the lines that fit.
-
-    A single word too long for a row is cut instead of dropped: losing the
-    line entirely is worse than losing its tail.
-    """
     wrapped = textwrap.wrap(text, width=COLUMNS, break_long_words=True) or [""]
     return tuple(line[:COLUMNS] for line in wrapped[:MAX_LINES])
 
@@ -111,12 +87,10 @@ def _row(line: str) -> bytes:
 
 
 def frame_span(cue: Cue, *, fps: float) -> tuple[int, int]:
-    """The half-open frame range a cue is on screen for."""
     return round(cue.start * fps), round(cue.end * fps)
 
 
 def _trimmed(cues: list[Cue]) -> list[Cue]:
-    """Shorten any cue that runs into the next one."""
     ordered = sorted(cues, key=lambda cue: (cue.start, cue.end))
     kept: list[Cue] = []
     for index, cue in enumerate(ordered):
@@ -129,7 +103,6 @@ def _trimmed(cues: list[Cue]) -> list[Cue]:
 
 
 def encode(cues: list[Cue], *, fps: float) -> bytes:
-    """Pack cues into fixed width records of frames plus laid-out glyph rows."""
     blob = bytearray()
     blank_row = bytes([fixtiles.GLYPHS["blank"]] * COLUMNS)
     for cue in _trimmed(cues):

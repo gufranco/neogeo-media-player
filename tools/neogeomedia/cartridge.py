@@ -1,13 +1,3 @@
-"""Turn a movie file into a cartridge with one command.
-
-The baker and the ROM build are separate tools because they answer
-separate questions, but the common case is neither: it is someone with a
-video file who wants a cartridge out the other end. This runs the whole
-path, chooses the quality tier by measuring the source, and takes the
-subtitle file by name rather than insisting it sit beside the movie
-under a matching name.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -138,7 +128,6 @@ def _settle_denoise(args: argparse.Namespace) -> None:
 
 
 def _measured_tier(args: argparse.Namespace) -> quality.Tier | None:
-    """Resolve a tier by baking rather than by sampling, remembering the result."""
     info = ffmpeg.probe(args.source)
     span = args.duration if args.duration is not None else max(0.0, info.duration - args.start)
     minutes = span / quality.SECONDS_PER_MINUTE

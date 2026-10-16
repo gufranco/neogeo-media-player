@@ -1,15 +1,3 @@
-"""Report how far the player's frame counter has fallen behind the raster.
-
-A capture taken after N vblanks should show movie frame N. Any shortfall is
-the player missing its deadline: the movie advances one frame per vblank it
-survives, and a frame whose work overruns costs a whole extra vblank. The
-sound chip does not wait, so the shortfall measured here is the gap the ear
-eventually hears.
-
-The stream is replayed once and every candidate in the window is scored
-against the same pass, rather than replaying from the start per candidate.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -26,21 +14,12 @@ import verify_capture as vc
 from neogeomedia import neocolor
 from tests.geolith_model import GeolithTileReader, StreamPlayer
 
-# The menu owns the first sixteen palettes, so video starts above them.
 VIDEO_BASE_BANK = 16
 
 _TIE = 1e-9
-"""Errors this close are the same picture, not a better one."""
 
 
 def _both_halves(epoch: int, colors: np.ndarray) -> np.ndarray:
-    """Place an epoch's palettes in the CRAM half it occupies.
-
-    A scan crosses epoch boundaries, and a slot interned under the previous
-    epoch still points into the other half. Rendering both halves lets that
-    slot resolve to black and score badly rather than raise, which is what a
-    search wants: the wrong candidate should lose, not stop the scan.
-    """
     half = colors.shape[0]
     both = np.zeros((half * 2, *colors.shape[1:]), dtype=colors.dtype)
     start = (epoch & 1) * half
@@ -98,9 +77,6 @@ def measure(
         scored[step] = error
         if error < best_error - _TIE:
             best_error, best_frame = error, step
-        # A static shot repeats itself exactly, so the match is a run of
-        # frames rather than one. The player is somewhere in that run, and
-        # the only defensible pick is the end nearest where it should be.
         elif (
             abs(error - best_error) <= _TIE
             and best_frame is not None

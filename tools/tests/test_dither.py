@@ -6,7 +6,6 @@ from neogeomedia import palettes
 
 
 def a_ramp_tile(low: int, high: int) -> np.ndarray:
-    """A 16x16 tile sweeping a gradient, the shape that bands worst."""
     row = np.linspace(low, high, palettes.TILE_PX, dtype=np.float64)
     return np.tile(row, (palettes.TILE_PX, 1)).astype(np.uint16)
 

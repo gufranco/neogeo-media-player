@@ -186,8 +186,6 @@ class TestValidation:
 
 
 class TestPlaybackFidelity:
-    """Replays the baked stream through the LSPC model and compares pictures."""
-
     def gradient_clip(self, count: int) -> np.ndarray:
         rng = np.random.default_rng(42)
         base = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
@@ -333,7 +331,6 @@ class TestFrameHold:
 
 class TestMotionMasking:
     def half_moving(self, count: int) -> np.ndarray:
-        """Left half churns hard, right half holds still."""
         rng = np.random.default_rng(21)
         clip = np.zeros((count, HEIGHT, WIDTH, 3), dtype=np.uint8)
         still = rng.integers(0, 256, size=(HEIGHT, WIDTH // 2, 3), dtype=np.uint8)
@@ -402,7 +399,6 @@ class TestMotionMasking:
 
 class TestSceneCutFloor:
     def gentle_drift(self, count: int) -> np.ndarray:
-        """Every slot changes every frame, by one shade."""
         clip = np.zeros((count, HEIGHT, WIDTH, 3), dtype=np.uint8)
         for index in range(count):
             clip[index, :, :] = (100 + 8 * index, 100, 100)
@@ -497,7 +493,6 @@ class TestDisplayedError:
 
 class TestRateControl:
     def busy(self, count: int) -> np.ndarray:
-        """Content that mints new tiles on every frame."""
         rng = np.random.default_rng(11)
         return rng.integers(0, 256, size=(count, HEIGHT, WIDTH, 3), dtype=np.uint8)
 
@@ -537,11 +532,6 @@ class TestRateControl:
         assert held.stats.peak_tolerance > options().tolerance
 
     def test_a_roomy_budget_never_tightens_past_the_base(self):
-        """The controller may relax below the tier, but must not tighten.
-
-        With room to spare there is nothing to correct, so the threshold
-        only ever moves in the direction that spends more.
-        """
         clip = self.busy(6)
 
         result = encode.encode(clip, options(tile_budget=1 << 20))
@@ -557,13 +547,6 @@ class TestRateControl:
 
 
 class TestSeekEquivalence:
-    """A keyframe must fully determine the screen.
-
-    The transport jumps to the nearest keyframe and plays on from there,
-    so if a keyframe record left any slot holding whatever the previous
-    scene put in it, every seek would land on a corrupted picture.
-    """
-
     def clip(self, count: int) -> np.ndarray:
         rng = np.random.default_rng(19)
         return rng.integers(0, 256, size=(count, HEIGHT, WIDTH, 3), dtype=np.uint8)
@@ -608,15 +591,6 @@ class TestSeekEquivalence:
 
 
 class TestPaletteEpochs:
-    """Palettes refitted per scene, in alternating halves of CRAM.
-
-    A tile is an index into whichever bank its slot names, so a tile
-    interned under one epoch's palettes renders wrong under another's.
-    Epochs therefore never share dictionary entries, and the two halves
-    let the next epoch's colours be uploaded while the current one is
-    still on screen.
-    """
-
     def two_scenes(self, count: int) -> np.ndarray:
         rng = np.random.default_rng(5)
         warm = rng.integers(0, 90, size=(count // 2, HEIGHT, WIDTH, 3), dtype=np.uint8)
@@ -665,13 +639,6 @@ class TestPaletteEpochs:
         assert 4 in list(result.stream.keyframes())
 
     def four_scenes(self, per_scene: int) -> np.ndarray:
-        """Four scenes with disjoint colour ranges.
-
-        One shared set has to span every scene while a per-epoch set
-        only spans its own, which is where refitting pays. With just two
-        scenes the halving for double buffering cancels the gain
-        exactly, so the effect needs more scenes than halves.
-        """
         rng = np.random.default_rng(5)
         scenes = []
         for channel, boost in ((0, 150), (1, 150), (2, 150), (0, 60)):
@@ -713,8 +680,6 @@ class TestPaletteEpochs:
 
 
 class TestEpochSchedule:
-    """What the player needs in order to have colours ready in time."""
-
     def clip(self, count: int) -> np.ndarray:
         rng = np.random.default_rng(3)
         return rng.integers(0, 256, size=(count, HEIGHT, WIDTH, 3), dtype=np.uint8)
@@ -777,14 +742,6 @@ class TestSingleEpochAllocation:
 
 
 class TestBudgetIsNotOverspent:
-    """The controller limits spending; it deliberately does not allocate.
-
-    Letting it relax below the tier was measured twice and lost both
-    times, because tile spending is front-loaded and pacing against a
-    uniform budget relaxes exactly when spending is naturally light.
-    These pin the behaviour that survived.
-    """
-
     def drifting(self, count: int) -> np.ndarray:
         x = np.arange(WIDTH, dtype=np.float32)[None, :]
         y = np.arange(HEIGHT, dtype=np.float32)[:, None]

@@ -1,13 +1,3 @@
-"""A model of the parts of the LSPC this project drives.
-
-Both classes are independent transcriptions of geolith's
-`src/geo_lspc.c`, not calls into the baker. `GeolithTileReader` mirrors
-`geo_lspc_tpix` and the sprite pixel loop, including the flip handling.
-`StreamPlayer` mirrors the VRAM write port plus the SCB1 decode at
-`geo_lspc_sprcalc`, so replaying a baked stream through it reconstructs
-the picture the emulator would put on screen.
-"""
-
 from __future__ import annotations
 
 import struct
@@ -55,8 +45,6 @@ class GeolithTileReader:
 
 
 class StreamPlayer:
-    """Applies baked frame records to a VRAM model and reads back the grid."""
-
     def __init__(self) -> None:
         self.vram = np.zeros(VRAM_WORDS, dtype=np.uint16)
 

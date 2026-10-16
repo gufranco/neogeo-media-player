@@ -1,9 +1,3 @@
-"""Calibration tests.
-
-Tile cost is a property of the content, so the sampler that measures it
-is checked against a real decode rather than a stub.
-"""
-
 from __future__ import annotations
 
 import itertools

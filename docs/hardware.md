@@ -45,4 +45,24 @@ One documented claim did not survive a source read. Bit 15 of `$3C0006` is descr
 
 The frame count is identical either way, and the hardware permits the overrun regardless.
 
+## Why the player code is shaped as it is
 
+These were comments in the player's C source, which the project's rules keep out of code.
+
+### [`hw.h`](../src/fmv/hw.h)
+
+The address port sits at 0x3C0000 and the data port immediately after it, so one 32-bit write lands both: the high word in the address port and the low word in the data port. That halves the instruction count of a scattered write, which is the shape the overlay draws in and the shape the stream falls back to when a run covers a single slot. The technique is the one libNG uses in its raster command processor.
+
+### [`menu.h`](../src/player/menu.h)
+
+What the debug page reports. Everything here is either a fact of the bake or a live measurement the player can take cheaply once a frame.
+
+### [`menu.c`](../src/player/menu.c)
+
+The fix layer is 32 rows but the raster only shows rows 2 to 29, so the panel is anchored to row 29 rather than to the nominal bottom. The panel reaches the edge but its contents do not. A television overscans, losing something like the outermost cell on every side, so text written on the last visible row is text the viewer may never see. The bottom row is left as padding for that reason.
+
+Right-aligned so a value that grows a digit does not shift the label beside it, which matters when reading these while the movie runs.
+
+One row per frame. Writing the whole page at once is several hundred cells, which does not fit in vblank: the writes spill into active display and the sprite layer comes back shredded. Spread this way the page costs about as much as a single row of text.
+
+Subtitles sit two rows above the transport panel so the two never fight for the same cells, and far enough inside the raster that a television losing its outermost row still shows the whole line.

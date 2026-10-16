@@ -47,8 +47,6 @@ def synthetic_clip(tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def epoch_clip(tmp_path_factory):
-    """An epoch cannot be shorter than the palette upload it covers, so a
-    clip meant to hold several of them has to be several seconds long."""
     path = tmp_path_factory.mktemp("epochs") / "source.mp4"
     subprocess.run(
         [
@@ -952,7 +950,6 @@ class TestQualityResolution:
 
 class TestPaletteEpochFlag:
     def test_epochs_are_on_by_default(self):
-        """No flag means the cadence is measured, not that epochs are off."""
         args = bake._parse_args(["--source", "clip.mp4", "--duration", "1"])
 
         assert args.palette_epoch_seconds is None
@@ -1011,7 +1008,6 @@ class TestPaletteEpochFlag:
 
 class TestSceneAlignedEpochs:
     def cut_clip(self, tmp_path):
-        """Two scenes with nothing in common, joined by a hard cut."""
         path = tmp_path / "cut.mp4"
         subprocess.run(
             [
@@ -1054,12 +1050,9 @@ class TestSceneAlignedEpochs:
         cut = round(3.0 * float(frames_mod.VBLANK_FPS))
         starts = outcome.result.epoch_starts
 
-        # Cuts are found in the strided palette sample, so a boundary
-        # lands within one stride of the true cut rather than on it.
         assert any(abs(start - cut) <= outcome.request.sample_stride for start in starts)
 
     def test_a_cadence_still_subdivides_a_long_scene(self, tmp_path):
-        """Subdivision survives, but only above the loader's minimum."""
         clip = self.cut_clip(tmp_path)
 
         outcome = bake.run(
@@ -1077,14 +1070,6 @@ class TestSceneAlignedEpochs:
 
 
 class TestEpochsGiveTheLoaderTime:
-    """An epoch must outlast the upload of the one after it.
-
-    The player writes the next epoch's palettes into the other half of
-    CRAM a slice per frame. A boundary that arrives before that finishes
-    leaves the half holding the epoch before last, and the picture comes
-    back as a checkerboard of two scenes.
-    """
-
     def test_no_epoch_is_shorter_than_the_upload_needs(self, synthetic_clip, tmp_path):
         outcome = bake.run(
             bake.BakeRequest(
@@ -1102,11 +1087,9 @@ class TestEpochsGiveTheLoaderTime:
             assert later - earlier >= bake.epoch_upload_frames(8)
 
     def test_the_minimum_follows_the_palette_count(self):
-        """Half the palettes are uploaded per epoch, so more colours take longer."""
         assert bake.epoch_upload_frames(240) > bake.epoch_upload_frames(8)
 
     def test_the_minimum_covers_the_upload_with_room_to_spare(self):
-        """One upload time would leave nothing for the transport to redraw in."""
         bare = (240 // 2) * bake.WORDS_PER_PALETTE / bake.PALETTE_WORDS_PER_FRAME
 
         assert bake.epoch_upload_frames(240) >= bare * bake.EPOCH_UPLOAD_MARGIN
@@ -1127,8 +1110,6 @@ class TestEpochsGiveTheLoaderTime:
 
 
 class TestTheOverlayNamesTheRungActuallyUsed:
-    """`auto` is a request, not an answer, and the cart must record the answer."""
-
     def test_a_resolved_rung_replaces_the_word_auto(self):
         request = bake.BakeRequest(
             source=Path("clip.mp4"), start=0.0, duration=1.0, build_dir=Path("build"), quality="q11"
@@ -1166,14 +1147,6 @@ class TestTheOverlayNamesTheRungActuallyUsed:
 
 
 class TestPaletteSampling:
-    """How densely palettes are fitted should follow the epoch, not a constant.
-
-    The sample stride was every eighth frame regardless of anything else, so
-    the number of frames each epoch was fitted from drifted with the epoch
-    length, which is itself measured from the source. Targeting a sample
-    count per epoch keeps palette quality steady instead.
-    """
-
     def test_a_longer_epoch_gets_a_coarser_stride(self):
         long_epoch = bake.stride_for_epoch(epoch_frames=1200)
         short_epoch = bake.stride_for_epoch(epoch_frames=120)

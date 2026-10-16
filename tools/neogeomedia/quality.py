@@ -1,47 +1,3 @@
-"""Quality tiers, and choosing one that fits the cartridge.
-
-A cartridge holds a fixed number of tiles, so the longest movie it can
-play is decided by how many tiles each minute costs. That cost is a
-property of the content rather than of the running time: dense animation
-can cost several times what a dialogue scene costs. A ladder indexed by
-duration alone would therefore over-compress easy sources and
-under-compress hard ones, so the rate is measured on the source itself
-and the ladder only says how to spend what was measured.
-
-Three ceilings bound a bake. Character ROM holds the tile dictionary and
-binds first at every tier measured. Program ROM carries the command
-stream and keeps around half its space spare throughout. The ADPCM-B
-voice ROM holds the soundtrack and only constrains anything past about
-25 minutes, where the sample rate has to come down to fit.
-
-The relative costs below were measured on dense animation. They set the
-shape of the ladder, never its absolute position, which calibration
-supplies per source.
-
-The rungs follow the measured Pareto frontier, which turned out to hold
-a surprise: frame rate is a far worse thing to spend than colour. At a
-fixed cost, keeping every frame and thinning the palette beat dropping
-to a third of the frame rate by nearly half the error, and did it for
-fewer tiles. Every rung down to 0.645 therefore keeps all 59.2 frames a
-second, and holding frames only begins once colour has been spent all
-the way down. An earlier ladder started dropping frames at 0.686, above
-the point where the data says not to, which is why its middle rungs felt
-like a cliff rather than a step.
-
-Steps are around 9%. Finer would be false precision: the costs come from
-one clip, so a 5% difference between neighbours sits inside the noise of
-the measurement that produced them.
-
-There is no lossless rung and there cannot be one. A tile draws from a
-single bank of 15 colours, and 83% of tiles in real footage hold more
-distinct colours than that once the picture is reduced to the hardware's
-15-bit palette, so the quantisation step always discards something. The
-top rung instead guarantees that nothing the encoder controls is given
-up: every frame is shown, no drift is tolerated, colour is charged at
-the same rate as luminance, nothing is denoised, and every palette is
-searched rather than a shortlist.
-"""
-
 from __future__ import annotations
 
 import math
@@ -68,8 +24,6 @@ SAFETY_MARGIN: Final = 0.92
 
 @dataclass(frozen=True, slots=True)
 class Tier:
-    """One rung of the ladder, and what it costs relative to `standard`."""
-
     name: str
     chroma_weight: float
     frame_hold: int
@@ -133,11 +87,6 @@ ALIASES: Final = {
 
 
 def tier_by_name(name: str) -> Tier:
-    """Look a tier up by name, listing the ladder when it is not one.
-
-    The older seven names still resolve, to the rung nearest what they
-    used to mean, so existing commands keep working.
-    """
     name = ALIASES.get(name, name)
     for tier in LADDER:
         if tier.name == name:
@@ -148,20 +97,12 @@ def tier_by_name(name: str) -> Tier:
 
 
 def effective_fps(tier: Tier, vblank_fps: float) -> float:
-    """Frames per second this tier actually shows."""
     return vblank_fps / tier.frame_hold
 
 
 def tile_rate_for(
     tier: Tier, reference_rate: float, anchors: dict[float, float] | None = None
 ) -> float:
-    """Tiles per minute this tier costs, given the measured reference.
-
-    The ladder's cost is averaged over several sources, and the shape of
-    that curve is a property of the content: measured across four sources
-    the same setting varied by up to 2x at the extremes. When the source's
-    own anchors are known, the averaged cost is bent onto them.
-    """
     relative = tier.relative_cost
     if anchors:
         relative = rescale(relative, anchors=anchors)
@@ -171,7 +112,6 @@ def tile_rate_for(
 def max_minutes(
     tier: Tier, reference_rate: float, anchors: dict[float, float] | None = None
 ) -> float:
-    """Longest movie this tier fits, before any safety margin."""
     rate = tile_rate_for(tier, reference_rate, anchors)
     if rate <= 0.0:
         return float("inf")
@@ -179,16 +119,6 @@ def max_minutes(
 
 
 def audio_grade(rate_hz: float) -> int:
-    """Where a sample rate sits on the same scale the picture uses.
-
-    The rate itself is never rounded to a step. Audio lives in its own
-    ROM and competes with nothing, so the planner always takes the
-    highest rate that fits and stepping it could only give quality away.
-    This is for reporting: it places whatever rate came out on the same
-    eighteen-rung scale as the picture, so the two are comparable at a
-    glance. Grade one is the chip's own maximum, and each grade down is
-    the same ratio the picture ladder uses between neighbours.
-    """
     steps = len(LADDER)
     if rate_hz >= MAX_AUDIO_HZ:
         return 1
@@ -199,25 +129,6 @@ def audio_grade(rate_hz: float) -> int:
 
 
 def audio_hz_for(minutes: float) -> float:
-    """Highest sample rate whose soundtrack the player can still address.
-
-    Audio lives in its own ROM, so a finer rate costs the picture
-    nothing at all and the only thing holding it down is how long the
-    movie runs. It therefore starts at what the chip itself can play and
-    comes down only far enough to fit.
-
-    The limit is the page counter rather than the ROM. ADPCM-B addresses
-    in 256-byte pages through a 16-bit register, so the last page a
-    player can name is 65,535 and filling the voice ROM to exactly its
-    16 MiB puts the final page one beyond that. The counter wraps and
-    playback restarts from the beginning of the sample.
-
-    The rate is then floored onto the chip's own Delta-N grid, because
-    the encoder quantises to that grid afterwards and rounding to the
-    nearest step can come back a fraction above what was asked for. A
-    fixed safety margin cannot cover that, since the excess grows with
-    runtime; landing on the grid deliberately does.
-    """
     if minutes <= 0.0:
         return DEFAULT_AUDIO_HZ
     seconds = minutes * SECONDS_PER_MINUTE
@@ -230,8 +141,6 @@ def audio_hz_for(minutes: float) -> float:
 
 @dataclass(frozen=True, slots=True)
 class Fit:
-    """How one tier stands against a specific runtime."""
-
     tier: Tier
     minutes: float
     capacity_minutes: float
@@ -242,26 +151,16 @@ class Fit:
 
     @property
     def overshoot(self) -> float:
-        """How many times over capacity the source runs, 1.0 when exact."""
         if self.capacity_minutes <= 0.0:
             return float("inf")
         return self.minutes / self.capacity_minutes
 
     @property
     def spare_minutes(self) -> float:
-        """Runtime still available at this tier, negative when over."""
         return self.capacity_minutes * SAFETY_MARGIN - self.minutes
 
     @property
     def trim_minutes(self) -> float:
-        """Runtime that would have to come out to reach this tier.
-
-        Rounded up to the next whole second. The exact shortfall lands on
-        the boundary, where floating point can leave a source a
-        fraction over after trimming by precisely the figure it was
-        given, and advice that does not quite work is worse than none.
-        Seconds are also the unit the figure is displayed in.
-        """
         shortfall = -self.spare_minutes
         if shortfall <= 0.0:
             return 0.0
@@ -269,7 +168,6 @@ class Fit:
 
 
 def clock(minutes: float) -> str:
-    """Runtime as h:mm:ss, or m:ss when under an hour."""
     total = round(minutes * SECONDS_PER_MINUTE)
     hours, rest = divmod(total, 3600)
     mins, secs = divmod(rest, 60)
@@ -301,15 +199,6 @@ def _ladder_table(fits: list[Fit], vblank_fps: float) -> list[str]:
 
 
 def _estimate_caveat() -> list[str]:
-    """Say plainly how far this choice can be wrong, and what is not a guess.
-
-    The rungs are priced by one ladder of relative costs, and measurement
-    says no single ladder can be right: how much a colour reduction saves
-    depends on the content. On the animated reference film q17 really
-    costs 0.43 of q01 where the ladder says 0.65, so the plan promises
-    less runtime than the cartridge has. On a grainy live-action clip the
-    same rung costs 0.75, so the plan promises more.
-    """
     return [
         "",
         "This choice is an estimate. Measured against real bakes the ladder runs",
@@ -360,14 +249,6 @@ def format_plan(
     vblank_fps: float,
     anchors: dict[float, float] | None = None,
 ) -> str:
-    """A full account of what this source can become, and what it costs.
-
-    Written to be acted on rather than skimmed. Every tier is listed with
-    the runtime it holds for this particular source, so a runtime that
-    just misses a better tier shows exactly how much has to come out, and
-    trimming the source stays a decision the person makes with the
-    numbers in front of them.
-    """
     scope = {"source_fps": float(source_fps), "vblank_fps": float(vblank_fps)}
     fits = survey(minutes, reference_rate, anchors, **scope)
     chosen = select(minutes, reference_rate, anchors, **scope)
@@ -421,15 +302,6 @@ def format_plan(
 
 
 def reachable(tier: Tier, *, source_fps: float, vblank_fps: float) -> bool:
-    """Whether baking this tier would drop any of the source's own frames.
-
-    A hold counts display refreshes rather than source frames. A 24 fps
-    source reaching a 59.185 Hz raster already repeats each frame about
-    2.47 times, so holding two refreshes still shows every frame it had:
-    the tier costs temporal accuracy and saves not one tile. The baker
-    refuses such a hold, so offering it hands back a tier that cannot be
-    baked.
-    """
     if tier.frame_hold <= 1:
         return True
     return vblank_fps / tier.frame_hold < source_fps
@@ -443,11 +315,6 @@ def survey(
     source_fps: float | None = None,
     vblank_fps: float | None = None,
 ) -> list[Fit]:
-    """Every tier measured against one runtime, best quality first.
-
-    Given the source's frame rate, tiers the baker would refuse are left
-    out rather than offered and then rejected.
-    """
     ladder: tuple[Tier, ...] = LADDER
     if source_fps is not None and vblank_fps is not None:
         ladder = tuple(
@@ -464,12 +331,6 @@ def shortfall_message(
     source_fps: float | None = None,
     vblank_fps: float | None = None,
 ) -> str | None:
-    """Why a source cannot be baked at all, or None when some tier fits.
-
-    Kept apart from the command line so the decision, and the number the
-    reader is asked to act on, can be checked without a source long
-    enough to actually overrun a cartridge.
-    """
     scope = {"source_fps": source_fps, "vblank_fps": vblank_fps}
     if select(minutes, reference_rate, anchors, **scope) is not None:
         return None
@@ -488,7 +349,6 @@ def select(
     source_fps: float | None = None,
     vblank_fps: float | None = None,
 ) -> Fit | None:
-    """The best tier that fits, or None when even the cheapest overruns."""
     for fit in survey(
         minutes, reference_rate, anchors, source_fps=source_fps, vblank_fps=vblank_fps
     ):
@@ -498,32 +358,9 @@ def select(
 
 
 ANCHOR_TIERS: Final = ("q01", "q17", "q30", "q32")
-"""Where the source's own cost curve is measured.
-
-One anchor is not enough. Measured across four sources, the cost of a
-setting relative to the reference agreed by construction at the reference
-and diverged by up to 2x at the extremes: at colour 8% the cheapest source
-came in at 0.378 and the dearest at 0.756. A ladder averaged over sources
-therefore mispredicts any single one, and it does so worst exactly where
-the rungs are cheapest. Three anchors pin both ends and the middle.
-
-The fourth sits on a frame-hold rung. Measured across the whole ladder on
-one source, the three chroma anchors left the hold rungs to extrapolation
-and the error ran the unsafe way: q32 through q35 cost 9%, 13%, 22% and
-26% more than predicted, so the planner promised runtime the cartridge
-could not hold. Every chroma rung was conservative by 2% to 9% over the
-same measurement. Anchoring inside the hold range replaces that
-extrapolation with a reading.
-"""
 
 
 def anchor_tiers(source_fps: float, vblank_fps: float) -> tuple[Tier, ...]:
-    """The rungs worth measuring on this source.
-
-    A hold anchor is only meaningful when the hold actually drops source
-    frames. On a slow source it would measure the same cost as no hold at
-    all and pin the curve to a value that says nothing.
-    """
     return tuple(
         tier
         for tier in (tier_by_name(name) for name in ANCHOR_TIERS)
@@ -532,13 +369,6 @@ def anchor_tiers(source_fps: float, vblank_fps: float) -> tuple[Tier, ...]:
 
 
 def rescale(relative_cost: float, *, anchors: dict[float, float]) -> float:
-    """Bend the ladder's averaged cost onto the curve this source actually has.
-
-    The anchors map a rung's averaged relative cost to what the source
-    measured there. Rungs between two anchors are interpolated in log space,
-    which keeps the ordering: a rung cheaper on the ladder stays cheaper
-    after correction.
-    """
     known = sorted(anchors.items())
     if relative_cost <= known[0][0]:
         low, high = known[0], known[1]
@@ -556,5 +386,4 @@ def rescale(relative_cost: float, *, anchors: dict[float, float]) -> float:
 
 
 def nearest_by_chroma(chroma_weight: float) -> Tier:
-    """The rung whose colour weight is closest to a wanted one."""
     return min(LADDER, key=lambda tier: abs(tier.chroma_weight - chroma_weight))

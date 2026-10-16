@@ -1,12 +1,3 @@
-"""Colour model tests.
-
-`geolith_reference_rgb` is an independent transcription of geolith's
-`geo_lspc_palconv` plus `geo_lspc_palgen_raw` from `src/geo_lspc.c`. It
-decodes a CRAM word the way the target emulator does, so the assertions
-below check the baker against the real decoder rather than against
-another copy of the baker's own arithmetic.
-"""
-
 from __future__ import annotations
 
 import numpy as np

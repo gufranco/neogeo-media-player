@@ -54,12 +54,6 @@ static inline void vram_addr(uint16_t address) { REG_VRAMADDR = address; }
 static inline void vram_mod(uint16_t modulo) { REG_VRAMMOD = modulo; }
 static inline void vram_write(uint16_t value) { REG_VRAMRW = value; }
 
-/* The address port sits at 0x3C0000 and the data port immediately after
- * it, so one 32-bit write lands both: the high word in the address port
- * and the low word in the data port. That halves the instruction count
- * of a scattered write, which is the shape the overlay draws in and the
- * shape the stream falls back to when a run covers a single slot. The
- * technique is the one libNG uses in its raster command processor. */
 static inline void vram_poke(uint16_t address, uint16_t value)
 {
     REG_VRAMPAIR = ((uint32_t)address << 16) | value;

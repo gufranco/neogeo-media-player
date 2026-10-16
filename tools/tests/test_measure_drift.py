@@ -23,7 +23,6 @@ def measure_drift():
 
 @pytest.fixture
 def flat_reconstruction(measure_drift, monkeypatch):
-    """Stub the reconstruction so a test controls what each frame looks like."""
     painted: dict[int, int] = {}
 
     class Player:
@@ -54,7 +53,6 @@ def flat_reconstruction(measure_drift, monkeypatch):
 
 @pytest.fixture
 def baked(tmp_path):
-    """Six frames whose offsets are their own index, so a stub can key on them."""
     root = tmp_path / "baked"
     root.mkdir()
     (root / "stream.bin").write_bytes(b"")
@@ -137,14 +135,6 @@ class TestExitCode:
 
 
 class TestTiedMatches:
-    """Consecutive frames are often pixel-identical on a static shot.
-
-    Keeping the first of those reports the player as hundreds of frames
-    behind when it is on time, because the tie runs backwards from the true
-    position. Among equally good matches the one nearest where the player
-    should be is the honest answer.
-    """
-
     def test_a_tie_resolves_to_the_frame_nearest_the_expected_one(
         self, measure_drift, monkeypatch, baked, flat_reconstruction
     ):

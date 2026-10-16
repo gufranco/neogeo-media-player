@@ -436,6 +436,7 @@ MAMEは224行すべてで列0を黒で返します。それを除くと、残差
 | [`tools/neogeomedia/`](tools/neogeomedia) | ベイカーです。デコード、色、パレット、辞書、エンコーダー、品質ラダー、音声、ROMコンテナ、バンドルの出力 |
 | [`tools/tests/`](tools/tests) | 974個のテストで、オラクルとして使うエミュレーターの書き起こしを含みます |
 | [`tools/clips.manifest.json`](tools/clips.manifest.json) | 回帰用の映像の識別情報、クレジット、ライセンス。映像そのものは含みません |
+| [`tools/DESIGN.md`](tools/DESIGN.md) | ベイカーの各モジュール、スクリプト、テストがなぜその形なのかと、その裏付けとなる測定 |
 | [`tools/scripts/`](tools/scripts) | キャプチャ、検証、タイミング、ラダーのスイープ用のヘルパー |
 | [`toolchain/`](toolchain) | ネイティブまたはコンテナ化したngdevkitビルド |
 | [`FAMILY.md`](FAMILY.md) | sms-media-playerおよびfmv-core-pythonと共有する標準で、それぞれで同一です |

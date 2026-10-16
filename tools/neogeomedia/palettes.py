@@ -1,37 +1,3 @@
-"""Per-tile palette clustering and assignment.
-
-The LSPC gives each 16x16 tile one CRAM bank of 16 entries, and entry 0
-is transparent, so a tile is quantized to 15 colors chosen from a bank.
-With 256 banks and 16 reserved for the fix layer, the video draws from
-240 banks, or 3600 simultaneous colors, and the encoder's job is to pick
-banks that let every tile in the movie land close to its source colors.
-
-The approach follows the tiled-palette-quantizer family cited in
-`references.md`: describe each tile compactly, cluster tiles into as many
-groups as there are banks, fit a palette per group, then assign every
-tile to whichever bank quantizes it best. Clustering uses a nine
-dimensional descriptor, the Oklab mean plus the darkest and brightest
-pixel, because tiles that agree on those three points almost always
-share a palette well.
-
-Palette entries are chosen from colors that actually occur in the
-source rather than from arbitrary grid points, the same choice
-`median_cut_select` makes in the DoomNG `palette.py`, so a palette never
-spends a slot on a color the content does not contain.
-
-Distance is squared Oklab throughout, matching `oklab_distance_sq` in
-the DoomNG `palette.py`.
-
-Optional ordered dithering trades a little spatial noise for smoother
-gradients. Error diffusion is unavailable here for a structural reason:
-it makes a tile's output depend on its neighbours, so two identical
-source tiles stop quantising alike and stop interning as one, which
-spends the C-ROM this design is short of. A Bayer threshold has neither
-problem. It depends only on where a pixel sits inside its own tile, and
-because the matrix is 8x8 and a tile is 16x16 it also runs continuously
-across tile boundaries, so identical tiles still collapse to one entry.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -70,11 +36,6 @@ _BAYER_8 = np.array(
 
 
 def bayer_thresholds() -> npt.NDArray[np.float32]:
-    """A tile-sized threshold field in [0, 1), tiled from the 8x8 matrix.
-
-    TILE_PX is a multiple of the matrix order, so every tile sees the
-    same field and identical tiles still quantise identically.
-    """
     unit = (_BAYER_8 + 0.5) / float(_BAYER_ORDER * _BAYER_ORDER)
     repeat = TILE_PX // _BAYER_ORDER
     return np.tile(unit, (repeat, repeat)).astype(np.float32)
@@ -84,25 +45,6 @@ _OKLAB_GRIDS: dict[float, npt.NDArray[np.float32]] = {}
 
 
 def oklab_grid(chroma_weight: float = DEFAULT_CHROMA_WEIGHT) -> npt.NDArray[np.float32]:
-    """Color index to Oklab, with the chroma axes optionally scaled down.
-
-    Vision resolves luminance far more finely than colour, which is why
-    every broadcast and consumer codec since the 1950s has spent fewer
-    bits on chroma than on luma. Angel Studios leaned on exactly this to
-    fit Resident Evil 2's video into 24 MiB, quartering the horizontal
-    chroma resolution outright.
-
-    There is no separate chroma plane to subsample here, because a tile
-    is a palette index and not a Y/Cb/Cr triple. The equivalent lever is
-    the distance metric every stage already shares: scaling the `a` and
-    `b` axes by the square root of the weight makes a squared distance
-    charge chroma error at `chroma_weight` times the rate of luma error.
-    Palette fitting, palette assignment, redraw decisions, and motion
-    masking all measure distance through this table, so weighting it
-    here moves the whole encoder onto a luma-first metric at once.
-
-    A weight of one reproduces unweighted Oklab.
-    """
     if chroma_weight <= 0.0:
         msg = f"chroma weight must be positive, got {chroma_weight}"
         raise ValueError(msg)
@@ -140,11 +82,9 @@ class PaletteSet:
         return int(self.colors.shape[0])
 
     def bank_of(self, palette_id: int) -> int:
-        """CRAM bank holding a palette."""
         return self.base_bank + palette_id
 
     def cram_blob(self) -> bytes:
-        """CRAM words for every palette, transparent slot first."""
         words = np.zeros((len(self), neocolor.PALETTE_COLORS), dtype=">u2")
         words[:, 1:] = neocolor.color_index_to_palette_word(self.colors).astype(">u2")
         return words.tobytes()
@@ -157,7 +97,6 @@ class Assignment:
     error: npt.NDArray[np.float32]
 
     def rendered(self, palette_set: PaletteSet) -> npt.NDArray[np.uint16]:
-        """Color indices the hardware will actually display."""
         if self.palette_ids.size == 0:
             return np.zeros((0, TILE_PX, TILE_PX), dtype=np.uint16)
         return palette_set.colors[self.palette_ids[:, None, None], self.nibbles - 1]
@@ -166,13 +105,6 @@ class Assignment:
 def _two_nearest(
     distance: npt.NDArray[np.float32],
 ) -> tuple[npt.NDArray[np.uint8], npt.NDArray[np.uint8], npt.NDArray[np.uint8]]:
-    """The two closest slots per colour, and how far between them it sits.
-
-    The share is the nearer radius over the sum of both, so it is 0 when
-    the colour lands on a palette entry and rises to half when the two
-    are equidistant. Ordered dithering then swaps in the runner-up for
-    that fraction of the pixels in a tile.
-    """
     pair = np.argpartition(distance, 1, axis=1)[:, :2]
     picked = np.take_along_axis(distance, pair, axis=1)
     swapped = picked[:, 0] > picked[:, 1]
@@ -192,12 +124,6 @@ def _two_nearest(
 def _sqdist(
     points: npt.NDArray[np.float32], centres: npt.NDArray[np.float32]
 ) -> npt.NDArray[np.float32]:
-    """Pairwise squared distance without materializing the difference tensor.
-
-    The expanded form keeps memory at one value per pair instead of one
-    per pair per dimension, which matters because a feature-length bake
-    ranks hundreds of thousands of tiles against 240 palettes.
-    """
     gram = points @ centres.T
     distance: npt.NDArray[np.float32] = (
         (points * points).sum(axis=1)[:, None]
@@ -293,7 +219,6 @@ def build_palette_set(
     seed: int,
     chroma_weight: float = DEFAULT_CHROMA_WEIGHT,
 ) -> PaletteSet:
-    """Cluster a sample of tiles and fit one palette per cluster."""
     if tiles.shape[0] == 0:
         msg = "cannot build a palette set from an empty tile batch"
         raise ValueError(msg)
@@ -322,8 +247,6 @@ def build_palette_set(
 
 
 class PaletteAssigner:
-    """Picks the best palette for each tile and emits its pixel indices."""
-
     def __init__(
         self, palette_set: PaletteSet, *, candidates: int = 0, dither: bool = False
     ) -> None:
@@ -349,7 +272,6 @@ class PaletteAssigner:
         self._chunk = max(1, _ASSIGN_CHUNK_BYTES // (self._candidates * TILE_PIXELS * 4))
 
     def assign(self, tiles: npt.NDArray[np.uint16]) -> Assignment:
-        """Choose a palette per tile and quantize its pixels."""
         count = tiles.shape[0]
         if count == 0:
             return Assignment(
@@ -385,7 +307,6 @@ class PaletteAssigner:
     def _quantise(
         self, chosen: npt.NDArray[np.int64], pixels: npt.NDArray[np.uint16]
     ) -> npt.NDArray[np.uint8]:
-        """Pixel indices for a chunk of tiles, dithered when asked for."""
         nearest = self._slot[chosen[:, None], pixels]
         if self._second is None or self._mix is None:
             return nearest

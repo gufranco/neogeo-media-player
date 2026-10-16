@@ -1,21 +1,3 @@
-"""Package the cart for MAME as well as for a flash cart.
-
-Everything this project encodes was confirmed against geolith, which
-models the board rather than being it. MAME is a second, independent
-implementation, so a cart that behaves identically in both is far more
-likely to be right on a console than one confirmed by either alone. That
-matters here because the two emulators do not agree on everything: MAME
-masks the program-ROM bank register with 0x07, matching the three-bit
-latch on real hardware, while geolith allows far more banks. A cart that
-overruns eight banks runs in geolith and reads the wrong bank on
-hardware.
-
-The dataarea names, sizes and load flags are the ones MAME's Neo Geo
-cart slot looks for in `src/devices/bus/neogeo/slot.cpp`. `maincpu`
-loads word-swapped because the ROM image is in physical MASK ROM order,
-and the two character halves load byte-interleaved.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -51,14 +33,6 @@ def _digests(path: Path) -> tuple[str, str]:
 def _rom_element(
     parent: ElementTree.Element, path: Path, loadflag: str | None = None, offset: int = 0
 ) -> None:
-    """Add one rom entry.
-
-    The offset is not optional. MAME's own software lists carry it on
-    every entry, and an interleaved pair needs 0 and 1 to land on
-    alternating bytes. Omitting it loads both halves at zero, so the
-    second silently overwrites the first and the sprite layer decodes
-    from wrong data.
-    """
     sha1, crc = _digests(path)
     attrs = {
         "name": path.name,
@@ -75,7 +49,6 @@ def _rom_element(
 def build_software_list(
     rom_dir: Path, *, name: str, description: str, year: int, publisher: str
 ) -> ElementTree.Element:
-    """Build the software-list entry MAME binds cart regions with."""
     root = ElementTree.Element(
         "softwarelist", {"name": "neogeo", "description": f"{description} homebrew cartridge"}
     )
@@ -141,7 +114,6 @@ def write_cart(
     year: int = 2026,
     publisher: str = "neogeomedia",
 ) -> CartPackage:
-    """Write the MAME zip and the software list that binds it."""
     rom_dir = Path(rom_dir)
     for region in REQUIRED_REGIONS:
         if not (rom_dir / region).is_file():

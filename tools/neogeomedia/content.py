@@ -1,32 +1,3 @@
-"""Measure the properties of a source that change what a good bake looks like.
-
-Geometry analysis lives in `frames`, because a bake cannot proceed without
-it. What is measured here is different: nothing breaks if it is skipped, but
-the numbers say which settings are safe on this particular material.
-
-Two measurements, each tied to one decision:
-
-- Saturation, from `signalstats`. Colour weight is charged against the a and
-  b axes of the metric, so on washed-out material a low weight costs little
-  and on vivid material it costs a lot.
-- Movement, from the source's own frame-to-frame slot distances. What counts
-  as "this slot moved" decides when a scene cut fires, and a fixed threshold
-  is not portable: 0.01 flagged 1% of slots on one film and 22% on another,
-  so cut detection meant something different on each. Taking a high
-  percentile of the movement the source actually shows makes it mean the
-  same thing everywhere.
-- Scene cuts, from `scdet`. Palettes are fitted per epoch, and an epoch that
-  spans a cut has to serve two scenes with one set of colours.
-
-Grain is deliberately absent. Two candidates were tried and both measured
-high-frequency content rather than noise: chroma bitplane noise called a
-pristine 720p capture grainier than a synthetic clip built out of noise, and
-comparing a source against a temporally denoised copy ranked the noisy clip
-as the cleaner of the two, because motion moves that measure further than
-grain does. A grain number that fires on detail would argue for denoising the
-very texture the dictionary exists to carry, so none is reported.
-"""
-
 from __future__ import annotations
 
 import re
@@ -50,14 +21,11 @@ _METADATA = re.compile(r"lavfi\.(\S+)=([0-9.eE+-]+)")
 
 @dataclass(frozen=True, slots=True)
 class ContentProfile:
-    """What the source is made of, as far as ffmpeg can tell."""
-
     saturation: float
     cuts_per_minute: float
 
 
 def _metadata_values(path: Path, filter_spec: str, key: str, *, duration: float) -> list[float]:
-    """Run a filter that prints metadata and collect one key from it."""
     result = subprocess.run(
         [
             ffmpeg.require_tool("ffmpeg"),
@@ -87,7 +55,6 @@ def _mean(values: list[float]) -> float:
 
 
 def measure(path: Path, *, duration: float = 8.0) -> ContentProfile:
-    """Profile a source without decoding it into the encoder."""
     path = Path(path)
 
     saturation = _metadata_values(path, "signalstats", "SATAVG", duration=duration)
@@ -104,13 +71,6 @@ def measure(path: Path, *, duration: float = 8.0) -> ContentProfile:
 
 
 def epoch_seconds_for(*, cuts_per_minute: float) -> float:
-    """How long a palette epoch should last on material that cuts this often.
-
-    An epoch spanning a cut serves two scenes from one set of colours, so
-    the cadence tracks the cut rate. It is bounded at both ends: the loader
-    needs frames to upload the next set, and an epoch long enough to cover a
-    whole reel stops being per-scene at all.
-    """
     if cuts_per_minute <= 0.0:
         return MAX_EPOCH_SECONDS
     wanted = SECONDS_PER_MINUTE / cuts_per_minute
@@ -118,24 +78,13 @@ def epoch_seconds_for(*, cuts_per_minute: float) -> float:
 
 
 MOVEMENT_PERCENTILE: Final = 99.0
-"""Where the "this slot moved" line is drawn in the source's own movement.
-
-A cut moves nearly every slot, while ordinary motion inside a scene moves
-few. Setting the line at the 99th percentile leaves about one slot in a
-hundred above it during ordinary motion, which is a wide margin against the
-fraction a cut has to clear. On the movie this project was built against,
-the measured value comes out at 0.0099, which is the constant the parameter
-used to be fixed at: that default was this source's own answer all along.
-"""
 
 MOVEMENT_FLOOR_MINIMUM: Final = 1e-6
-"""A floor of exactly zero would call every rounding difference a movement."""
 
 MOVEMENT_SAMPLE_SECONDS: Final = 1.2
 
 
 def movement_floor(path: Path, *, duration: float = MOVEMENT_SAMPLE_SECONDS) -> float:
-    """How far a slot has to move on this source before it counts as moved."""
     clip = np.concatenate(list(frames.stream(Path(path), start=0.0, duration=duration)))
     if clip.shape[0] < 2:
         return MOVEMENT_FLOOR_MINIMUM

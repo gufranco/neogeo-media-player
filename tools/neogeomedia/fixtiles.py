@@ -1,19 +1,3 @@
-"""Glyphs for the fix-layer transport overlay.
-
-The fix layer draws 8x8 tiles from the S-ROM over the sprite layer, so
-the overlay costs no sprites and never disturbs the video grid. A tile
-is 32 bytes of 4bpp pixels, two per byte with the low nibble on the
-left, and the four column pairs are stored in the order 0x10, 0x18,
-0x00, 0x08. The layout is the one geolith's `geo_lspc_fixline_default`
-reads.
-
-Glyphs are drawn as text art rather than loaded from a font file, which
-keeps the cart free of any font licensing question and keeps the shapes
-editable in place. Index 0 of a fix palette is transparent, so the
-overlay paints its own opaque panel behind the text instead of relying
-on whatever video happens to be underneath.
-"""
-
 from __future__ import annotations
 
 from typing import Final
@@ -950,7 +934,6 @@ GLYPHS: Final[dict[str, int]] = {name: index for index, name in enumerate(GLYPH_
 
 
 def pack_tile(pixels: list[list[int]]) -> bytes:
-    """Pack one 8x8 nibble tile into its 32 S-ROM bytes."""
     if len(pixels) != TILE_PX or any(len(row) != TILE_PX for row in pixels):
         msg = f"fix tile must be 8x8, got {len(pixels)} rows"
         raise ValueError(msg)
@@ -968,7 +951,6 @@ def pack_tile(pixels: list[list[int]]) -> bytes:
 
 
 def build_rom(*, pad_to: int | None = None) -> bytes:
-    """Pack every glyph into an S-ROM image."""
     out = bytearray()
     for name in GLYPH_ORDER:
         out += pack_tile([_resolve(row) for row in _ART[name]])
@@ -981,7 +963,6 @@ def build_rom(*, pad_to: int | None = None) -> bytes:
 
 
 def palette_words() -> list[int]:
-    """CRAM words for the overlay palette, transparent slot first."""
     words = [0] * 16
     words[INK] = pack_palette_word(*_INK_COLOR)
     words[PANEL] = pack_palette_word(*_PANEL_COLOR)

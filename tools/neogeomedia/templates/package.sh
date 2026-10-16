@@ -28,10 +28,6 @@ require "$ROM_DIR/$GAME-m1.m1"
 require "$ROM_DIR/$GAME-c1.c1"
 require "$ROM_DIR/$GAME-c2.c2"
 
-# The containers take one program ROM holding the fixed megabyte and every
-# switchable bank after it. An ngdevkit project builds those as two files,
-# so they are joined here. Leaving the second one out costs the movie its
-# command stream, and the cartridge then plays a blank screen.
 cat "$ROM_DIR/$GAME-p1.p1" > "$STAGE/p1.p1"
 if [[ -f "$ROM_DIR/$GAME-p2.p2" ]]; then
     cat "$ROM_DIR/$GAME-p2.p2" >> "$STAGE/p1.p1"

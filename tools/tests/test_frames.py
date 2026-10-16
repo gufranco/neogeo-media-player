@@ -1,10 +1,3 @@
-"""Source decode tests.
-
-The decode tests drive the real ffmpeg binary against a generated clip
-rather than a stubbed decoder, so the filter chain is checked as ffmpeg
-actually applies it.
-"""
-
 from __future__ import annotations
 
 import subprocess
@@ -65,11 +58,9 @@ class TestFillGeometry:
     def test_a_taller_source_is_cropped_vertically(self):
         geometry = frames.plan_geometry(720, 1280, 320, 224, fit="fill")
 
-        # 4:3 on screen, not the raster's own 320:224
         assert geometry.crop == (720, 540)
 
     def test_a_matching_aspect_is_not_cropped(self):
-        """A source already shaped like the screen, 4:3, survives whole."""
         geometry = frames.plan_geometry(640, 480, 320, 224, fit="fill")
 
         assert geometry.crop == (640, 480)
@@ -358,8 +349,6 @@ class TestFrameHoldPlanning:
 
 
 class TestSourceAnalysis:
-    """What the source itself says about how it should be baked."""
-
     def interlaced_clip(self, tmp_path):
         path = tmp_path / "interlaced.mp4"
         subprocess.run(
@@ -440,14 +429,6 @@ class TestSourceAnalysis:
 
 
 class TestDisplayAspect:
-    """The raster has non-square pixels, so cropping must target the screen.
-
-    An AES drives a 4:3 television with a 320x224 raster, which makes a
-    pixel 0.9333 as wide as it is tall. Cropping a source to the raster's
-    own ratio therefore squashes the picture by that much once it is
-    displayed; cropping to 4:3 is what arrives undistorted.
-    """
-
     def displayed_aspect(self, geometry) -> float:
         width, height = geometry.image
         return (width / height) * frames.PIXEL_ASPECT

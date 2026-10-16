@@ -1,9 +1,3 @@
-"""Plan command tests.
-
-The plan command is the surface a person reads before deciding whether
-to trim a source, so it is driven end to end against a real clip.
-"""
-
 from __future__ import annotations
 
 import subprocess

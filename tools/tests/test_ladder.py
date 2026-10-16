@@ -20,7 +20,6 @@ def point(cost: float, error: float, chroma: float = 1.0, hold: int = 1) -> ladd
 
 class TestTheFrontier:
     def test_a_point_beaten_on_both_axes_is_dropped(self):
-        """Costing more for a worse picture is never worth a rung."""
         good = point(1.0, 0.10)
         beaten = point(1.5, 0.20)
 
@@ -68,11 +67,6 @@ class TestChoosingRungs:
         assert chosen[-1] == kept[-1]
 
     def test_a_crowd_does_not_swallow_every_rung(self):
-        """Fifty settings within a few percent must not use up the ladder.
-
-        Spacing is chosen in cost, not in list position, so a cheap outlier
-        still earns a rung even when it is outnumbered fifty to one.
-        """
         crowded = [point(2.0 - step * 0.01, 0.01 + step * 0.001) for step in range(50)]
         crowded.append(point(0.5, 0.4))
 

@@ -4,16 +4,6 @@
 #include "movie_data.h"
 #include "timeline.h"
 
-/* The fix layer is 32 rows but the raster only shows rows 2 to 29, so the
- * panel is anchored to row 29 rather than to the nominal bottom. Sitting it
- * any higher leaves a band of video below the overlay. */
-/* The fix layer is 32 rows but the raster only shows rows 2 to 29, so the
- * panel is anchored to row 29 rather than to the nominal bottom.
- *
- * The panel reaches the edge but its contents do not. A television
- * overscans, losing something like the outermost cell on every side, so
- * text written on the last visible row is text the viewer may never
- * see. The bottom row is left as padding for that reason. */
 #define MENU_LAST_ROW   29
 #define MENU_ROWS       5
 #define MENU_TOP_ROW    (MENU_LAST_ROW - MENU_ROWS + 1)
@@ -193,8 +183,6 @@ void menu_draw(transport_state state, uint16_t speed, uint8_t sound_on, uint32_t
 #define DEBUG_ROWS      9
 #define DEBUG_LEFT      1
 
-/* Right-aligned so a value that grows a digit does not shift the label
- * beside it, which matters when reading these while the movie runs. */
 static uint16_t draw_number(uint16_t col, uint16_t row, uint32_t value, uint16_t digits)
 {
     uint16_t index = digits;
@@ -223,10 +211,6 @@ void menu_debug_hide(void)
     }
 }
 
-/* One row per frame. Writing the whole page at once is several hundred
- * cells, which does not fit in vblank: the writes spill into active
- * display and the sprite layer comes back shredded. Spread this way the
- * page costs about as much as a single row of text. */
 void menu_debug_row(const debug_stats *stats, uint16_t slot)
 {
     uint16_t row = DEBUG_TOP_ROW;
@@ -279,9 +263,6 @@ void menu_debug_row(const debug_stats *stats, uint16_t slot)
     }
 }
 
-/* Subtitles sit two rows above the transport panel so the two never fight
- * for the same cells, and far enough inside the raster that a television
- * losing its outermost row still shows the whole line. */
 #define SUBTITLE_TOP_ROW  (MENU_TOP_ROW - 3)
 
 void menu_subtitle_show(const unsigned char *rows)

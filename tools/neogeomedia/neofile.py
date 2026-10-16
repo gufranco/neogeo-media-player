@@ -1,24 +1,3 @@
-"""Write the .neo cart container without loading the cart into memory.
-
-This replaces neosdconv, which holds the whole cartridge in a Node heap
-and is killed by the OOM reaper once the C-ROM passes a few tens of
-megabytes. A movie cart is mostly C-ROM by definition, so that ceiling
-bounded the entire project. Writing the container in fixed-size chunks
-keeps memory flat no matter how long the movie is.
-
-The layout was recovered from a known-good neosdconv file and
-cross-checked against geolith's `geo_neo_load`. A 4096-byte header holds
-a magic tag, six little-endian region sizes, four metadata words, a
-33-byte name and a 17-byte manufacturer. The regions follow in the order
-P, S, M, V1, V2, C. A `v21.v2` file is optional: when present it becomes
-the ADPCM-B region, and when absent the loader points ADPCM-B at the
-ADPCM-A data instead. The character region is the two ROM halves
-interleaved byte by byte, which is what the LSPC tile decoder expects.
-
-This module imports only the standard library so the build can run it
-with whatever bare python3 the toolchain container happens to ship.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -69,7 +48,6 @@ def build_header(
     screenshot: int,
     ngh: int,
 ) -> bytes:
-    """Build the 4096-byte container header."""
     if len(name.encode()) >= NAME_BYTES:
         msg = f"name must be shorter than {NAME_BYTES} bytes, got {name!r}"
         raise ValueError(msg)
@@ -121,7 +99,6 @@ def write_neo(
     ngh: int = 0x9999,
     chunk_bytes: int = DEFAULT_CHUNK_BYTES,
 ) -> Path:
-    """Assemble the cart regions into a .neo container."""
     rom_dir = Path(rom_dir)
     paths = {key: _require(rom_dir, key) for key in REGION_FILES}
     voice_two = rom_dir / OPTIONAL_REGION_FILES["v2"]

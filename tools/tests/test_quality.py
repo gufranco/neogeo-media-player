@@ -1,9 +1,3 @@
-"""Quality tier selection tests.
-
-The ladder decides how long a movie can be, so the arithmetic that picks
-a tier is checked directly rather than through a bake.
-"""
-
 from __future__ import annotations
 
 import itertools
@@ -25,7 +19,6 @@ class TestLadder:
         assert len(names) == len(set(names))
 
     def test_the_reference_tier_costs_about_one(self):
-        """Calibration measures this rung, so it anchors the others."""
         assert quality.tier_by_name(quality.REFERENCE_TIER).relative_cost == pytest.approx(
             1.0, abs=0.06
         )
@@ -200,12 +193,6 @@ class TestShortfallMessage:
 
 
 class TestAudioFitsThePageCounter:
-    """ADPCM-B addresses in 256-byte pages through a 16-bit register.
-
-    Page 65,536 does not exist, so filling the voice ROM to exactly
-    16 MiB puts the last page one beyond what the player can name.
-    """
-
     RUNTIMES = (1.0, 10.0, 25.0, 25.4, 26.0, 30.0, 40.0, 90.0)
 
     @pytest.mark.parametrize("minutes", RUNTIMES)
@@ -229,14 +216,6 @@ class TestAudioFitsThePageCounter:
 
 
 class TestReferenceTier:
-    """The top rung concedes nothing the encoder controls.
-
-    True lossless is not reachable on this hardware: a tile may use 15
-    colours and 83% of real tiles hold more than that, so the palette
-    step always loses something. What this tier guarantees is that every
-    avoidable compromise is switched off.
-    """
-
     def tier(self):
         return quality.tier_by_name("reference")
 
@@ -273,14 +252,6 @@ class TestReferenceTier:
 
 
 class TestAudioTakesWhatIsFree:
-    """The voice ROM is its own chip, so audio quality costs no video.
-
-    Nothing about the sample rate touches the character ROM the picture
-    is built from, so the only reason to hold it down is the length of
-    the movie. It should therefore start at what the chip can do and
-    come down only when runtime demands it.
-    """
-
     def test_a_short_movie_gets_the_chip_maximum(self):
         assert quality.audio_hz_for(1.0) == pytest.approx(quality.MAX_AUDIO_HZ, rel=0.01)
 
@@ -300,13 +271,6 @@ class TestAudioTakesWhatIsFree:
 
 
 class TestAudioGrade:
-    """Audio reported on the same eighteen-step scale as the picture.
-
-    The rate itself stays continuous, because audio competes with
-    nothing and rounding it down to a step could only throw quality
-    away. The grade exists so the two can be compared at a glance.
-    """
-
     def test_the_chip_maximum_is_the_top_grade(self):
         assert quality.audio_grade(quality.MAX_AUDIO_HZ) == 1
 
@@ -322,14 +286,6 @@ class TestAudioGrade:
 
 
 class TestPerSourceCurve:
-    """The shape of the cost curve is a property of the content, not the ladder.
-
-    Measured across four sources, a setting's cost relative to the reference
-    varied by up to 2x at the extremes, so a ladder averaged over them
-    mispredicts any single source. Anchoring the curve at both ends of the
-    source itself removes that error.
-    """
-
     def test_the_reference_anchor_is_left_alone(self):
         corrected = quality.rescale(1.0, anchors={2.0: 2.0, 1.0: 1.0, 0.3: 0.3})
 
@@ -366,12 +322,6 @@ class TestPerSourceCurve:
 
 
 class TestUnreachableHolds:
-    """A hold that shows every source frame anyway saves nothing.
-
-    The baker refuses such a hold outright, so a planner that still offers
-    it hands back a tier that cannot be baked.
-    """
-
     VBLANK = 59.185
 
     def test_a_hold_that_drops_no_source_frame_is_not_offered(self):
@@ -458,13 +408,6 @@ class TestPlanAgreesWithTheBake:
 
 
 class TestTheCodeNeverTrims:
-    """Shortening the film is the owner's call, never the baker's.
-
-    Every path that could be tempted to make a source fit by cutting it
-    has to do something else instead: refuse and say how much would have
-    to go, or give up a different budget.
-    """
-
     def test_a_source_that_fits_nowhere_is_refused_rather_than_shortened(self):
         assert quality.select(600.0, 100_000.0) is None
 

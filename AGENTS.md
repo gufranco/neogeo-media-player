@@ -61,7 +61,8 @@ read out of both emulators' decoders.
    packages by a dated snapshot and ngdevkit by version and SHA-256, and runs
    as the calling user.
 2. **No comments or docstrings in source.** Reasoning goes in the commit
-   message, this file or the development log.
+   message, this file, the development log, [`tools/DESIGN.md`](tools/DESIGN.md)
+   for the baker, or [`docs/hardware.md`](docs/hardware.md) for the player.
 3. **Functions under 30 lines, files under 500**, `mypy` strict, `ruff` clean,
    coverage 95%.
 4. **The tier file is a property of films, not of a run.**

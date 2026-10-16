@@ -1,25 +1,3 @@
-"""Exercise the library as compiled C, against a stub of the hardware.
-
-`src/fmv/fmv.c` is the half of the player that touches registers, so it
-cannot run on the host without something standing in for them. The stub
-in `hwstub/hw.h` is that stand-in, and it is deliberately not a faithful
-mirror: the fix-source, palette-bank and bank latches are exposed only
-through the functions that write them, with no read path at all. That is
-what the board offers, and modelling it any other way would let a
-save-by-reading defect pass, which is exactly the defect these tests
-exist to keep out.
-
-What runs here is the translation unit that ships, built by the host
-compiler and called through ctypes, rather than a Python copy of it.
-
-The blobs these tests hand it are packed in the host's byte order rather
-than the cartridge's. Byte order is a property of the target, and what is
-under test is the arithmetic that walks those blobs: which epoch covers a
-frame, which bank an offset falls in, which slot a run starts at. The
-cartridge's own big-endian packing is checked where it belongs, against
-the emulator transcriptions.
-"""
-
 from __future__ import annotations
 
 import ctypes
@@ -108,14 +86,6 @@ PLAYER_BYTES = 256
 
 
 def _stage(root: Path) -> Path:
-    """Copy the library beside the stub, because `#include "hw.h"` is quoted.
-
-    A quoted include resolves against the directory of the file doing the
-    including before it looks at anything on the search path, so the real
-    header would win however the flags are ordered. Standing the sources
-    next to the stub is also how a developer holding an emitted folder
-    sees them: one directory, one header of each name.
-    """
     staged = root / "fmv"
     staged.mkdir()
     for source in sorted(LIBRARY_DIR.glob("*.[ch]")):
@@ -198,7 +168,6 @@ def silent_fmv(tmp_path_factory):
 
 
 def _keyframe_record() -> bytes:
-    """One run covering the whole first column, so a frame writes tiles."""
     body = struct.pack("=H", 1)
     body += struct.pack("=HH", FIRST_SPRITE * SCB1_WORDS_PER_SPRITE, GRID_ROWS)
     for row in range(GRID_ROWS):

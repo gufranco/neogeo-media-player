@@ -1,22 +1,3 @@
-"""Global tile dictionary, sized for a cart filled to the C-ROM ceiling.
-
-A full cart holds 1,048,576 tiles, the whole span of the 20-bit tile
-number, so this has to stay compact at a million entries. Tiles are kept
-in their packed C-ROM form, 64 bytes in each ROM half, and the lookup is
-keyed by a 128-bit digest of those bytes rather than by the bytes
-themselves. Storing full keys would cost more than the tile data.
-
-Flip deduplication is off by default. It was measured on real footage at
-67 saved tiles out of 81,044, under a tenth of a percent, because exact
-16x16 mirrors essentially do not occur in photographed or rendered
-material. Leaving it on would quadruple the lookup for that.
-
-When the dictionary fills, `intern_batch` reports no reference for
-further new tiles rather than raising. A movie longer than the cart can
-hold should degrade by leaving those slots showing their previous tile,
-not by failing the bake outright.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -44,8 +25,6 @@ class TileRef:
 
 
 class TileDictionary:
-    """Interns packed 16x16 nibble tiles, optionally collapsing mirrors."""
-
     def __init__(self, *, allow_flip: bool = False, capacity: int = MAX_TILES) -> None:
         self._allow_flip = allow_flip
         self.capacity = min(capacity, MAX_TILES)
@@ -59,19 +38,9 @@ class TileDictionary:
         return self._count
 
     def is_full(self) -> bool:
-        """True once the tile number has no room left."""
         return self._count >= self.capacity
 
     def reseed(self, epoch: int) -> None:
-        """Stop sharing entries with earlier epochs.
-
-        A tile holds palette indices, not colours, so one interned while
-        a given bank held one epoch's colours draws wrong once that bank
-        holds another's. Salting the key retires every earlier entry
-        without discarding the bytes already written to the ROM. Measured
-        on real footage, scenes share about 0.1% of their tiles, so the
-        cost of giving that up is close to nothing.
-        """
         self._salt = epoch.to_bytes(4, "big")
 
     def _digest(self, first: bytes, second: bytes) -> bytes:
@@ -85,7 +54,6 @@ class TileDictionary:
         )
 
     def intern_batch(self, tiles: npt.NDArray[np.uint8]) -> list[TileRef | None]:
-        """Intern a batch of patterns, packing them in one pass."""
         if tiles.shape[0] == 0:
             return []
         first, second = crom.pack_tiles(tiles)
@@ -115,7 +83,6 @@ class TileDictionary:
         return refs
 
     def intern(self, tile: npt.NDArray[np.uint8]) -> TileRef:
-        """Intern one pattern, rejecting anything the packer would reject."""
         if tile.shape != (TILE_PX, TILE_PX):
             msg = f"tile must be 16x16, got shape {tile.shape}"
             raise ValueError(msg)
@@ -146,16 +113,9 @@ class TileDictionary:
             self._lookup.setdefault(key, (index << _INDEX_SHIFT) | flags)
 
     def payload_bytes(self) -> int:
-        """Length of the dictionary itself, before any padding.
-
-        A C-ROM is a flat array of tiles, so a caller appending its own
-        after the movie's writes them at this offset and its first tile
-        takes the number this dictionary stops at.
-        """
         return self._count * crom.TILE_BYTES_PER_ROM
 
     def rom_images(self, *, pad_to: int | None = None) -> tuple[bytes, bytes]:
-        """The two C-ROM halves, padded to their final size."""
         target = crom.rom_size_for(self._count) if pad_to is None else pad_to
         payload = self._count * crom.TILE_BYTES_PER_ROM
         if target < payload:
@@ -167,7 +127,6 @@ class TileDictionary:
         )
 
     def tiles(self) -> npt.NDArray[np.uint8]:
-        """Unpack the stored patterns, for verification rather than for the ROM."""
         if self._count == 0:
             return np.zeros((0, TILE_PX, TILE_PX), dtype=np.uint8)
         first = np.frombuffer(bytes(self._first), dtype=np.uint8).reshape(self._count, -1)

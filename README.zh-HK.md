@@ -436,6 +436,7 @@ MAME 在全部 224 行中把第 0 欄傳回為黑色。排除這一欄後，剩�
 | [`tools/neogeomedia/`](tools/neogeomedia) | 烘焙器：解碼、顏色、調色盤、字典、編碼器、質素階梯、音訊、ROM 容器、套件輸出 |
 | [`tools/tests/`](tools/tests) | 974 個測試，包括用作測試基準的模擬器轉寫 |
 | [`tools/clips.manifest.json`](tools/clips.manifest.json) | 回歸測試影片：身分、鳴謝及授權，從不包含影片本身 |
+| [`tools/DESIGN.md`](tools/DESIGN.md) | 每個烘焙器模組、腳本及測試為何如此設計，以及背後的量度 |
 | [`tools/scripts/`](tools/scripts) | 擷取、驗證、時序和階梯掃描的輔助工具 |
 | [`toolchain/`](toolchain) | ngdevkit 建置，原生或容器化 |
 | [`FAMILY.md`](FAMILY.md) | 與 sms-media-player 和 fmv-core-python 共用的標準，三者內容相同 |

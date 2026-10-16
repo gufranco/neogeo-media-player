@@ -1,11 +1,3 @@
-"""Cart container tests.
-
-The field offsets and the byte-interleaved C region were recovered from
-a known-good file produced by neosdconv and cross-checked against
-geolith's `geo_neo_load`, so these tests assert against the format the
-emulator actually parses rather than against the writer's own idea of it.
-"""
-
 from __future__ import annotations
 
 import struct

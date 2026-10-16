@@ -9,7 +9,6 @@ MINUTES = 10.0
 
 
 def measurer(true_rates, log, *, exhausted_above=None):
-    """A stand-in for baking: reports what a tier would really cost."""
 
     def measure(tier: quality.Tier) -> probe.Reading:
         log.append(tier.name)
@@ -24,7 +23,6 @@ def measurer(true_rates, log, *, exhausted_above=None):
 
 
 def walk(rates, budget=BUDGET):
-    """The rung a plain walk down the ladder would settle on."""
     for tier in quality.LADDER:
         if rates * tier.relative_cost * MINUTES <= budget:
             return tier.name

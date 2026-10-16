@@ -1,22 +1,3 @@
-"""Keyframe and delta command stream for the on-cart player.
-
-The screen is a 20 by 14 grid of 16x16 tiles held by sprites 1 to 20,
-one sprite per column, chained with the SCB3 sticky bit. Sprite index 0
-is never drawn by the LSPC, so the grid starts at sprite 1. A slot's
-SCB1 entry therefore sits at word address `(col + 1) * 64 + row * 2`.
-
-A frame record is a list of runs. A run carries a VRAM word address and
-a count, followed by that many tile-number and attribute word pairs. The
-player writes the address to REG_VRAMADDR once, sets the auto-increment
-modulo to 1, and streams the words straight out of ROM, so a run costs
-one register setup regardless of length. Consecutive rows in the same
-column merge into one run, which makes a full keyframe exactly twenty
-runs.
-
-Every field is a big-endian 16-bit word, matching 68000 byte order, so
-the player never byte-swaps.
-"""
-
 from __future__ import annotations
 
 import struct
@@ -49,7 +30,6 @@ class SlotUpdate:
 
 
 def vram_address(col: int, row: int) -> int:
-    """SCB1 word address of a grid slot's tile entry."""
     if not (0 <= col < GRID_COLS and 0 <= row < GRID_ROWS):
         msg = f"slot ({col}, {row}) falls outside the {GRID_COLS}x{GRID_ROWS} grid"
         raise ValueError(msg)
@@ -57,7 +37,6 @@ def vram_address(col: int, row: int) -> int:
 
 
 def attribute_word(*, palette: int, tile: int, hflip: bool, vflip: bool) -> int:
-    """Build the SCB1 odd word for a tile entry."""
     if not 0 <= palette < MAX_PALETTE:
         msg = f"palette {palette} does not fit the 8-bit attribute field"
         raise ValueError(msg)
@@ -68,7 +47,6 @@ def attribute_word(*, palette: int, tile: int, hflip: bool, vflip: bool) -> int:
 
 
 def pack_frame(updates: list[SlotUpdate]) -> bytes:
-    """Pack one frame's slot updates into a run-coded record."""
     ordered = sorted(updates, key=lambda u: (u.col, u.row))
     seen: set[tuple[int, int]] = set()
     for item in ordered:
@@ -103,15 +81,6 @@ def pack_frame(updates: list[SlotUpdate]) -> bytes:
 
 
 class MovieStream:
-    """Accumulates frame records and the seek index that points at them.
-
-    The stream lives in the 68000's switchable P-ROM window, so a frame
-    record must never straddle a bank boundary; the player would have to
-    change banks mid-record to finish reading it. Padding a record
-    forward to the next bank costs at most one record per megabyte and
-    keeps the player's inner loop free of any bank check.
-    """
-
     def __init__(self, *, bank_size: int = PROM_BANK_BYTES) -> None:
         self._bank_size = bank_size
         self._blob = bytearray()
@@ -122,7 +91,6 @@ class MovieStream:
         return len(self._offsets)
 
     def append(self, updates: list[SlotUpdate], *, keyframe: bool = False) -> None:
-        """Add one frame record, keeping it inside a single bank."""
         record = pack_frame(updates)
         if len(record) > self._bank_size:
             msg = f"frame record of {len(record)} bytes exceeds the {self._bank_size} byte bank"
@@ -137,19 +105,9 @@ class MovieStream:
         self._blob += record
 
     def payload_size(self) -> int:
-        """Bytes written so far, before padding out to whole banks."""
         return len(self._blob)
 
     def bank_count(self) -> int:
-        """Number of switchable banks the stream occupies, always at least one.
-
-        Real hardware latches only three bits of bank number, and MAME
-        masks the register with 0x07 to match. geolith allows far more,
-        so a cart that overruns eight banks runs correctly in one
-        emulator and silently reads the wrong bank on a console. The
-        limit is enforced at bake time rather than discovered on
-        hardware.
-        """
         banks = max(1, (len(self._blob) + self._bank_size - 1) // self._bank_size)
         if banks > PROM_BANK_LIMIT:
             msg = (
@@ -160,7 +118,6 @@ class MovieStream:
         return banks
 
     def blob(self) -> bytes:
-        """The stream padded out to whole banks."""
         return bytes(self._blob).ljust(self.bank_count() * self._bank_size, b"\x00")
 
     def frame_offsets(self) -> npt.NDArray[np.uint32]:

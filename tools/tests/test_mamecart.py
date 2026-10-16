@@ -1,12 +1,3 @@
-"""MAME cart packaging tests.
-
-The dataarea names and load flags are the ones MAME's Neo Geo cart slot
-looks for, taken from `src/devices/bus/neogeo/slot.cpp`. Packaging for a
-second, independent emulator is the closest available stand-in for a
-console: an encoding that both geolith and MAME agree on is far more
-likely to be right on hardware than one confirmed by either alone.
-"""
-
 from __future__ import annotations
 
 import hashlib

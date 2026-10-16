@@ -1,13 +1,3 @@
-"""Fix-layer glyph tests.
-
-`geolith_fix_pixel` transcribes the S-ROM decode in geolith's
-`geo_lspc_fixline_default`. A fix tile is 32 bytes holding 8x8 pixels at
-four bits each, two pixels per byte with the low nibble on the left, and
-the column pairs are stored in the order 0x10, 0x18, 0x00, 0x08. Reading
-the packed bytes back through that order proves the glyphs land on
-screen the way they were drawn.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -26,7 +16,6 @@ def decode(tile: bytes) -> list[list[int]]:
 
 
 def glyph(name: str) -> list[list[int]]:
-    """The drawn pixels of one named glyph, read back out of the ROM."""
     index = fixtiles.GLYPHS[name]
     rom = fixtiles.build_rom()
     return decode(rom[index * fixtiles.TILE_BYTES : (index + 1) * fixtiles.TILE_BYTES])
@@ -157,8 +146,6 @@ class TestPalette:
 
 
 class TestOverlayStyling:
-    """The overlay reads as a seek bar rather than a row of blocks."""
-
     def test_every_glyph_index_fits_the_fix_tile_field(self):
         assert max(fixtiles.GLYPHS.values()) < fixtiles.MAX_TILE_INDEX
 

@@ -1,28 +1,3 @@
-"""Encode mono audio into the YM2610's ADPCM-B format.
-
-The algorithm is the one ymfm implements in `adpcm_b_channel_clock`,
-which is the decoder geolith runs and the reference MAME shares. Each
-4-bit nibble carries a sign in bit 3 and a magnitude in bits 2 to 0, the
-predictor moves by `(2 * magnitude + 1) * step / 8`, and the step is
-then scaled by `[57, 57, 57, 57, 77, 102, 128, 153] / 64` and clamped to
-the range 127 to 24576. The predictor starts at zero with the smallest
-step. The high nibble of a byte is played first.
-
-The encoder is closed-loop: it runs the decoder's own state machine and
-picks, for each sample, the nibble whose resulting predictor lands
-nearest the target. Choosing greedily against the real decoder state is
-what keeps quantization error from accumulating, and it means the
-encoder cannot drift away from what the chip will produce.
-
-ADPCM-B addresses are in 256-byte pages, so the payload is padded to a
-page boundary and the start and end registers hold page numbers. Padding
-uses 0x08 rather than 0x00 because there is no zero delta in this
-format: the smallest magnitude still moves the predictor, so a run of
-0x00 ramps steadily to full scale. 0x08 pairs a positive step with a
-negative one and stays put, which keeps the tail of the ROM quiet if the
-end address is ever overshot.
-"""
-
 from __future__ import annotations
 
 import math
@@ -58,22 +33,14 @@ class EncodedAudio:
 
     @property
     def start_address(self) -> int:
-        """Start register value, in 256-byte pages."""
         return 0
 
     @property
     def end_address(self) -> int:
-        """End register value, in 256-byte pages, inclusive."""
         return (len(self.payload) - 1) >> 8
 
 
 def delta_n_for(rate_hz: float) -> int:
-    """Rate register for a target sample rate.
-
-    ymfm advances a 16-bit accumulator by this value each chip sample
-    and consumes a nibble when it passes 0x10000, so the divisor is
-    65536 rather than the 65535 the hardware notes quote.
-    """
     if not 0 < rate_hz <= BASE_RATE_HZ:
         msg = f"rate {rate_hz} must be above 0 and at most {BASE_RATE_HZ} Hz"
         raise ValueError(msg)
@@ -81,28 +48,19 @@ def delta_n_for(rate_hz: float) -> int:
 
 
 def exact_rate(delta_n: int) -> Fraction:
-    """Sample rate produced by a rate register value, without rounding."""
     return CHIP_RATE_HZ * delta_n / DELTA_N_UNITY
 
 
 def rate_below(rate_hz: float) -> float:
-    """The nearest playable rate at or under a wanted one.
-
-    `delta_n_for` rounds to the nearest step, which can land above the
-    caller's ceiling. Flooring onto the grid keeps a rate that has to
-    fit inside a budget from quietly exceeding it.
-    """
     delta_n = max(1, math.floor(rate_hz * DELTA_N_UNITY / CHIP_RATE_HZ))
     return rate_for(min(DELTA_N_MAX, delta_n))
 
 
 def rate_for(delta_n: int) -> float:
-    """Sample rate produced by a rate register value."""
     return float(exact_rate(delta_n))
 
 
 def encode(samples: npt.NDArray[np.integer], *, rate_hz: float = 22050.0) -> EncodedAudio:
-    """Encode 16-bit mono samples into ADPCM-B nibbles."""
     if samples.ndim != 1:
         msg = f"audio must be mono, got shape {samples.shape}"
         raise ValueError(msg)
@@ -155,7 +113,6 @@ def encode(samples: npt.NDArray[np.integer], *, rate_hz: float = 22050.0) -> Enc
 
 
 def build_rom(encoded: EncodedAudio, *, pad_to: int | None = None) -> bytes:
-    """Lay the encoded payload out as the ADPCM-B voice ROM."""
     target = len(encoded.payload) if pad_to is None else pad_to
     if target < len(encoded.payload):
         msg = f"pad_to {target} is smaller than the {len(encoded.payload)} byte payload"

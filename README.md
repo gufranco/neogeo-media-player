@@ -442,6 +442,7 @@ The [cutscene example](examples/cutscene) has run on a board too and came back t
 | [`tools/neogeomedia/`](tools/neogeomedia) | The baker: decode, colour, palettes, dictionary, encoder, quality ladder, audio, ROM containers, bundle emission |
 | [`tools/tests/`](tools/tests) | 974 tests, including the emulator transcriptions used as oracles |
 | [`tools/clips.manifest.json`](tools/clips.manifest.json) | The regression films: identity, credit and licence, never the films |
+| [`tools/DESIGN.md`](tools/DESIGN.md) | Why each baker module, script and test is shaped as it is, with the measurements behind it |
 | [`tools/scripts/`](tools/scripts) | Capture, verification, timing and ladder-sweep helpers |
 | [`toolchain/`](toolchain) | The ngdevkit build, native or containerised |
 | [`FAMILY.md`](FAMILY.md) | The standard shared with sms-media-player and fmv-core-python, identical in each |

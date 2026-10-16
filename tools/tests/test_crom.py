@@ -1,13 +1,3 @@
-"""Tile packer tests.
-
-`GeolithTileReader` is an independent transcription of `geo_lspc_tpix`
-and the sprite pixel loop in geolith's `src/geo_lspc.c`. It reads the
-byte-interleaved C-ROM the way the target emulator does, including the
-flip handling, so a round trip through it proves the packed bytes render
-as the source tile rather than merely matching the packer's own
-arithmetic.
-"""
-
 from __future__ import annotations
 
 import numpy as np

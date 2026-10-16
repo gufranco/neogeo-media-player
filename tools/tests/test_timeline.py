@@ -1,16 +1,3 @@
-"""Exercise the player's pure core as compiled C, not as a reimplementation.
-
-`src/timeline.c` holds every lookup and every piece of arithmetic the
-68000 player does that has no hardware in it: which keyframe a seek
-lands on, which cue covers a frame, which ADPCM page the audio wants,
-how far along the seek bar sits. A mistake in any of them is silent,
-because the picture still appears and only the wrong part of it does.
-
-These build the real translation unit with the host compiler and call
-into it, so what is under test is the code that ships rather than a
-Python copy of it that could drift.
-"""
-
 from __future__ import annotations
 
 import ctypes

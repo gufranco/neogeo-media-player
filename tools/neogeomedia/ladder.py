@@ -1,18 +1,3 @@
-"""Measure what each quality setting costs, and build the ladder from that.
-
-The rungs used to be hand-picked, with their relative costs written down
-from ad-hoc runs. That is how the ladder ended up with a rung strictly
-worse than the one below it: nothing was comparing them.
-
-Here a grid of settings is encoded against the same decoded clip, so cost
-and error are measured under identical conditions. Anything beaten on both
-axes at once is dropped, and the rungs are spread evenly through the cost
-that survives. A rung therefore always buys something over the rung below.
-
-Decoding dominates the run, so the clip is decoded once and every setting
-is encoded against it.
-"""
-
 from __future__ import annotations
 
 import math
@@ -42,17 +27,10 @@ HOLD_SWEEP: Final = (1, 2, 3, 4, 5, 6)
 _DEFAULT_CANDIDATES: Final[int] = quality.Tier(
     "probe", 1.0, 1, 0.0005, 0.0, 1.0, "probe"
 ).candidates
-"""The ladder's own default, read off a throwaway rung rather than repeated.
-
-A slots dataclass exposes a descriptor rather than the default on the class,
-so the value has to come from an instance.
-"""
 
 
 @dataclass(frozen=True, slots=True)
 class Point:
-    """One measured setting: what it cost and how wrong it looked."""
-
     chroma_weight: float
     tolerance: float
     frame_hold: int
@@ -68,7 +46,6 @@ def measure_point(
     frame_hold: int,
     seed: int,
 ) -> Point:
-    """Encode one setting against an already decoded clip."""
     sample_tiles = encode.to_tiles(neocolor.rgb_to_color_index(clip[::4])).reshape(-1, 16, 16)
     result = encode.encode_stream(
         [clip],
@@ -93,11 +70,6 @@ def measure_point(
 
 
 def frontier(points: Sequence[Point]) -> list[Point]:
-    """Drop every setting beaten on cost and on error at once.
-
-    What remains is the set worth having a rung for: each one is either
-    cheaper or better than everything else that survived.
-    """
     ranked = sorted(points, key=lambda entry: (entry.cost, entry.error))
     kept: list[Point] = []
     best_error = math.inf
@@ -110,12 +82,6 @@ def frontier(points: Sequence[Point]) -> list[Point]:
 
 
 def choose(measured: Sequence[Point], *, count: int) -> list[Point]:
-    """Spread `count` rungs evenly through the measured cost range.
-
-    Even spacing in cost, not in list position, is what makes a rung buy
-    something: a frontier can crowd twenty settings into a few percent and
-    leave a chasm below them.
-    """
     if len(measured) <= count:
         return list(measured)
     top, bottom = measured[0].cost, measured[-1].cost
@@ -140,12 +106,6 @@ def _summary(entry: Point) -> str:
 
 
 def to_tiers(measured: Sequence[Point], *, reference_cost: float) -> list[quality.Tier]:
-    """Turn measured points into ladder rungs with costs relative to the reference.
-
-    The top rung searches every palette rather than a shortlist. It is the
-    rung chosen when nothing is being economised, so the one place where the
-    shortlist's occasional wrong pick is not worth its speed.
-    """
     return [
         quality.Tier(
             name=f"q{index + 1:02d}",
@@ -168,7 +128,6 @@ def sweep(
     seconds: float = calibrate.DEFAULT_SAMPLE_SECONDS,
     seed: int = 0,
 ) -> list[Point]:
-    """Measure every setting in the grid against one source."""
     info = ffmpeg.probe(source)
     windows = calibrate.sample_windows(info.duration, count=count, seconds=seconds)
     clip = np.concatenate(
@@ -197,12 +156,6 @@ def sweep(
 
 
 def _paired_tolerances() -> list[float]:
-    """Loosen the redraw threshold in step with the colour weight.
-
-    The two levers move together: a picture already charged less for colour
-    error has nothing to gain from being redrawn on a colour change too
-    small to see.
-    """
     span = len(CHROMA_SWEEP) - 1
     low, high = math.log(TOLERANCE_SWEEP[0]), math.log(TOLERANCE_SWEEP[-1])
     return [math.exp(low + (high - low) * index / span) for index in range(len(CHROMA_SWEEP))]

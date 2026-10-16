@@ -11,8 +11,6 @@ typedef enum {
     TRANSPORT_STOP
 } transport_state;
 
-/* What the debug page reports. Everything here is either a fact of the
- * bake or a live measurement the player can take cheaply once a frame. */
 typedef struct {
     uint32_t frame;
     uint32_t total;

@@ -1,22 +1,3 @@
-"""Turn vblank-rate frames into a tile dictionary and a command stream.
-
-The encoder walks the clip one frame at a time holding a model of what
-the LSPC currently shows. A slot is only touched when its source content
-changed since the previous frame and the change is large enough to see,
-which is what makes a 24 fps source cheap at the 59 Hz refresh: every
-repeated source frame leaves all 280 slots alone and costs two bytes.
-
-Keyframes rewrite all 280 slots whether or not they changed. That is
-what makes them random-access entry points for the transport controls,
-so the cost is deliberate. A keyframe also fires on a scene cut, where
-most of the frame changed anyway and a delta would be no cheaper.
-
-There is no framebuffer on this hardware, so there are no additive
-residuals. Every correction resolves to pointing a slot at some tile
-that exists in the dictionary, which means residual precision is
-dictionary richness is C-ROM.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator, Sequence
@@ -100,7 +81,6 @@ class EncodeResult:
 
 
 def to_tiles(frame_colors: npt.NDArray[np.uint16]) -> npt.NDArray[np.uint16]:
-    """Split frames of color indices into a (frame, row, col, y, x) grid."""
     count = frame_colors.shape[0]
     return frame_colors.reshape(count, GRID_ROWS, TILE_PX, GRID_COLS, TILE_PX).transpose(
         0, 1, 3, 2, 4
@@ -108,7 +88,6 @@ def to_tiles(frame_colors: npt.NDArray[np.uint16]) -> npt.NDArray[np.uint16]:
 
 
 def from_tiles(tiles: npt.NDArray[np.uint16]) -> npt.NDArray[np.uint16]:
-    """Reassemble one grid of tiles into a full frame."""
     return tiles.transpose(0, 2, 1, 3).reshape(FRAME_HEIGHT, FRAME_WIDTH)
 
 
@@ -119,22 +98,6 @@ def _masked_threshold(
     options: EncodeOptions,
     tolerance: float,
 ) -> npt.NDArray[np.float32] | float:
-    """Per-slot error budget, raised where the picture is moving.
-
-    Vision is far less sensitive to spatial detail in a region that is
-    changing quickly, and far more sensitive in one that is still, where
-    an error sits on screen and stays visible. A single flat threshold
-    spends the same precision on both. Scaling the budget by how much
-    the source itself moved buys back tiles from exactly the places the
-    eye cannot inspect them, which is the whole point of a lossy codec.
-
-    A masking factor of zero reproduces the flat threshold.
-
-    Masking is only safe because a skipped slot stays pending and is
-    re-tested every frame. Once its motion stops the budget collapses
-    back to the flat threshold and the slot is corrected, so an error
-    hidden by movement never outlives the movement that hid it.
-    """
     if options.motion_masking <= 0.0 or previous is None:
         return tolerance
     moved = _movement(current, previous, targets, options.chroma_weight)
@@ -147,7 +110,6 @@ def _movement(
     targets: npt.NDArray[np.bool_],
     chroma_weight: float,
 ) -> npt.NDArray[np.float32]:
-    """Mean squared Oklab distance the source itself moved, per slot."""
     grid = palettes.oklab_grid(chroma_weight)
     moved: npt.NDArray[np.float32] = (
         ((grid[current[targets]] - grid[previous[targets]]) ** 2).sum(axis=3).mean(axis=(1, 2))
@@ -156,43 +118,6 @@ def _movement(
 
 
 class _RateController:
-    """Keeps tile spending on pace so the movie fits the cartridge.
-
-    A tier is chosen from a sample, and a sample cannot know that the
-    third act is busier than the first. Left alone the dictionary runs
-    out partway through and every remaining slot freezes, which wrecks
-    the end of the film instead of costing a little quality across all
-    of it.
-
-    Correcting from cumulative overshoot proved far too slow. By the
-    time the running total is visibly over, the only thresholds that
-    would still recover the deficit are ones this controller would take
-    hundreds of frames to reach, so it arrives after the dictionary has
-    already hit its cap. This instead compares the recent rate of tile
-    creation against the rate the remaining budget affords, and holds a
-    multiplier that persists between frames so it keeps moving until it
-    actually bites.
-
-    The multiplier never falls below one, so the tier's threshold is a
-    floor and the controller only ever tightens. Letting it relax was
-    tried, in the hope of spending the capacity a discrete tier leaves
-    behind, and it loses in both the forms attempted. Tile spending is
-    heavily front-loaded, since an empty dictionary mints a tile for
-    almost every slot and a full one reuses: over one clip the four
-    quarters spent 7,030, 16,229, 11,572 and 22,704 updates against a
-    flat expectation of 14,247. A controller pacing against a uniform
-    budget therefore relaxes exactly when spending is naturally light
-    and starves the passages that legitimately need the tiles. Filling
-    the cartridge to 100% that way scored 26.63 where never relaxing
-    scored 20.11.
-
-    Spending the leftover capacity needs a budget curve shaped like the
-    content rather than a straight line, which is a two-pass problem.
-
-    The multiplier never falls below one, so the tier's own threshold is
-    a floor and the controller can only tighten.
-    """
-
     _SMOOTHING: Final = 0.05
     _RAMP_LIMIT: Final = 1.25
     _DECAY: Final = 0.90
@@ -207,7 +132,6 @@ class _RateController:
         self._rate = 0.0
 
     def tolerance(self, tiles_used: int, index: int, total_frames: int) -> float:
-        """The error budget for this frame."""
         if self._budget <= 0 or total_frames <= 0:
             return self._base
         added = tiles_used - self._previous_tiles
@@ -231,12 +155,6 @@ class _RateController:
 
 
 def _new_dictionary(options: EncodeOptions) -> TileDictionary:
-    """The dictionary this encode may fill, capped by any tile budget.
-
-    Capping here rather than in the controller is what makes the budget
-    a guarantee: no threshold can be raised high enough to slow some
-    content down, but a dictionary that refuses to grow always holds.
-    """
     capacity = options.dictionary_capacity
     if options.tile_budget > 0:
         capacity = min(capacity, options.tile_budget)
@@ -250,21 +168,6 @@ def _is_scene_cut(
     index: int,
     options: EncodeOptions,
 ) -> bool:
-    """Whether the picture jumped rather than moved.
-
-    A cut earns a keyframe because a delta could not be cheaper when
-    nearly every slot has to be rewritten anyway. Deciding that on the
-    count of slots that differ at all does not work on photographed
-    material: grain, dither, and any gentle camera move perturb almost
-    every slot by a shade every frame, so a plain count reads a still
-    scene as a cut. Measured on real footage that fired on 22% of all
-    frames, and each false cut rewrote all 280 slots and interned the
-    tiles a delta would have skipped.
-
-    Magnitude separates the two cases cleanly. A slot counts toward a
-    cut only once the source moved further than `scene_cut_floor`, which
-    leaves gradual motion to the delta path where it belongs.
-    """
     if index == 0 or previous is None:
         return True
     if not changed.any():
@@ -285,17 +188,6 @@ def _select_targets(
     options: EncodeOptions,
     tolerance: float,
 ) -> tuple[npt.NDArray[np.bool_], npt.NDArray[np.bool_]]:
-    """Which slots to redraw this frame, and which stay owed a redraw.
-
-    A keyframe takes every slot and clears the backlog, which is what
-    makes it a seek target. Otherwise a slot is a candidate when its
-    source changed or when an earlier frame skipped it, and it is only
-    redrawn when the picture on screen has drifted past the budget.
-
-    A skipped slot stays pending rather than being forgotten, so an
-    error the encoder chose to tolerate is re-tested on every later
-    frame and repaired as soon as it stops being cheap to hide.
-    """
     if keyframe:
         return (
             np.ones((GRID_ROWS, GRID_COLS), dtype=bool),
@@ -313,7 +205,6 @@ def _select_targets(
 def _tile_frames(
     chunks: Iterable[npt.NDArray[np.uint8]],
 ) -> Iterator[npt.NDArray[np.uint16]]:
-    """Yield one frame's tile grid at a time from chunks of RGB frames."""
     for chunk in chunks:
         grids = to_tiles(neocolor.rgb_to_color_index(chunk))
         for index in range(grids.shape[0]):
@@ -331,8 +222,6 @@ def _validate(clip: npt.NDArray[np.uint8]) -> None:
 
 @dataclass(slots=True)
 class _Totals:
-    """Running counters the encode loop accumulates across frames."""
-
     keyframe_bytes: int = 0
     delta_bytes: int = 0
     error_total: float = 0.0
@@ -344,7 +233,6 @@ class _Totals:
     peak_tolerance: float = 0.0
 
     def track_tolerance(self, tolerance: float) -> float:
-        """Record the highest budget the controller had to reach."""
         self.peak_tolerance = max(self.peak_tolerance, tolerance)
         return tolerance
 
@@ -393,8 +281,6 @@ def _build_stats(
 
 
 class _Screen:
-    """What the LSPC is currently showing, tracked slot by slot."""
-
     def __init__(self, palette_set: palettes.PaletteSet) -> None:
         self._palette_set = palette_set
         self.tile = np.full((GRID_ROWS, GRID_COLS), -1, dtype=np.int64)
@@ -406,37 +292,15 @@ class _Screen:
     def drift(
         self, source: npt.NDArray[np.uint16], targets: npt.NDArray[np.bool_]
     ) -> npt.NDArray[np.float32]:
-        """Mean squared Oklab distance between the source and the picture on screen."""
         grid = palettes.oklab_grid(self._palette_set.chroma_weight)
         source_lab = grid[source[targets]]
         screen_lab = grid[self.render[targets]]
         return ((source_lab - screen_lab) ** 2).sum(axis=3).mean(axis=(1, 2))
 
     def retarget(self, palette_set: palettes.PaletteSet) -> None:
-        """Point the model at a new epoch's colours.
-
-        What is on screen does not change, so the model of it must not
-        either. Only the palettes that later assignments are measured
-        against move.
-        """
         self._palette_set = palette_set
 
     def fidelity(self, source: npt.NDArray[np.uint16]) -> float:
-        """Mean squared Oklab error of the whole displayed frame.
-
-        Deliberately measured on the unweighted grid over every slot,
-        including the ones the encoder chose not to redraw. `mean_error`
-        averages the palette error of tiles that were written, so it
-        improves when the encoder skips more work, which makes it
-        useless for judging output quality. This is the number that
-        answers whether the picture on screen still matches the source,
-        and no encoder knob can flatter it.
-
-        The comparison is against the true source frame for this refresh,
-        never the frame the encoder chose to hold. Holding a frame across
-        four refreshes is a real error the viewer sees, so measuring
-        against the held copy would score a cheat as free.
-        """
         grid = palettes.oklab_grid(palettes.DEFAULT_CHROMA_WEIGHT)
         error: float = float(((grid[source] - grid[self.render]) ** 2).sum(axis=4).mean())
         return error
@@ -450,7 +314,6 @@ class _Screen:
         *,
         force: bool,
     ) -> list[stream.SlotUpdate]:
-        """Write the chosen tiles into the model and list what must be sent."""
         display = assignment.rendered(self._palette_set)
         updates: list[stream.SlotUpdate] = []
         for slot, (row, col) in enumerate(zip(rows, cols, strict=True)):
@@ -485,7 +348,6 @@ class _Screen:
 
 
 def encode(clip: npt.NDArray[np.uint8], options: EncodeOptions) -> EncodeResult:
-    """Encode a whole in-memory clip. Convenience wrapper over `encode_stream`."""
     _validate(clip)
     sample = to_tiles(neocolor.rgb_to_color_index(clip[:: max(1, options.sample_stride)]))
     return encode_stream(
@@ -501,18 +363,6 @@ def _build_palette_sets(
     sample_tiles: npt.NDArray[np.uint16],
     epoch_samples: Sequence[tuple[int, npt.NDArray[np.uint16]]] | None,
 ) -> tuple[list[int], list[palettes.PaletteSet]]:
-    """One palette set per epoch, alternating between the two CRAM halves.
-
-    Colours refitted per scene score around a tenth better than a single
-    set stretched over a whole feature, but the new set has to reach CRAM
-    before the scene it belongs to appears. Alternating halves buys that
-    time: the next epoch is written into the half nobody is reading while
-    the current one is still on screen.
-
-    A movie with one epoch has nothing to alternate with, so it keeps the
-    whole allocation. Halving it there would give up half the colours to
-    buy time nobody needs.
-    """
     if not epoch_samples:
         return [0], [
             palettes.build_palette_set(
@@ -560,7 +410,6 @@ def _enter_epoch(
     dictionary: TileDictionary,
     options: EncodeOptions,
 ) -> palettes.PaletteAssigner:
-    """Move the encoder onto a new epoch's colours."""
     screen.retarget(palette_set)
     dictionary.reseed(epoch)
     return palettes.PaletteAssigner(
@@ -579,7 +428,6 @@ def _advance_epoch(
     dictionary: TileDictionary,
     options: EncodeOptions,
 ) -> tuple[int, palettes.PaletteAssigner]:
-    """Move onto the next palette epoch once this frame has reached it."""
     if epoch + 1 >= len(epoch_starts) or index < epoch_starts[epoch + 1]:
         return epoch, assigner
     following = epoch + 1
@@ -587,24 +435,15 @@ def _advance_epoch(
 
 
 def _render_buffer(total_frames: int, options: EncodeOptions) -> npt.NDArray[np.uint16]:
-    """Somewhere to keep every rendered frame, when the caller wants them."""
     kept = total_frames if options.collect_rendered else 0
     return np.zeros((kept, FRAME_HEIGHT, FRAME_WIDTH), dtype=np.uint16)
 
 
 def _should_stop(dictionary: TileDictionary, options: EncodeOptions) -> bool:
-    """Whether a probe bake has learned everything it can."""
     return options.stop_when_over_budget and _out_of_room(dictionary, options)
 
 
 def _out_of_room(dictionary: TileDictionary, options: EncodeOptions) -> bool:
-    """Whether this bake can no longer finish inside its budget.
-
-    Once the dictionary is full or the budget is spent, every later frame
-    stops interning new tiles and the picture stops tracking the source.
-    Nothing after that point can change the verdict, so a probe bake has
-    no reason to keep decoding.
-    """
     if dictionary.is_full():
         return True
     return options.tile_budget > 0 and len(dictionary) >= options.tile_budget
@@ -620,7 +459,6 @@ def _record_frame(
     options: EncodeOptions,
     on_render: Callable[[npt.NDArray[np.uint16]], None] | None,
 ) -> None:
-    """Score this frame and hand the picture to whoever wants it."""
     totals.displayed_error_total += screen.fidelity(incoming)
     totals.displayed_frames += 1
     if index % BLURRED_EVERY == 0:
@@ -647,13 +485,6 @@ def encode_stream(
     epoch_samples: Sequence[tuple[int, npt.NDArray[np.uint16]]] | None = None,
     on_render: Callable[[npt.NDArray[np.uint16]], None] | None = None,
 ) -> EncodeResult:
-    """Encode frames as they arrive, holding only two frames at a time.
-
-    A cart filled to the character-ROM ceiling is around 15,600 frames.
-    Neither the source nor the rendered output fits in memory at that
-    length, so the palette set is fitted from a strided sample taken in
-    an earlier pass and the frames themselves stream past.
-    """
     epoch_starts, palette_sets = _build_palette_sets(options, sample_tiles, epoch_samples)
     epoch = 0
     dictionary = _new_dictionary(options)

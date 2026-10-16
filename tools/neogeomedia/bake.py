@@ -1,29 +1,3 @@
-"""Drive the bake passes and report what the movie costs in ROM.
-
-Writes the cart-side artifacts under `build/baked/` and the generated
-sources under `build/generated/`. Blobs reach the ROM through `.incbin`
-in an assembly stub rather than as C arrays. Measured on this toolchain,
-a C array costs about five times its own size in source text and 0.4
-seconds per 256 KiB; the tables alone would be tolerable either way, and
-the character ROM would not, since it never passes through the compiler
-at all and turning it into source would mean compiling it only to
-extract the same bytes back out.
-
-The character ROM halves are written at the dictionary's own length with
-no padding. A sprite ROM is a flat array of tiles, so a caller appending
-its own writes them straight after the movie's, and whoever assembles
-the cartridge pads to the power of two the hardware needs.
-
-The stub names those blobs by filename alone and leaves the assembler
-to find them on its include path, so the build passes `-I` for the baked
-directory. Writing the path the baker happened to use would pin the
-sources to one machine, and a bake taken from anywhere but the build
-tree would fail to assemble.
-
-The preview output re-encodes the decoded picture at the vblank rate, so
-the quantization can be judged in motion without booting a cart.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -66,54 +40,20 @@ _SCENE_CUT_SHARE: Final = 0.6
 
 MOVIE_SYMBOL: Final = "fmv_movie_data"
 STREAM_BASE_SYMBOL: Final = "fmv_stream_base"
-"""Link-time byte offset of the stream inside the switchable window.
-
-The value arrives through `--defsym` at link time rather than baked in,
-because which switchable bank the stream starts at is decided by the
-project doing the linking. A cartridge whose banks are otherwise empty
-starts it at zero; a game that already banks code of its own moves it up
-without re-baking anything.
-"""
 
 STREAM_BANK_SYMBOL: Final = "fmv_stream_bank"
 STREAM_BANK_STEM: Final = "fmv_stream__bank"
-"""File-name stem of the per-bank stubs.
-
-ngdevkit's linkscript keeps every object whose file name contains
-`__bank` out of the fixed megabyte and gathers it into `.text2`, which
-the cartridge rules turn into one switchable bank. The doubled
-underscore is the convention, not a typo.
-"""
 
 PALETTE_WORDS_PER_FRAME: Final = 48
-"""How many colour words the player uploads per frame.
-
-The figure is a vblank budget rather than a preference, and the baker has to
-agree with it: an epoch shorter than the upload of the one after it shows a
-half-written palette. It is emitted into the header so the player reads this
-value rather than keeping a second copy of it.
-"""
 
 EPOCH_UPLOAD_MARGIN: Final = 3
-"""How many upload times an epoch must last.
-
-One would be the bare minimum and would leave nothing for the frames where
-the transport or the diagnostics page is also writing to the fix layer.
-"""
 
 WORDS_PER_PALETTE: Final = 16
 
 SAMPLES_PER_EPOCH: Final = 64
-"""How many frames each epoch's palettes are fitted from.
-
-This is the quantity that decides palette quality, so it is the one worth
-holding steady. Fixing the stride instead let it drift with the epoch
-length, which is measured from the source and therefore varies per film.
-"""
 
 
 def stride_for_epoch(*, epoch_frames: int) -> int:
-    """Sample every nth frame, so an epoch contributes about the target count."""
     return max(1, round(epoch_frames / SAMPLES_PER_EPOCH))
 
 
@@ -121,15 +61,6 @@ FIX_PALETTE_BANK: Final = 1
 S_ROM_BYTES: Final = 131072
 
 CYCLES_PER_UPDATE: Final = 64
-"""What one slot update costs in `apply_frame`'s inner loop.
-
-Read off the compiled loop rather than assumed, and the same six
-instructions the project README walks through: 12 for the port address
-reload, 12 and 16 for the two data writes, 8 for the pointer bump, 6 for
-the compare and 10 for the taken branch. It counts the per-tile loop
-only. A frame also pays a setup per run, twenty of them on a full
-keyframe, so a budget taken from this is a floor rather than a ceiling.
-"""
 
 CYCLES_PER_LINE: Final = 768
 BLANK_LINES: Final = 40
@@ -137,7 +68,6 @@ VBLANK_CYCLES: Final = (BLANK_LINES - 1) * CYCLES_PER_LINE
 
 
 def has_audio_stream(source: Path) -> bool:
-    """True when the source carries at least one audio stream."""
     result = subprocess.run(
         [
             "ffprobe",
@@ -161,11 +91,6 @@ def has_audio_stream(source: Path) -> bool:
 def _decode_audio(
     source: Path, start: float, duration: float, rate_hz: float
 ) -> npt.NDArray[np.int16]:
-    """Decode the source soundtrack to mono 16-bit at the target rate.
-
-    A source with no audio track is a normal input, not a failure, so
-    this reports an empty signal and the bake simply omits the voice ROM.
-    """
     if not has_audio_stream(source):
         return np.zeros(0, dtype=np.int16)
     result = subprocess.run(
@@ -197,7 +122,6 @@ def _decode_audio(
 
 
 def self_tier_name(request: BakeRequest) -> str:
-    """The rung this cart was baked at, for the overlay to display."""
     return (request.quality or "custom").upper()[:8]
 
 
@@ -227,7 +151,6 @@ def _fix_defines() -> str:
 
 
 _PROFILE_SECONDS: Final = 30.0
-"""How much of the source to profile. Long enough to see several cuts."""
 
 _HEADER_TEMPLATE: Final = """#ifndef MOVIE_DATA_H
 #define MOVIE_DATA_H
@@ -370,12 +293,6 @@ class BakeRequest:
     stop_when_over_budget: bool = False
     audio_rate_hz: float | None = None
     subtitles: Path | None = None
-    """Sample rate for the voice ROM, or None to take the highest that fits.
-
-    There is no sensible constant here. The ceiling is the chip's, the floor
-    is however slow the sample has to run to end on an addressable page, and
-    which of the two applies depends entirely on how long the movie is.
-    """
     audio: bool = True
 
 
@@ -387,7 +304,6 @@ class BakeOutcome:
     artifacts: dict[str, Path] = field(default_factory=dict)
 
     def report(self) -> dict[str, Any]:
-        """Sizes measured on this clip and what they project to."""
         stats = self.result.stats
         seconds = stats.frames / float(frames.VBLANK_FPS)
         minutes = seconds / SECONDS_PER_MINUTE
@@ -434,14 +350,6 @@ class BakeOutcome:
 
 
 def _thin_sample(tiles: np.ndarray, seed: int) -> np.ndarray:
-    """Cap how many tiles the palette fit sees.
-
-    Fitting the palette set materializes an Oklab triple per pixel of
-    every sample tile. On a full-length clip the strided sample runs to
-    over half a million tiles, which is gigabytes of float before the
-    encoder has started. A capped random subset picks the same palettes
-    for a fraction of the memory.
-    """
     if tiles.shape[0] <= MAX_SAMPLE_TILES:
         return tiles
     rng = np.random.default_rng(seed)
@@ -451,31 +359,12 @@ def _thin_sample(tiles: np.ndarray, seed: int) -> np.ndarray:
 
 
 def audio_pages_per_frame(delta_n: int) -> Fraction:
-    """Voice-ROM pages advanced per video frame, as an exact fraction.
-
-    The player multiplies a frame number by this to find where in the
-    soundtrack that frame sits, which is what lets a seek re-point audio
-    and video together. Two samples share a byte and a page is 256
-    bytes, hence the 512.
-
-    This is deliberately a ratio rather than fixed point. A rounded
-    fixed-point step accumulates: at 4096ths of a page the error reaches
-    a quarter of a second by the half-hour mark, which is a visible lip
-    sync failure. An exact ratio keeps the error at the page
-    quantization alone, about 23 ms, no matter how long the movie runs.
-    """
     if delta_n <= 0:
         return Fraction(0)
     return adpcmb.exact_rate(delta_n) / (512 * frames.VBLANK_FPS)
 
 
 def write_movie_bundle(target: Path, outcome: BakeOutcome) -> bundle.BundleLayout:
-    """Emit the drop-in folder for a bake that has already run.
-
-    Every number the bundle states about the movie comes from the bake
-    that produced it rather than from a second measurement, so the guide
-    and the generated header cannot disagree about what the movie costs.
-    """
     stats = outcome.result.stats
     return bundle.write_bundle(
         target=target,
@@ -494,27 +383,11 @@ def write_movie_bundle(target: Path, outcome: BakeOutcome) -> bundle.BundleLayou
 
 
 def baker_version() -> tuple[int, int]:
-    """Major and minor of the installed baker, for the bundle stamp.
-
-    Patch releases are left out of the comparison deliberately. The
-    stamp exists to catch a bundle whose library and movie data drifted
-    apart, and a patch that fixes a bake without moving the data layout
-    is not that.
-    """
     major, minor = version("neogeomedia").split(".")[:2]
     return int(major), int(minor)
 
 
 def _write_stream_banks(build_dir: Path, stream_path: Path, banks: int) -> list[Path]:
-    """One `__bank`-named stub per switchable bank the stream occupies.
-
-    The stream is far larger than the single megabyte the linkscript
-    gives to the switchable window, so it cannot be one object. Slicing
-    it at bank boundaries costs nothing, because the encoder already
-    pads every frame record forward rather than letting one straddle a
-    boundary, and it gives the toolchain the one shape it can place:
-    a bank is an object, and an object is a link.
-    """
     generated = build_dir / "generated"
     generated.mkdir(parents=True, exist_ok=True)
     stubs: list[Path] = []
@@ -616,19 +489,12 @@ def _write_sources(
 
 
 def _preview_codec(path: Path) -> list[str]:
-    """Lossless for .mkv, viewable h264 otherwise.
-
-    A lossy preview layers its own artifacts on top of the quantizer's,
-    which is exactly what a quality judgement must not do, so the
-    verification path writes FFV1 and only the shareable copy is h264.
-    """
     if path.suffix.lower() == ".mkv":
         return ["-c:v", "ffv1", "-level", "3", "-pix_fmt", "rgb24"]
     return ["-c:v", "libx264", "-preset", "medium", "-crf", "16", "-pix_fmt", "yuv420p"]
 
 
 def _write_audio_params(build_dir: Path, encoded: adpcmb.EncodedAudio) -> Path:
-    """Emit the ADPCM-B register values the Z80 driver assembles against."""
     generated = build_dir / "generated"
     generated.mkdir(parents=True, exist_ok=True)
     path = generated / "audio_params.s"
@@ -649,13 +515,6 @@ def _write_audio_params(build_dir: Path, encoded: adpcmb.EncodedAudio) -> Path:
 
 
 class _PreviewWriter:
-    """Feeds rendered frames to ffmpeg as they are produced.
-
-    A full-capacity bake renders more frames than fit in memory, so the
-    preview cannot be assembled at the end. Frames go down the pipe as
-    the encoder finishes them.
-    """
-
     def __init__(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         rate = frames.VBLANK_FPS
@@ -695,17 +554,10 @@ class _PreviewWriter:
 
 
 def _palette_blob(result: encode.EncodeResult) -> bytes:
-    """Every epoch's CRAM words, back to back in playing order."""
     return b"".join(palette_set.cram_blob() for palette_set in result.palette_sets)
 
 
 def _subtitle_blob(request: BakeRequest) -> bytes:
-    """Cues from the sidecar beside the source, or nothing when there is none.
-
-    Timings are absolute in the file, so the baked window has to be shifted
-    to the front and anything outside it dropped: a cue at 20 minutes means
-    nothing to a cartridge holding minutes three to five.
-    """
     sidecar: Path
     if request.subtitles is not None:
         sidecar = Path(request.subtitles)
@@ -734,24 +586,10 @@ def _subtitle_blob(request: BakeRequest) -> bytes:
 
 
 def _epoch_blob(result: encode.EncodeResult) -> bytes:
-    """The frame each epoch begins on.
-
-    The half it lives in is not stored, because it alternates: an epoch
-    occupies the half its index parity names, which is what lets the
-    next set be written while the current one is still being read.
-    """
     return np.asarray(result.epoch_starts, dtype=">u4").tobytes()
 
 
 def epoch_upload_frames(palette_count: int) -> int:
-    """Frames the player needs to make one epoch's colours resident.
-
-    Epochs alternate between the two halves of the video palette allocation,
-    so a set is half the palettes, and the upload runs at a fixed number of
-    words per frame. Computing it here keeps the baker and the player from
-    disagreeing about a number that, if they do, shows a half-written palette
-    on screen.
-    """
     words = (palette_count // 2) * WORDS_PER_PALETTE
     upload = -(-words // PALETTE_WORDS_PER_FRAME)
     return upload * EPOCH_UPLOAD_MARGIN
@@ -766,14 +604,6 @@ def _epoch_starts(
     floor: float,
     minimum: int,
 ) -> list[int]:
-    """Where epochs begin: at scene cuts, falling back to a fixed cadence.
-
-    A bucket that straddles a cut has to carry colours for both sides of
-    it, which is the thing per-scene palettes exist to avoid. Starting
-    each epoch at a real cut measured 4% less error and 1.7% fewer tiles
-    than an even split. Cuts further apart than the cadence are still
-    subdivided, so a long static scene does not become one huge epoch.
-    """
     grid = palettes.oklab_grid(1.0)
     starts = [0]
     previous = grids[0] if grids.shape[0] else None
@@ -790,13 +620,6 @@ def _epoch_starts(
         stop = starts[index + 1] if index + 1 < len(starts) else total
         filled.extend(range(start, stop, step))
 
-    # An epoch has to last long enough for the player to write the next
-    # one into the other half of CRAM, a slice at a time. Any boundary
-    # that arrives sooner leaves that half still holding the epoch
-    # before last, and the picture comes back a checkerboard of two
-    # scenes. The guard above spaces scene cuts from each other but says
-    # nothing about the boundaries subdivision adds between them, so the
-    # final list is what has to be thinned.
     spaced: list[int] = []
     for start in filled:
         if not spaced or start - spaced[-1] >= minimum:
@@ -807,13 +630,6 @@ def _epoch_starts(
 def _epoch_samples(
     grids: npt.NDArray[np.uint16], request: BakeRequest
 ) -> list[tuple[int, npt.NDArray[np.uint16]]] | None:
-    """Split the palette sample into one bucket per epoch.
-
-    The sample is every `sample_stride`-th frame in order, so a movie
-    frame maps onto a sample row by dividing by that stride. Buckets are
-    thinned individually, since thinning the whole sample first would
-    shuffle away the ordering the split depends on.
-    """
     if request.palette_epoch_seconds <= 0.0:
         return None
     step = int(request.palette_epoch_seconds * float(frames.VBLANK_FPS))
@@ -836,7 +652,6 @@ def _epoch_samples(
 
 
 def run(request: BakeRequest) -> BakeOutcome:
-    """Decode, encode, and write every cart artifact."""
     sample_clip = frames.sample(
         request.source,
         start=request.start,
@@ -1094,14 +909,6 @@ def _resolve_duration(args: argparse.Namespace) -> float:
 
 
 def _resolve_quality(args: argparse.Namespace) -> quality.Tier | None:
-    """Pick the tier.
-
-    A rung is named or it is not chosen here. Estimating one from a
-    sample was measured to be wrong in both directions and cannot be
-    fixed, because what a colour reduction saves depends on the content
-    rather than on the setting. The cartridge tool settles it by baking;
-    `neogeomedia.plan` prints the estimate for a human to look at.
-    """
     if args.quality is None:
         return None
     if args.quality == "auto":
@@ -1118,7 +925,6 @@ def _resolve_quality(args: argparse.Namespace) -> quality.Tier | None:
 def _pick[Knob: (int, float)](
     explicit: Knob | None, tier_value: Knob | None, fallback: Knob
 ) -> Knob:
-    """An explicit flag wins, then the tier, then the built-in default."""
     if explicit is not None:
         return explicit
     if tier_value is not None:
@@ -1127,15 +933,6 @@ def _pick[Knob: (int, float)](
 
 
 def _resolve_frame_hold(args: argparse.Namespace, tier: quality.Tier | None) -> int:
-    """Turn a wanted frame rate into a hold, and reject a hold that does nothing.
-
-    A hold counts display refreshes while the interesting quantity is
-    source frames, so the two only agree when the source runs at the
-    raster rate. Asking for 30 fps from a 24 fps source picks a hold of
-    2, which skips no source frame and buys no tiles while still
-    costing temporal accuracy. That is worth an error rather than a
-    silent no-op.
-    """
     hold = int(_pick(args.frame_hold, tier.frame_hold if tier else None, 1))
     if args.target_fps is not None:
         hold = frames.hold_for_target_fps(args.target_fps)
@@ -1154,14 +951,6 @@ def _resolve_frame_hold(args: argparse.Namespace, tier: quality.Tier | None) -> 
 
 
 def _overran(report: dict[str, object]) -> bool:
-    """Whether the encoder ran out of room rather than finishing the film.
-
-    Rate control degrades quality to stay inside the budget, and that is
-    the healthy path. When even its ceiling is not enough the dictionary
-    fills, every later frame stops interning new tiles, and the picture
-    quietly stops tracking the source. That has to be a failure: the
-    build otherwise succeeds and the cartridge looks finished.
-    """
     return (
         bool(report.get("dictionary_full"))
         or bool(report.get("budget_exceeded"))

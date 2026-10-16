@@ -1,15 +1,3 @@
-"""Keep the library header's version in step with the package's.
-
-A release bumps `FMV_VERSION` in `src/fmv/fmv.h`, because that is the
-one form python-semantic-release can rewrite in a C header. The numeric
-major and minor beside it are what the generated movie header compares
-against at compile time, and the preprocessor cannot split a string, so
-they are rewritten from it here.
-
-The release runs this as its build command. Anyone can run it by hand;
-running it when nothing has moved rewrites nothing.
-"""
-
 from __future__ import annotations
 
 import re
@@ -25,7 +13,6 @@ _MINOR: Final = re.compile(r"^#define FMV_VERSION_MINOR \d+$", re.M)
 
 
 def restamp(text: str) -> str:
-    """Rewrite the numeric defines from the version string above them."""
     found = _VERSION.search(text)
     if found is None:
         msg = 'src/fmv/fmv.h carries no `#define FMV_VERSION "x.y.z"` to read'

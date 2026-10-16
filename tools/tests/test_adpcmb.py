@@ -1,12 +1,3 @@
-"""ADPCM-B encoder tests.
-
-`YmfmDecoder` transcribes `adpcm_b_channel_clock` from the ymfm core
-that geolith drives the YM2610 with. Encoding then decoding through it
-proves the nibbles reconstruct the intended waveform on the chip that
-will actually play them, rather than merely round-tripping through the
-encoder's own model.
-"""
-
 from __future__ import annotations
 
 from fractions import Fraction
@@ -185,8 +176,6 @@ class TestRomLayout:
 
 
 class TestAdaptiveRates:
-    """The planner lowers the rate for long movies, so every rate it can pick is checked."""
-
     RATES = (8000.0, 11025.0, 16000.0, 17600.0, 20000.0, 22050.0)
 
     def signal(self, rate_hz: float) -> np.ndarray:

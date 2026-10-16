@@ -93,6 +93,52 @@ void play_intro(void)
 failed its check against the movie's limits. All three give the machine
 back the same way, so a caller that treats them alike is correct.
 
+## What fmv.mk and package.sh do
+
+`fmv.mk` comes between `include rom.mk` and `include build.mk`, because it
+adds its own source directories to `SRCDIRS`, which `build.mk` reads:
+
+```make
+include rom.mk
+include fmv/fmv.mk
+include build.mk
+```
+
+- **`FMV_FIRST_BANK`** is the switchable bank the stream starts at. Raise it
+  if your own banked code takes the low banks. The stream needs
+  {stream_banks} consecutive bank(s), and the three-bit latch reaches banks 0
+  to 7.
+- **`FMV_AUDIO`** set to anything but `yes` gives a video-only build. Nothing
+  then references a Z80 symbol, so your own sound driver keeps the M1 ROM.
+- **The sizes** the cartridge declaration needs are measured by the bake.
+  `FMV_CROM_BYTES` already leaves room for your own tiles: the sprite ROM has
+  to be a power of two and the movie's dictionary rarely lands on one, and
+  `FMV_FREE_TILES` is how many slots that slack is worth.
+- **The reference Z80 driver** gets a rule of its own, because ngdevkit's
+  stock rule does not know where the movie's ADPCM-B parameters live.
+- **The movie's `.incbin` stubs** get an assembly rule, because ngdevkit ships
+  pattern rules for `.c` and `.cc` but none for m68k assembly.
+- **A bank stub** holds nothing but its slice of the stream. Every object gas
+  emits also carries an empty `.data`, and for a `__bank`-named file the
+  linkscript routes that into the bank-switched RAM segment, which turns
+  `.data2` into a loadable section and warns. Dropping the empty sections
+  leaves the object saying exactly what it is.
+- **One ELF per switchable bank** is the shape ngdevkit's linkscript wants: it
+  keeps the `__bank`-named object out of the fixed megabyte and gathers it
+  into `.text2`, and the cartridge rules turn each `.text2` into one bank
+  image. Set `FMV_GAME_OBJS` to your own objects before `fmv.mk` is included
+  and those rules are declared for you; leave it empty and declare the ELF and
+  `PROM2` dependencies yourself.
+- **The second program ROM** is its banks joined in the order they are named,
+  so every bank below `FMV_FIRST_BANK` is named too, even with no rule here.
+  That keeps a bank you own from landing at the wrong offset. Give each of
+  yours a rule such as `$(PROM2)_bank0: $(BUILDDIR)/my-banked-code.elf`.
+
+`package.sh` joins the two program ROM files an ngdevkit project builds. The
+containers take one program ROM holding the fixed megabyte and every
+switchable bank after it, and leaving the second file out costs the movie its
+command stream, so the cartridge plays a blank screen.
+
 ## The calls
 
 | Call | What it does |

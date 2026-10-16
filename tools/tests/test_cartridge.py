@@ -179,7 +179,6 @@ def _stub_info():
 
 
 def _reading_bake(monkeypatch, *, tiles, full=False, exceeded=False, status=0, write_report=True):
-    """Stand in for a bake that reports what it spent."""
     seen: list[str] = []
 
     def fake_bake(argv):

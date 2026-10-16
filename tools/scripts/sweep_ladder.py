@@ -1,17 +1,3 @@
-"""Measure every rung of the quality ladder against one window.
-
-The ladder claims to be a frontier: no rung costs as much as another
-while looking no better. Nothing checked that until this existed, and
-the claim is worth checking because the planner trusts the declared
-costs to decide what fits a cartridge. Baking the same window at every
-tier turns the claim into a measurement, and turns the declared costs
-into an error bar against what the encoder actually spends.
-
-Each bake gets the whole tile budget for a short window, so the rate
-controller never engages and every rung reports its natural cost rather
-than what a controller squeezed it into.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -34,8 +20,6 @@ DEFAULT_DURATION = 45.0
 
 @dataclass(frozen=True, slots=True)
 class Measurement:
-    """What one rung cost on the window every rung saw."""
-
     name: str
     declared: float
     tiles: int
@@ -43,22 +27,14 @@ class Measurement:
 
 
 def cost_inversions(rows: list[Measurement]) -> list[tuple[str, str]]:
-    """Neighbours where the cheaper-looking rung costs more."""
     return [(a.name, b.name) for a, b in itertools.pairwise(rows) if b.tiles > a.tiles]
 
 
 def error_inversions(rows: list[Measurement]) -> list[tuple[str, str]]:
-    """Neighbours where giving up quality improved the picture."""
     return [(a.name, b.name) for a, b in itertools.pairwise(rows) if b.error < a.error]
 
 
 def dominated(rows: list[Measurement]) -> list[tuple[str, str, int, float]]:
-    """Rungs another rung beats on cost and on error at once.
-
-    A rung that costs at least as much as another while looking no
-    better has no reason to exist: anyone who would pick it is better
-    served by the rung that beats it.
-    """
     found = []
     for row in rows:
         for other in rows:
@@ -76,12 +52,6 @@ def dominated(rows: list[Measurement]) -> list[tuple[str, str, int, float]]:
 
 
 def model_error(rows: list[Measurement], *, reference: str) -> dict[str, float]:
-    """How far each rung's declared cost sits from what it actually cost.
-
-    Positive means the rung costs more than the ladder claims, which is
-    the unsafe direction: the planner promises runtime the cartridge
-    cannot hold.
-    """
     anchor = next((row for row in rows if row.name == reference), None)
     if anchor is None:
         raise KeyError(f"no measurement for the reference rung {reference!r}")
@@ -89,7 +59,6 @@ def model_error(rows: list[Measurement], *, reference: str) -> dict[str, float]:
 
 
 def verdict(rows: list[Measurement]) -> int:
-    """Zero when the ladder is a frontier, non-zero when it is not."""
     if dominated(rows) or cost_inversions(rows) or error_inversions(rows):
         return 1
     return 0

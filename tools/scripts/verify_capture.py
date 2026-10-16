@@ -1,16 +1,3 @@
-"""Match a geolith screenshot against the baker's own rendered frames.
-
-The boot delay between powering the cart and the first movie frame is not
-known ahead of time, so this searches every rendered frame for the one
-that best matches the capture instead of assuming an offset. A near-zero
-best match proves the whole chain agrees with the emulator: the packed
-C-ROM bytes, the SCB attribute words, the palette upload, the run-coded
-stream, and the player's VRAM writes.
-
-The capture is cropped by geolith's overscan options, so the reference
-frames are cropped the same way before comparison.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -31,17 +18,9 @@ RASTER_WIDTH = 320
 RASTER_HEIGHT = 224
 
 TIE = 1e-9
-"""Errors this close are the same picture, not a better one."""
 
 
 def tied_run(scored: dict[int, float], best: int) -> set[int]:
-    """The frames around the best match that score identically to it.
-
-    A 24 fps source shown on a 59.185 Hz raster repeats each frame about
-    two and a half times, so a match is a run rather than a single
-    frame. Every member of that run is the same picture, and none of
-    them is a rival to the others.
-    """
     run = {best}
     for direction in (-1, 1):
         step = best
@@ -60,13 +39,6 @@ def _decode_rgb(path: Path) -> bytes:
 
 
 def stream_preview(path: Path) -> Iterator[np.ndarray]:
-    """Rendered frames from a preview, one at a time.
-
-    A feature-length preview decodes to several gigabytes of raw RGB, so
-    holding all of it to search for one matching frame exhausts memory
-    and the process is killed. Reading the pipe a frame at a time keeps
-    the cost at one frame regardless of how long the movie runs.
-    """
     stride = RASTER_WIDTH * RASTER_HEIGHT * 3
     process = subprocess.Popen(
         ["ffmpeg", "-v", "error", "-i", str(path), "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
@@ -87,7 +59,6 @@ def stream_preview(path: Path) -> Iterator[np.ndarray]:
 
 
 def decode_capture(path: Path) -> np.ndarray:
-    """One screenshot at whatever geometry the emulator produced."""
     probe = subprocess.run(
         [
             "ffprobe",
@@ -110,14 +81,6 @@ def decode_capture(path: Path) -> np.ndarray:
 
 
 def downscale_capture(capture: np.ndarray) -> np.ndarray:
-    """Undo the front end's integer upscale, if it applied one.
-
-    RetroArch writes the screenshot at the window scale rather than at
-    the emulated resolution, so a capture arrives as a whole multiple of
-    the active area. Sampling the centre of each block recovers the
-    original pixels exactly for nearest-neighbour scaling and stays
-    representative for any other filter.
-    """
     height, width = capture.shape[:2]
     if height % RASTER_HEIGHT != 0:
         return capture
@@ -137,12 +100,6 @@ def _palette_colors(blob: bytes) -> np.ndarray:
 
 
 def _epoch_palettes(baked: Path, frame: int, colors: np.ndarray) -> tuple[int, np.ndarray]:
-    """The palette set on screen at a frame, and which half it sits in.
-
-    Colours are refitted per scene into alternating halves of CRAM, so a
-    reconstruction has to pick the epoch covering the frame and read its
-    slice of the blob. A movie with one epoch keeps the whole blob.
-    """
     table = baked / "epochs.bin"
     if not table.is_file():
         return 0, colors
@@ -157,13 +114,6 @@ def _epoch_palettes(baked: Path, frame: int, colors: np.ndarray) -> tuple[int, n
 
 
 def reconstruct_frame(baked: Path, frame: int, *, base_bank: int = 16) -> np.ndarray:
-    """Rebuild one frame's picture from the cart artifacts alone.
-
-    Replaying the stream into the VRAM model and rendering from the
-    packed C-ROM reproduces exactly what the hardware shows, without a
-    preview video. Long bakes cannot keep every rendered frame in
-    memory, so this is the only reference available for them.
-    """
     baked = Path(baked)
     stream = (baked / "stream.bin").read_bytes()
     index = (baked / "index.bin").read_bytes()

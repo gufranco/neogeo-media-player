@@ -1,13 +1,3 @@
-"""Decode a source clip into vblank-rate 320x224 RGB frames.
-
-The Neo Geo raster is 384 pixels by 264 lines at a 6 MHz dot clock, so
-the refresh is 6000000 / (384 * 264), about 59.1856 Hz. The player
-advances one movie frame per vblank, so the baker resamples the source
-to exactly that rate. A 24 fps source therefore repeats most frames,
-and a repeated frame costs nothing downstream because every tile slot
-is unchanged.
-"""
-
 from __future__ import annotations
 
 import re
@@ -43,16 +33,6 @@ _FIT_MODES: Final = ("fill", "letterbox")
 
 @dataclass(frozen=True, slots=True)
 class Denoise:
-    """hqdn3d strengths, spatial then temporal.
-
-    Denoising runs after the downscale rather than before it, because
-    what matters here is the temporal stability of the 320x224 tiles the
-    encoder deduplicates. Grain that survives into the scaled frame makes
-    every tile differ from its neighbour in time, which destroys the
-    delta path and inflates the dictionary. Cleaning the scaled image
-    targets exactly that.
-    """
-
     luma_spatial: float = 4.0
     chroma_spatial: float = 3.0
     luma_temporal: float = 6.0
@@ -82,12 +62,10 @@ class Geometry:
 
 
 def frame_count(*, seconds: float) -> int:
-    """Number of vblank-rate frames covering a duration."""
     return int(seconds * VBLANK_FPS)
 
 
 def hold_for_target_fps(target: float) -> int:
-    """Refreshes to hold each frame to land nearest a wanted rate."""
     if target <= 0.0:
         msg = f"target fps must be positive, got {target}"
         raise ValueError(msg)
@@ -95,28 +73,17 @@ def hold_for_target_fps(target: float) -> int:
 
 
 def source_frames_kept(hold: int, source_fps: float) -> float:
-    """Fraction of the source's own frames a hold preserves.
-
-    A hold counts display refreshes, not source frames, and the two
-    differ: a 24 fps source reaching a 59.185 Hz raster already repeats
-    each frame about 2.47 times. Holding fewer refreshes than that skips
-    nothing and only shifts which refresh carries the update, so it
-    costs temporal accuracy and saves no tiles at all.
-    """
     effective = float(VBLANK_FPS) / max(1, hold)
     return min(1.0, effective / float(source_fps))
 
 
 @dataclass(frozen=True, slots=True)
 class SourceAnalysis:
-    """What ffmpeg can tell us about a source before anything is baked."""
-
     interlaced: bool
     crop: tuple[int, int, int, int] | None
 
 
 def _run_filter(path: Path, filter_spec: str, *, start: float, duration: float) -> str:
-    """Run an analysis filter and hand back what it wrote to stderr."""
     result = subprocess.run(
         [
             ffmpeg.require_tool("ffmpeg"),
@@ -142,16 +109,6 @@ def _run_filter(path: Path, filter_spec: str, *, start: float, duration: float) 
 
 
 def analyse(path: Path, *, start: float = 0.0, duration: float = 8.0) -> SourceAnalysis:
-    """Detect the two things that ruin a bake if they go unnoticed.
-
-    Interlaced fields woven into a progressive frame become permanent
-    comb artifacts once they are quantised into character ROM, and black
-    bars spend the raster on nothing. Both are cheap to detect up front
-    and impossible to undo afterwards.
-
-    A crop is only reported when it actually reduces the frame, since
-    cropdetect names the full frame when it finds no bars at all.
-    """
     path = Path(path)
     verdict = _run_filter(path, "idet", start=start, duration=duration)
     interlaced = False
@@ -174,7 +131,6 @@ def analyse(path: Path, *, start: float = 0.0, duration: float = 8.0) -> SourceA
 
 
 def _analysed_size(info: ffmpeg.SourceInfo, analysis: SourceAnalysis) -> tuple[int, int]:
-    """The frame size after black bars are removed."""
     if analysis.crop is None:
         return info.width, info.height
     return analysis.crop[0], analysis.crop[1]
@@ -192,14 +148,6 @@ def plan_geometry(
     *,
     fit: FitMode = "fill",
 ) -> Geometry:
-    """Work out the crop, scale, and pad that map a source onto the raster.
-
-    The raster is not square. An AES drives a 4:3 television with 320 by
-    224 pixels, so a pixel is 0.9333 as wide as it is tall, and a crop
-    aimed at the raster's own ratio arrives on screen squashed by that
-    much. Aspect decisions are therefore made in display space and only
-    converted to pixels at the end.
-    """
     if fit not in _FIT_MODES:
         msg = f"unknown fit mode {fit!r}, expected one of {_FIT_MODES}"
         raise ValueError(msg)
@@ -218,9 +166,6 @@ def plan_geometry(
     crop = (_even(source_width), _even(source_height))
     rows_total = target_height // TILE_PX
     ideal_rows = (target_width * PIXEL_ASPECT / source_aspect) / TILE_PX
-    # A source that exactly fills the screen lands on a whole row count
-    # that binary floating point renders a hair under it, which would
-    # letterbox a 4:3 source for no reason. Compare with a tolerance.
     image_rows = max(
         (
             rows
@@ -247,12 +192,6 @@ def build_filter(
     deinterlace: bool = False,
     pre_crop: tuple[int, int, int, int] | None = None,
 ) -> str:
-    """Build the ffmpeg filter chain for a planned geometry.
-
-    Scaling runs before the frame-rate resample so upsampling to the
-    vblank rate duplicates already-scaled frames instead of scaling the
-    same source frame two or three times.
-    """
     crop_w, crop_h = geometry.crop
     image_w, image_h = geometry.image
     target_w, target_h = geometry.target
@@ -288,7 +227,6 @@ def decode(
     denoise: float = 0.0,
     motion_blur: int = 0,
 ) -> npt.NDArray[np.uint8]:
-    """Decode a clip window into vblank-rate RGB frames."""
     wanted = frame_count(seconds=duration)
     window = Window(start, duration, fit, (target_width, target_height), denoise, motion_blur)
     produced = list(_frames(Path(path), window, wanted))
@@ -328,14 +266,6 @@ def stream(
     motion_blur: int = 0,
     chunk_frames: int = DEFAULT_CHUNK_FRAMES,
 ) -> Iterator[npt.NDArray[np.uint8]]:
-    """Yield decoded frames in chunks instead of all at once.
-
-    A cart filled to the 128 MiB character-ROM ceiling is about four and
-    a half minutes of video, which is roughly 15,600 frames. Holding
-    those as RGB would be over three gigabytes before the encoder has
-    allocated anything, so a full-capacity bake is only possible if the
-    frames arrive a chunk at a time.
-    """
     wanted = frame_count(seconds=duration)
     window = Window(start, duration, fit, (target_width, target_height), denoise, motion_blur)
     pending = iter(_frames(Path(path), window, wanted))
@@ -378,7 +308,6 @@ def sample(
     denoise: float = 0.0,
     motion_blur: int = 0,
 ) -> npt.NDArray[np.uint8]:
-    """Every `stride`-th frame, for fitting the palette set."""
     kept: list[npt.NDArray[np.uint8]] = []
     index = 0
     for chunk in stream(

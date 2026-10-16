@@ -115,14 +115,6 @@ class TestEpochCadence:
 
 
 class TestMovementFloor:
-    """What counts as "this slot moved" is a property of the content.
-
-    A fixed threshold flagged 1% of slots on one source and 22% on another,
-    so scene-cut detection meant something different on every film. The floor
-    is measured as a high percentile of the movement the source actually
-    shows, which makes it mean the same thing everywhere.
-    """
-
     def test_a_still_source_asks_for_a_low_floor(self, tmp_path):
         still = tmp_path / "still.mkv"
         subprocess.run(

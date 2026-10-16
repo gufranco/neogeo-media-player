@@ -3,9 +3,9 @@ set -euo pipefail
 
 IMAGE="${NEOGEOMEDIA_TOOLCHAIN_IMAGE:-neogeo-media-player-toolchain}"
 
-if ! command -v m68k-neogeo-elf-gcc >/dev/null; then
+if [[ "${NEOGEOMEDIA_IN_TOOLCHAIN_IMAGE:-}" != "1" ]]; then
     if ! command -v docker >/dev/null; then
-        echo "No m68k-neogeo-elf toolchain and no Docker to supply one." >&2
+        echo "The ROM builds only inside the toolchain image, and there is no Docker to run it." >&2
         exit 1
     fi
     if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then

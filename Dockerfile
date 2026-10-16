@@ -15,17 +15,17 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends "ca-certificates=${CA_CERTIFICATES}" \
  && apt-get update --snapshot "${UBUNTU_SNAPSHOT}" \
  && apt-get install -y --no-install-recommends --snapshot "${UBUNTU_SNAPSHOT}" \
-      autoconf \
-      automake \
-      binutils \
-      cppcheck \
-      curl \
-      git \
-      make \
-      pkg-config \
-      python3 \
-      rsync \
-      zip \
+      autoconf=2.72-3.1ubuntu2 \
+      automake=1:1.18.1-3build1 \
+      binutils=2.46-3ubuntu2 \
+      cppcheck=2.19.0-3 \
+      curl=8.18.0-1ubuntu2.7 \
+      git=1:2.53.0-1ubuntu1 \
+      make=4.4.1-3 \
+      pkg-config=2.5.1-4 \
+      python3=3.14.3-0ubuntu2 \
+      rsync=3.4.1+ds1-7ubuntu0.3 \
+      zip=3.0-15ubuntu3 \
  && rm -rf /var/lib/apt/lists/*
 
 COPY toolchain/ngdevkit.sha256 /tmp/ngdevkit/ngdevkit.sha256
@@ -40,5 +40,7 @@ RUN cd /tmp/ngdevkit \
       ./ngdevkit-toolchain.deb ./ngdevkit.deb ./ngdevkit-gngeo.deb \
  && cd / && rm -rf /tmp/ngdevkit /var/lib/apt/lists/* \
  && m68k-neogeo-elf-gcc --version | head -1
+
+ENV NEOGEOMEDIA_IN_TOOLCHAIN_IMAGE=1
 
 WORKDIR /work

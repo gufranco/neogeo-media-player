@@ -206,10 +206,10 @@ Any video file ffmpeg can read works. Nothing has to live in a particular folder
 
 | Tool | Version | Install |
 |:-----|:--------|:--------|
-| Python | >= 3.12 | [python.org](https://www.python.org) |
+| Python | 3.14, fetched by uv from [`.python-version`](.python-version) | |
 | uv | latest | [docs.astral.sh/uv](https://docs.astral.sh/uv/) |
 | ffmpeg and ffprobe | any recent | [ffmpeg.org](https://ffmpeg.org) |
-| m68k toolchain | ngdevkit | [Toolchain](#toolchain) |
+| Docker | any recent | [docs.docker.com](https://docs.docker.com/get-docker/) |
 | Neo Geo BIOS | any | Only to run the emulators, not to build |
 
 ### Get the code
@@ -296,17 +296,7 @@ Under a libretro front end, load `build/neogeomedia.neo` with the geolith core a
 
 ### Toolchain
 
-The cartridge needs an `m68k-neogeo-elf` toolchain. Ubuntu takes it from ngdevkit's PPA, which publishes amd64 only. Apple Silicon takes it natively from the Homebrew tap:
-
-```bash
-brew install --force-bottle dciabrin/ngdevkit/ngdevkit-toolchain \
-                            dciabrin/ngdevkit/ngdevkit
-```
-
-> [!TIP]
-> `--force-bottle` pours the arm64 bottle on a macOS release the tap has not tagged yet. Without it Homebrew builds GCC from source.
-
-[`build-in-docker.sh`](toolchain/build-in-docker.sh) compiles directly when a toolchain is on the path and otherwise runs itself inside the toolchain image, as the calling user. The [`Dockerfile`](Dockerfile) pins that image: Ubuntu by digest, its packages from a dated snapshot, and the three ngdevkit packages by exact version and SHA-256, listed in [`toolchain/ngdevkit.sha256`](toolchain/ngdevkit.sha256). A build today and a build next year produce the same ROM.
+Every ROM build goes through Docker, and there is no host toolchain path. [`build-in-docker.sh`](toolchain/build-in-docker.sh) runs itself inside the toolchain image as the calling user, even when an `m68k-neogeo-elf` toolchain is on the host's path. The [`Dockerfile`](Dockerfile) pins that image: Ubuntu by digest, every package by exact version from a dated snapshot, and the three ngdevkit packages by exact version and SHA-256, listed in [`toolchain/ngdevkit.sha256`](toolchain/ngdevkit.sha256). ngdevkit's PPA publishes amd64 only, so the image is amd64 everywhere and Docker emulates it on Apple Silicon. A build today and a build next year produce the same ROM.
 
 ### A film inside your own game
 
@@ -354,7 +344,7 @@ game_redraw();
 
 **Sound is opt-in.** The video path needs no sound driver, so a game that already owns the M1 ROM keeps it. The movie's soundtrack is ADPCM-B driven by three Z80 commands, and the reference driver ships as source to read or merge.
 
-[`examples/cutscene/`](examples/cutscene) is a game that plays a cutscene and carries on, built from an emitted folder in a stock ngdevkit project at a pinned commit. Its title screen is drawn after the movie returns, writing fix tiles and nothing else, so a register left in the wrong place would show.
+[`examples/cutscene/`](examples/cutscene) is a game that plays a cutscene and carries on, built from an emitted folder in a stock ngdevkit project at a pinned commit. Its title screen is drawn after the movie returns, writing fix tiles and nothing else, so a register left in the wrong place would show. `make example` builds it from `build/bundle` in the toolchain image, and `make example FMV_AUDIO=yes` builds it with the movie's own sound driver.
 
 ## Quality
 
@@ -444,7 +434,7 @@ The [cutscene example](examples/cutscene) has run on a board too and came back t
 | [`tools/clips.manifest.json`](tools/clips.manifest.json) | The regression films: identity, credit and licence, never the films |
 | [`tools/DESIGN.md`](tools/DESIGN.md) | Why each baker module, script and test is shaped as it is, with the measurements behind it |
 | [`tools/scripts/`](tools/scripts) | Capture, verification, timing and ladder-sweep helpers |
-| [`toolchain/`](toolchain) | The ngdevkit build, native or containerised |
+| [`toolchain/`](toolchain) | The ngdevkit build, run in the toolchain image |
 | [`FAMILY.md`](FAMILY.md) | The standard shared with sms-media-player and fmv-core-python, identical in each |
 | [`CHANGELOG.md`](CHANGELOG.md) | What was measured, and what was rejected |
 | [`RELEASES.md`](RELEASES.md) | Generated release notes, one entry per version |

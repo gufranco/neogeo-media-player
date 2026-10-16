@@ -11,6 +11,7 @@ from tests.bakehelp import SYNTHETIC_FILM
 from tests.cartridgehelp import (
     cache_key,
     fake_docker,
+    fake_host_compiler,
     header,
     last_report,
     preview_pixels,
@@ -140,6 +141,21 @@ class TestCartridgeBuild:
         assert code == 0
         assert f"-e BUILD={out} " in log.read_text()
         assert f"{out / cartridge.CARTRIDGE_NAME}  " in capsys.readouterr().out
+
+    def test_a_host_toolchain_on_the_path_still_builds_in_the_image(
+        self, movie, tmp_path, monkeypatch
+    ):
+        # Arrange
+        log = fake_docker(monkeypatch, tmp_path)
+        fake_host_compiler(tmp_path)
+        out = tmp_path / "out"
+
+        # Act
+        code = cartridge.main([str(movie), "--quality", "q17", "--build-dir", str(out)])
+
+        # Assert
+        assert code == 0
+        assert f"-e BUILD={out} " in log.read_text()
 
     def test_a_failed_build_returns_its_status(self, movie, tmp_path, monkeypatch, capsys):
         # Arrange

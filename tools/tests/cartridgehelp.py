@@ -20,6 +20,7 @@ TWO_TONE = (
 DOCKER_LOG = "docker.log"
 MEDIA_TOOLS = ("ffmpeg", "ffprobe")
 SYSTEM_PATH = ("/usr/bin", "/bin")
+HOST_COMPILER = "m68k-neogeo-elf-gcc"
 
 
 def short_clip(path: Path) -> Path:
@@ -41,7 +42,14 @@ def fake_docker(monkeypatch: pytest.MonkeyPatch, directory: Path, *, status: int
         (shim / tool).symlink_to(str(shutil.which(tool)))
     monkeypatch.setenv("PATH", ":".join([str(shim), *SYSTEM_PATH]))
     monkeypatch.delenv("NEOGEOMEDIA_TOOLCHAIN_IMAGE", raising=False)
+    monkeypatch.delenv("NEOGEOMEDIA_IN_TOOLCHAIN_IMAGE", raising=False)
     return log
+
+
+def fake_host_compiler(directory: Path) -> None:
+    compiler = directory / "shim" / HOST_COMPILER
+    compiler.write_text("#!/bin/sh\nexit 1\n")
+    compiler.chmod(0o755)
 
 
 def last_report(stdout: str) -> dict[str, object]:

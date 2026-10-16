@@ -203,10 +203,10 @@ ffmpegで読み込める動画ファイルなら何でも使えます。特定�
 
 | ツール | バージョン | インストール |
 |:-----|:--------|:--------|
-| Python | >= 3.12 | [python.org](https://www.python.org) |
+| Python | 3.14、[`.python-version`](.python-version)からuvが取得 | |
 | uv | 最新 | [docs.astral.sh/uv](https://docs.astral.sh/uv/) |
 | ffmpegとffprobe | 最近のもの | [ffmpeg.org](https://ffmpeg.org) |
-| m68kツールチェーン | ngdevkit | [ツールチェーン](#ツールチェーン) |
+| Docker | 最近のもの | [docs.docker.com](https://docs.docker.com/get-docker/) |
 | Neo Geo BIOS | 任意 | エミュレーターの実行にのみ必要で、ビルドには不要です |
 
 ### コードの取得
@@ -290,17 +290,7 @@ libretroフロントエンドでは、geolithコアで`build/neogeomedia.neo`を
 
 ### ツールチェーン
 
-カートリッジには`m68k-neogeo-elf`ツールチェーンが必要です。UbuntuではngdevkitのPPAから入手でき、このPPAはamd64版のみを公開しています。Apple SiliconではHomebrewのtapからネイティブ版を入手できます。
-
-```bash
-brew install --force-bottle dciabrin/ngdevkit/ngdevkit-toolchain \
-                            dciabrin/ngdevkit/ngdevkit
-```
-
-> [!TIP]
-> `--force-bottle`は、tapがまだタグ付けしていないmacOSリリースでもarm64のbottleを導入します。これがないと、HomebrewはGCCをソースからビルドします。
-
-[`build-in-docker.sh`](toolchain/build-in-docker.sh)は、パス上にツールチェーンがあれば直接コンパイルし、なければ呼び出したユーザーとしてツールチェーンイメージ内で自身を実行します。[`Dockerfile`](Dockerfile)はそのイメージを固定しています。Ubuntuはダイジェストで、そのパッケージは日付付きのスナップショットから、3つのngdevkitパッケージは正確なバージョンとSHA-256で固定し、[`toolchain/ngdevkit.sha256`](toolchain/ngdevkit.sha256)に記載しています。今日のビルドと来年のビルドは同じROMを生成します。
+ROMのビルドはすべてDockerを通り、ホストのツールチェーンを使う経路はありません。[`build-in-docker.sh`](toolchain/build-in-docker.sh)は、ホストのパス上に`m68k-neogeo-elf`ツールチェーンがあっても、呼び出したユーザーとしてツールチェーンイメージ内で自身を実行します。[`Dockerfile`](Dockerfile)はそのイメージを固定しています。Ubuntuはダイジェストで、すべてのパッケージは日付付きのスナップショットから正確なバージョンで、3つのngdevkitパッケージは正確なバージョンとSHA-256で固定し、[`toolchain/ngdevkit.sha256`](toolchain/ngdevkit.sha256)に記載しています。ngdevkitのPPAはamd64版のみを公開しているため、イメージはどこでもamd64で、Apple SiliconではDockerがそれをエミュレートします。今日のビルドと来年のビルドは同じROMを生成します。
 
 ### 自作ゲームに映像を組み込む
 
@@ -348,7 +338,7 @@ game_redraw();
 
 **音声はオプトインです。** 映像の処理にサウンドドライバーは不要なので、すでにM1 ROMを使っているゲームはそのまま使い続けられます。映像のサウンドトラックは3つのZ80コマンドで駆動するADPCM-Bで、リファレンスドライバーは読んだり統合したりできるようソースとして提供されます。
 
-[`examples/cutscene/`](examples/cutscene)は、カットシーンを再生してから処理を続けるゲームで、固定したコミットの標準ngdevkitプロジェクト内で、出力されたフォルダーからビルドされます。タイトル画面は映像が戻った後にfixタイルだけを書き込んで描画されるため、誤った状態に残されたレジスタがあれば表示に現れます。
+[`examples/cutscene/`](examples/cutscene)は、カットシーンを再生してから処理を続けるゲームで、固定したコミットの標準ngdevkitプロジェクト内で、出力されたフォルダーからビルドされます。タイトル画面は映像が戻った後にfixタイルだけを書き込んで描画されるため、誤った状態に残されたレジスタがあれば表示に現れます。`make example`はツールチェーンイメージ内で`build/bundle`からこれをビルドし、`make example FMV_AUDIO=yes`は映像自身のサウンドドライバー付きでビルドします。
 
 ## 品質
 
@@ -438,7 +428,7 @@ MAMEは224行すべてで列0を黒で返します。それを除くと、残差
 | [`tools/clips.manifest.json`](tools/clips.manifest.json) | 回帰用の映像の識別情報、クレジット、ライセンス。映像そのものは含みません |
 | [`tools/DESIGN.md`](tools/DESIGN.md) | ベイカーの各モジュール、スクリプト、テストがなぜその形なのかと、その裏付けとなる測定 |
 | [`tools/scripts/`](tools/scripts) | キャプチャ、検証、タイミング、ラダーのスイープ用のヘルパー |
-| [`toolchain/`](toolchain) | ネイティブまたはコンテナ化したngdevkitビルド |
+| [`toolchain/`](toolchain) | ツールチェーンイメージ内で実行するngdevkitビルド |
 | [`FAMILY.md`](FAMILY.md) | sms-media-playerおよびfmv-core-pythonと共有する標準で、それぞれで同一です |
 | [`CHANGELOG.md`](CHANGELOG.md) | 何を計測し、何を却下したか |
 | [`RELEASES.md`](RELEASES.md) | 生成されたリリースノートで、バージョンごとに1エントリー |

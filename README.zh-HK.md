@@ -203,10 +203,10 @@ flowchart LR
 
 | 工具 | 版本 | 安裝 |
 |:-----|:--------|:--------|
-| Python | >= 3.12 | [python.org](https://www.python.org) |
+| Python | 3.14，由 uv 按 [`.python-version`](.python-version) 取得 | |
 | uv | 最新 | [docs.astral.sh/uv](https://docs.astral.sh/uv/) |
 | ffmpeg 和 ffprobe | 任何近期版本 | [ffmpeg.org](https://ffmpeg.org) |
-| m68k 工具鏈 | ngdevkit | [工具鏈](#工具鏈) |
+| Docker | 任何近期版本 | [docs.docker.com](https://docs.docker.com/get-docker/) |
 | Neo Geo BIOS | 任何 | 只在運行模擬器時需要，建置時不需要 |
 
 ### 取得程式碼
@@ -290,17 +290,7 @@ mame aes -bios unibios23 -cart neogeomedia \
 
 ### 工具鏈
 
-卡帶需要 `m68k-neogeo-elf` 工具鏈。Ubuntu 從 ngdevkit 的 PPA 取得，該 PPA 只發佈 amd64 版本。Apple Silicon 則從 Homebrew tap 取得原生版本：
-
-```bash
-brew install --force-bottle dciabrin/ngdevkit/ngdevkit-toolchain \
-                            dciabrin/ngdevkit/ngdevkit
-```
-
-> [!TIP]
-> 在 tap 尚未標記的 macOS 版本上，`--force-bottle` 會安裝 arm64 bottle。沒有這個旗標，Homebrew 會從原始碼建置 GCC。
-
-[`build-in-docker.sh`](toolchain/build-in-docker.sh) 在路徑上有工具鏈時直接編譯，否則以呼叫者的使用者身份在工具鏈映像內運行自己。[`Dockerfile`](Dockerfile) 固定了該映像：Ubuntu 以摘要固定，其套件取自有日期的快照，三個 ngdevkit 套件則以確切版本和 SHA-256 固定，列於 [`toolchain/ngdevkit.sha256`](toolchain/ngdevkit.sha256)。今天的建置與明年的建置會產生相同的 ROM。
+每次 ROM 建置都經過 Docker，沒有使用主機工具鏈的路徑。即使主機路徑上有 `m68k-neogeo-elf` 工具鏈，[`build-in-docker.sh`](toolchain/build-in-docker.sh) 也會以呼叫者的使用者身份在工具鏈映像內運行自己。[`Dockerfile`](Dockerfile) 固定了該映像：Ubuntu 以摘要固定，每個套件以確切版本取自有日期的快照，三個 ngdevkit 套件則以確切版本和 SHA-256 固定，列於 [`toolchain/ngdevkit.sha256`](toolchain/ngdevkit.sha256)。ngdevkit 的 PPA 只發佈 amd64 版本，所以映像在任何地方都是 amd64，在 Apple Silicon 上由 Docker 模擬運行。今天的建置與明年的建置會產生相同的 ROM。
 
 ### 在你自己的遊戲中播放影片
 
@@ -348,7 +338,7 @@ game_redraw();
 
 **聲音須主動啟用。** 影片路徑不需要音效驅動程式，所以已經擁有 M1 ROM 的遊戲可以保留它。影片的音軌是由三個 Z80 指令驅動的 ADPCM-B，參考驅動程式以原始碼形式提供，可供閱讀或合併。
 
-[`examples/cutscene/`](examples/cutscene) 是一個播放過場動畫後繼續運行的遊戲，在固定 commit 的原裝 ngdevkit 專案中由輸出的資料夾建置。它的標題畫面在影片返回後才繪製，只寫入 fix tile，所以任何留在錯誤位置的暫存器都會顯現出來。
+[`examples/cutscene/`](examples/cutscene) 是一個播放過場動畫後繼續運行的遊戲，在固定 commit 的原裝 ngdevkit 專案中由輸出的資料夾建置。它的標題畫面在影片返回後才繪製，只寫入 fix tile，所以任何留在錯誤位置的暫存器都會顯現出來。`make example` 在工具鏈映像內從 `build/bundle` 建置它，`make example FMV_AUDIO=yes` 則連同影片自己的聲音驅動程式一起建置。
 
 ## 質素
 
@@ -438,7 +428,7 @@ MAME 在全部 224 行中把第 0 欄傳回為黑色。排除這一欄後，剩�
 | [`tools/clips.manifest.json`](tools/clips.manifest.json) | 回歸測試影片：身分、鳴謝及授權，從不包含影片本身 |
 | [`tools/DESIGN.md`](tools/DESIGN.md) | 每個烘焙器模組、腳本及測試為何如此設計，以及背後的量度 |
 | [`tools/scripts/`](tools/scripts) | 擷取、驗證、時序和階梯掃描的輔助工具 |
-| [`toolchain/`](toolchain) | ngdevkit 建置，原生或容器化 |
+| [`toolchain/`](toolchain) | 在工具鏈映像內運行的 ngdevkit 建置 |
 | [`FAMILY.md`](FAMILY.md) | 與 sms-media-player 和 fmv-core-python 共用的標準，三者內容相同 |
 | [`CHANGELOG.md`](CHANGELOG.md) | 測量了甚麼，以及否決了甚麼 |
 | [`RELEASES.md`](RELEASES.md) | 自動產生的發佈說明，每個版本一項 |

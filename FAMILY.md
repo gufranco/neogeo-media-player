@@ -296,5 +296,3 @@ Gaps against "What every player does" (as of 2026-10-16):
   out with `FMV_AUDIO=no`, and sound lives in its own V-ROM, so leaving it out
   frees no character ROM for the picture.
 - `--fit letterbox` still adds bars, which the picture rule forbids.
-- The build script compiles with a host toolchain when one is on the path,
-  where the conventions require Docker for every build.

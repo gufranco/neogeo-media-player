@@ -1,8 +1,2 @@
-.git
-.work
-build
-specs
-media
-tools/.venv
-*.mp4
-fmv-core-python
+*
+!toolchain/ngdevkit.sha256

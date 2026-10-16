@@ -10,7 +10,6 @@
 #define OVERLAY_REDRAW_MASK    0x07
 #define DEBUG_ROW_MASK         0x0Fu
 #define REWIND_FRAMES_PER_STEP 6
-#define SEEK_SECONDS           10u
 #define FAULT_RED              0x4F00u
 #define RESTART_BUTTONS        (FMV_PAD_A | FMV_PAD_B)
 
@@ -54,11 +53,6 @@ static void clear_reserved_palettes(void)
     while (reserved--) {
         *target++ = 0;
     }
-}
-
-static uint32_t seconds_to_frames(uint32_t seconds)
-{
-    return timeline_seconds_to_frames(seconds, MOVIE_FPS_NUM, MOVIE_FPS_DEN);
 }
 
 static buttons read_buttons(void)
@@ -158,6 +152,21 @@ static void seek_to(session *s, uint32_t frame)
     s->speed = 1;
 }
 
+static void seek_point(session *s, int direction)
+{
+    timeline_seek_grid grid;
+    uint32_t target;
+
+    grid.keyframes = (const uint32_t *)movie_keyframes;
+    grid.keyframe_count = MOVIE_KEYFRAME_COUNT;
+    grid.every = MOVIE_SEEK_FRAMES;
+    grid.frames = MOVIE_FRAME_COUNT;
+    target = timeline_seek_target(&grid, s->frame, direction);
+    if (target != TIMELINE_SEEK_NONE) {
+        seek_to(s, target);
+    }
+}
+
 static void toggle_subtitles(session *s)
 {
     s->subtitles_on = (uint8_t)!s->subtitles_on;
@@ -184,8 +193,6 @@ static void play_normally(session *s)
 
 static void handle_transport(session *s, uint8_t pressed)
 {
-    uint32_t back = seconds_to_frames(SEEK_SECONDS);
-
     if (pressed & FMV_PAD_A) {
         toggle_pause(s);
     }
@@ -199,10 +206,10 @@ static void handle_transport(session *s, uint8_t pressed)
         start_rewind(s);
     }
     if (pressed & FMV_PAD_C) {
-        seek_to(s, (s->frame > back) ? s->frame - back : 0);
+        seek_point(s, TIMELINE_SEEK_BACK);
     }
     if (pressed & FMV_PAD_D) {
-        seek_to(s, s->frame + back);
+        seek_point(s, TIMELINE_SEEK_AHEAD);
     }
 }
 

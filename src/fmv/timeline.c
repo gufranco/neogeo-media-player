@@ -113,3 +113,49 @@ uint16_t timeline_bar_fill(uint32_t frame, uint32_t total, uint16_t span)
     }
     return (uint16_t)((frame * span) / (total - 1u));
 }
+
+static uint32_t seek_points(const timeline_seek_grid *grid)
+{
+    if (grid->every == 0u || grid->frames == 0u) {
+        return 1u;
+    }
+    return (grid->frames - 1u) / grid->every + 1u;
+}
+
+static uint32_t seek_landing(const timeline_seek_grid *grid, uint32_t point)
+{
+    return timeline_keyframe_at_or_before(grid->keyframes, grid->keyframe_count,
+                                          point * grid->every);
+}
+
+static uint32_t seek_current(const timeline_seek_grid *grid, uint32_t position, uint32_t points)
+{
+    uint32_t point;
+
+    if (position == 0u || grid->every == 0u) {
+        return 0u;
+    }
+    point = (position - 1u) / grid->every;
+    if (point >= points) {
+        point = points - 1u;
+    }
+    while (point + 1u < points && seek_landing(grid, point + 1u) < position) {
+        point++;
+    }
+    return point;
+}
+
+uint32_t timeline_seek_target(const timeline_seek_grid *grid, uint32_t position, int direction)
+{
+    const uint32_t points = seek_points(grid);
+    const uint32_t current = seek_current(grid, position, points);
+    const uint32_t landed = seek_landing(grid, current);
+
+    if (direction == TIMELINE_SEEK_AHEAD) {
+        return (current + 1u < points) ? (current + 1u) * grid->every : TIMELINE_SEEK_NONE;
+    }
+    if (current > 0u && position > landed && position - 1u - landed < TIMELINE_SEEK_GRACE) {
+        return (current - 1u) * grid->every;
+    }
+    return current * grid->every;
+}

@@ -203,6 +203,7 @@ Each of these ran in geolith and nowhere else, and each needs a board run:
 | The 40-line blanking budget | That the overrun counter stays at zero across a full film |
 | Eye-catcher mode 2 | That the stock AES BIOS skips its logo and starts the film |
 | The frame check, stop and restart, sound on and off, the fault screen | That playback is unchanged, Start stops on black and restarts, Up mutes, and a corrupt cartridge turns red |
+| C and D jump between baked seek points, with C going one point further back inside 120 frames of a point | That each press lands on the keyframe at or before its point, audio follows, and repeated D presses always move forward |
 
 ## What is not done
 

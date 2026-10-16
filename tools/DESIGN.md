@@ -2196,7 +2196,9 @@ arithmetic.
 A 16x16 tile sweeping a gradient, the shape that bands worst.
 
 
-### [`tests/test_encode.py`](tests/test_encode.py)
+### The encoder tests
+
+Split by behaviour across [`tests/test_encode_frames.py`](tests/test_encode_frames.py), [`tests/test_encode_tolerance.py`](tests/test_encode_tolerance.py), [`tests/test_encode_budget.py`](tests/test_encode_budget.py), [`tests/test_encode_playback.py`](tests/test_encode_playback.py), [`tests/test_encode_epochs.py`](tests/test_encode_epochs.py), [`tests/test_encode_chroma.py`](tests/test_encode_chroma.py), [`tests/encodehelp.py`](tests/encodehelp.py).
 
 #### `TestPlaybackFidelity`
 
@@ -2209,17 +2211,6 @@ Left half churns hard, right half holds still.
 #### `gentle_drift`
 
 Every slot changes every frame, by one shade.
-
-#### `busy`
-
-Content that mints new tiles on every frame.
-
-#### `test_a_roomy_budget_never_tightens_past_the_base`
-
-The controller may relax below the tier, but must not tighten.
-
-With room to spare there is nothing to correct, so the threshold
-only ever moves in the direction that spends more.
 
 #### `TestSeekEquivalence`
 
@@ -2302,7 +2293,9 @@ The drawn pixels of one named glyph, read back out of the ROM.
 The overlay reads as a seek bar rather than a row of blocks.
 
 
-### [`tests/test_fmv.py`](tests/test_fmv.py)
+### The library tests
+
+Split by behaviour across [`tests/test_fmv_open.py`](tests/test_fmv_open.py), [`tests/test_fmv_close.py`](tests/test_fmv_close.py), [`tests/test_fmv_playback.py`](tests/test_fmv_playback.py), [`tests/test_fmv_audio.py`](tests/test_fmv_audio.py), [`tests/test_fmv_corrupt.py`](tests/test_fmv_corrupt.py), [`tests/fmvhelp.py`](tests/fmvhelp.py).
 
 Exercise the library as compiled C, against a stub of the hardware.
 
@@ -2334,11 +2327,6 @@ including before it looks at anything on the search path, so the real
 header would win however the flags are ordered. Standing the sources
 next to the stub is also how a developer holding an emitted folder
 sees them: one directory, one header of each name.
-
-#### `_keyframe_record`
-
-One run covering the whole first column, so a frame writes tiles.
-
 
 ### [`tests/test_frames.py`](tests/test_frames.py)
 

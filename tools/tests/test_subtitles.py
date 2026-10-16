@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from fmvcore import subtitles as srt
 from fmvcore.testing import seeded
 
 from neogeomedia import fixtiles, subtitles
@@ -37,62 +38,6 @@ def film(tmp_path):
     source = tmp_path / f"{seeded().word()}.mkv"
     source.write_bytes(b"")
     return source
-
-
-class TestParsingCues:
-    def test_it_reads_every_cue(self):
-        # Arrange
-        text = SAMPLE
-
-        # Act
-        cues = subtitles.parse(text)
-
-        # Assert
-        assert len(cues) == 2
-
-    def test_timings_are_read_in_seconds(self):
-        # Arrange
-        text = SAMPLE
-
-        # Act
-        cues = subtitles.parse(text)
-
-        # Assert
-        assert cues[0].start == pytest.approx(1.0)
-        assert cues[0].end == pytest.approx(3.5)
-
-    def test_multiple_text_lines_are_kept_separate(self):
-        # Arrange
-        text = SAMPLE
-
-        # Act
-        cues = subtitles.parse(text)
-
-        # Assert
-        assert cues[1].lines == ("A second line", "and its continuation")
-
-    def test_markup_is_stripped(self):
-        # Arrange
-        text = one_cue("<i>Slanted</i>")
-
-        # Act
-        cues = subtitles.parse(text)
-
-        # Assert
-        assert cues[0].lines == ("Slanted",)
-
-    @pytest.mark.parametrize(
-        "text", ["", "1\n00:00:00,000 --> 00:00:01,000\n\n"], ids=["empty", "no-text"]
-    )
-    def test_a_file_or_cue_with_no_text_yields_no_cues(self, text):
-        # Arrange
-        source = text
-
-        # Act
-        cues = subtitles.parse(source)
-
-        # Assert
-        assert cues == []
 
 
 class TestLayout:
@@ -133,7 +78,7 @@ class TestLayout:
 class TestEncoding:
     def test_each_cue_becomes_one_fixed_size_record(self):
         # Arrange
-        cues = subtitles.parse(SAMPLE)
+        cues = srt.parse(SAMPLE)
 
         # Act
         blob = subtitles.encode(cues, fps=60.0)
@@ -143,7 +88,7 @@ class TestEncoding:
 
     def test_frames_come_from_the_timings_and_the_rate(self):
         # Arrange
-        cues = subtitles.parse(SAMPLE)
+        cues = srt.parse(SAMPLE)
 
         # Act
         start, end = subtitles.frame_span(cues[0], fps=60.0)
@@ -154,7 +99,7 @@ class TestEncoding:
 
     def test_text_is_stored_as_glyph_indices(self):
         # Arrange
-        cues = subtitles.parse(one_cue("A"))
+        cues = srt.parse(one_cue("A"))
 
         # Act
         blob = subtitles.encode(cues, fps=60.0)
@@ -164,7 +109,7 @@ class TestEncoding:
 
     def test_lowercase_keeps_its_own_shape_rather_than_folding_to_capitals(self):
         # Arrange
-        cues = subtitles.parse(one_cue("ag"))
+        cues = srt.parse(one_cue("ag"))
 
         # Act
         blob = subtitles.encode(cues, fps=60.0)
@@ -177,7 +122,7 @@ class TestEncoding:
 
     def test_an_unknown_character_becomes_a_blank(self):
         # Arrange
-        cues = subtitles.parse(one_cue("§"))
+        cues = srt.parse(one_cue("§"))
 
         # Act
         blob = subtitles.encode(cues, fps=60.0)
@@ -187,7 +132,7 @@ class TestEncoding:
 
     def test_lines_are_centred(self):
         # Arrange
-        cues = subtitles.parse(one_cue("AB"))
+        cues = srt.parse(one_cue("AB"))
 
         # Act
         blob = subtitles.encode(cues, fps=60.0)
@@ -199,7 +144,7 @@ class TestEncoding:
 
     def test_records_are_ordered_by_start_frame(self):
         # Arrange
-        cues = subtitles.parse(SAMPLE)[::-1]
+        cues = srt.parse(SAMPLE)[::-1]
 
         # Act
         blob = subtitles.encode(cues, fps=60.0)
@@ -209,7 +154,7 @@ class TestEncoding:
 
     def test_overlapping_cues_are_trimmed_so_one_shows_at_a_time(self):
         # Arrange
-        overlapping = subtitles.parse(OVERLAPPING)
+        overlapping = srt.parse(OVERLAPPING)
 
         # Act
         blob = subtitles.encode(overlapping, fps=60.0)
@@ -219,27 +164,3 @@ class TestEncoding:
         second_start = word(0, blob, 1)
         assert first_end <= second_start
         assert (first_end, second_start) == (120, 120)
-
-
-class TestFindingTheSidecar:
-    def test_it_finds_a_file_beside_the_source(self, tmp_path):
-        # Arrange
-        source = film(tmp_path)
-        sidecar = source.with_suffix(".srt")
-        sidecar.write_text(SAMPLE)
-
-        # Act
-        found = subtitles.sidecar_for(source)
-
-        # Assert
-        assert found == sidecar
-
-    def test_a_source_with_no_sidecar_reports_none(self, tmp_path):
-        # Arrange
-        source = film(tmp_path)
-
-        # Act
-        found = subtitles.sidecar_for(source)
-
-        # Assert
-        assert found is None

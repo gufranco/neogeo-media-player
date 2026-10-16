@@ -740,19 +740,13 @@ editable in place. Index 0 of a fix palette is transparent, so the
 overlay paints its own opaque panel behind the text instead of relying
 on whatever video happens to be underneath.
 
-The art lives in [`neogeomedia/glyphs.json`](neogeomedia/glyphs.json), one
-string per pixel row, rather than in the module. It is data that nothing
+The art lives in the core's `fmvcore/glyphs.json`, read through
+`fmvcore.font`, one string per pixel row, rather than in the module. Both
+players draw text from it. It is data that nothing
 computes, so keeping it out of the source keeps the module to the code
 that packs it. JSON strings keep the spaces that mark transparent pixels,
 which a plain text file would lose to any editor that trims trailing
 whitespace.
-
-#### `glyph_art`
-
-Every glyph's rows, read from the packaged resource once and kept.
-
-It is read on first use rather than at import, so importing the module
-touches no file.
 
 #### `pack_tile`
 
@@ -1807,18 +1801,6 @@ Cues are trimmed so that no two overlap, because the fix layer shows one
 thing at a time and a player that had to merge them would need the string
 handling this format exists to avoid.
 
-#### `Cue`
-
-One subtitle, in seconds, with its text already split into lines.
-
-#### `sidecar_for`
-
-The `.srt` sitting beside the source under the same name, if there is one.
-
-#### `parse`
-
-Read cues out of SubRip text, dropping anything with no words in it.
-
 #### `layout`
 
 Wrap to the raster without splitting words, keeping the lines that fit.
@@ -1829,10 +1811,6 @@ line entirely is worse than losing its tail.
 #### `frame_span`
 
 The half-open frame range a cue is on screen for.
-
-#### `_trimmed`
-
-Shorten any cue that runs into the next one.
 
 #### `encode`
 

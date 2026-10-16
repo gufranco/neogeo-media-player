@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import functools
-import json
 import string
-from importlib import resources
 from typing import Final
+
+from fmvcore import font
 
 from neogeomedia.neocolor import pack_palette_word
 
@@ -12,7 +11,6 @@ TILE_PX: Final = 8
 TILE_BYTES: Final = 32
 COLUMN_PAIR_OFFSETS: Final = (0x10, 0x18, 0x00, 0x08)
 MAX_TILE_INDEX: Final = 0x1000
-ART_RESOURCE: Final = "glyphs.json"
 
 TRANSPARENT: Final = 0
 INK: Final = 1
@@ -73,19 +71,6 @@ GLYPH_ORDER: Final = (
 GLYPHS: Final[dict[str, int]] = {name: index for index, name in enumerate(GLYPH_ORDER)}
 
 
-def parse_art(text: str) -> dict[str, tuple[str, ...]]:
-    loaded = json.loads(text)
-    if not isinstance(loaded, dict):
-        msg = f"{ART_RESOURCE} must map glyph names to rows"
-        raise TypeError(msg)
-    return {str(name): tuple(str(row) for row in rows) for name, rows in loaded.items()}
-
-
-@functools.cache
-def glyph_art() -> dict[str, tuple[str, ...]]:
-    return parse_art(resources.files("neogeomedia").joinpath(ART_RESOURCE).read_text("utf-8"))
-
-
 def pack_tile(pixels: list[list[int]]) -> bytes:
     if len(pixels) != TILE_PX or any(len(row) != TILE_PX for row in pixels):
         msg = f"fix tile must be 8x8, got {len(pixels)} rows"
@@ -104,7 +89,7 @@ def pack_tile(pixels: list[list[int]]) -> bytes:
 
 
 def build_rom(*, pad_to: int | None = None) -> bytes:
-    art = glyph_art()
+    art = font.glyph_art()
     out = bytearray()
     for name in GLYPH_ORDER:
         out += pack_tile([_resolve(row) for row in art[name]])

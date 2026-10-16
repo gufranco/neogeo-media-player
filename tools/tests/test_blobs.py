@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from faker import Faker
+from fmvcore import subtitles as srt
 
 from neogeomedia import blobs, fixtiles
 from neogeomedia import subtitles as subtitles_mod
@@ -113,7 +114,7 @@ class TestSubtitleWindow:
         # Arrange
         text = _word()
         captions = _cue_file(tmp_path / "captions.srt", ("00:00:21,000", "00:00:22,000", text))
-        shifted = subtitles_mod.Cue(start=1.0, end=2.0, lines=(text,))
+        shifted = srt.Cue(start=1.0, end=2.0, lines=(text,))
         expected = subtitles_mod.encode([shifted], fps=blobs.FPS)
 
         # Act
@@ -128,7 +129,7 @@ class TestSubtitleWindow:
         # Arrange
         text = _word()
         captions = _cue_file(tmp_path / "captions.srt", ("00:00:19,000", "00:00:31,000", text))
-        clipped = subtitles_mod.Cue(start=0.0, end=10.0, lines=(text,))
+        clipped = srt.Cue(start=0.0, end=10.0, lines=(text,))
         expected = subtitles_mod.encode([clipped], fps=blobs.FPS)
 
         # Act

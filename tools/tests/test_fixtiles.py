@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from fmvcore import font
 
 from neogeomedia import fixtiles
 
@@ -316,7 +317,7 @@ class TestGlyphArtResource:
         expected = set(fixtiles.GLYPH_ORDER)
 
         # Act
-        art = fixtiles.glyph_art()
+        art = font.glyph_art()
 
         # Assert
         assert set(art) == expected
@@ -326,7 +327,7 @@ class TestGlyphArtResource:
         side = fixtiles.TILE_PX
 
         # Act
-        art = fixtiles.glyph_art()
+        art = font.glyph_art()
 
         # Assert
         assert all(len(rows) == side for rows in art.values())
@@ -342,14 +343,3 @@ class TestGlyphArtResource:
         # Assert
         assert len(rom) == count * fixtiles.TILE_BYTES
         assert decode(rom[: fixtiles.TILE_BYTES]) == [[fixtiles.TRANSPARENT] * 8] * 8
-
-    def test_art_that_is_not_a_table_of_glyphs_is_refused(self):
-        # Arrange
-        text = "[]"
-
-        # Act
-        with pytest.raises(TypeError) as raised:
-            fixtiles.parse_art(text)
-
-        # Assert
-        assert fixtiles.ART_RESOURCE in str(raised.value)

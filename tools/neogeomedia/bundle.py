@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
+from fmvcore import bundle
+
 from neogeomedia import crom
 from neogeomedia import stream as stream_mod
 
@@ -77,24 +79,6 @@ def rom_image_size(payload: int) -> int:
     return size
 
 
-def _copy_all(names: tuple[str, ...], source: Path, target: Path, *, required: bool) -> list[Path]:
-    copied: list[Path] = []
-    for name in names:
-        origin = source / name
-        if not origin.is_file():
-            if required:
-                msg = f"the bundle needs {name}, which is not in {source}"
-                raise FileNotFoundError(msg)
-            continue
-        shutil.copy2(origin, target / name)
-        copied.append(target / name)
-    return copied
-
-
-def _render(name: str, fields: dict[str, object]) -> str:
-    return (_TEMPLATES / name).read_text(encoding="utf-8").format(**fields)
-
-
 @dataclass(frozen=True, slots=True)
 class MovieFigures:
     stream_banks: int
@@ -120,18 +104,20 @@ def _make_dirs(target: Path) -> tuple[Path, Path]:
 def _copy_movie_data(build_dir: Path, movie: Path) -> list[Path]:
     generated = build_dir / "generated"
     baked = build_dir / "baked"
-    _copy_all(GENERATED_SOURCES, generated, movie, required=True)
-    _copy_all(GENERATED_OPTIONAL, generated, movie, required=False)
-    _copy_all(BAKED_ASSETS, baked, movie, required=True)
-    return _copy_all(BAKED_OPTIONAL, baked, movie, required=False)
+    bundle.copy_files(GENERATED_SOURCES, generated, movie, required=True)
+    bundle.copy_files(GENERATED_OPTIONAL, generated, movie, required=False)
+    bundle.copy_files(BAKED_ASSETS, baked, movie, required=True)
+    return bundle.copy_files(BAKED_OPTIONAL, baked, movie, required=False)
 
 
 def _write_packagers(target: Path) -> None:
     packagers = target / PACKAGER_DIR_NAME
     packagers.mkdir(parents=True, exist_ok=True)
-    _copy_all(PACKAGERS, PACKAGER_ROOT, packagers, required=True)
+    bundle.copy_files(PACKAGERS, PACKAGER_ROOT, packagers, required=True)
     script = packagers / PACKAGER_SCRIPT
-    script.write_text(_render(PACKAGER_SCRIPT, {"movie_dir": MOVIE_DIR_NAME}), encoding="utf-8")
+    script.write_text(
+        bundle.render(_TEMPLATES / PACKAGER_SCRIPT, {"movie_dir": MOVIE_DIR_NAME}), encoding="utf-8"
+    )
     script.chmod(SCRIPT_MODE)
 
 
@@ -182,16 +168,16 @@ def write_bundle(
 ) -> BundleLayout:
     root = Path(target)
     library, movie = _make_dirs(root)
-    _copy_all(LIBRARY_SOURCES, Path(library_root), library, required=True)
-    audio_sources = _copy_all(AUDIO_SOURCES, Path(library_root), library, required=False)
+    bundle.copy_files(LIBRARY_SOURCES, Path(library_root), library, required=True)
+    audio_sources = bundle.copy_files(AUDIO_SOURCES, Path(library_root), library, required=False)
     voice = _copy_movie_data(Path(build_dir), movie)
     _write_packagers(root)
     _copy_stream_banks(Path(build_dir) / "generated", movie, figures.stream_banks)
     fields = _fields(figures, voice)
     makefile = root / MAKEFILE_NAME
-    makefile.write_text(_render(MAKEFILE_NAME, fields), encoding="utf-8")
+    makefile.write_text(bundle.render(_TEMPLATES / MAKEFILE_NAME, fields), encoding="utf-8")
     guide = root / GUIDE_NAME
-    guide.write_text(_render("bundle_readme.md", fields), encoding="utf-8")
+    guide.write_text(bundle.render(_TEMPLATES / "bundle_readme.md", fields), encoding="utf-8")
     return BundleLayout(
         root=root,
         library=library,

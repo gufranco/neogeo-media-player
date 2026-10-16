@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Final
 
 import numpy as np
+from fmvcore import subtitles as srt
 
 from neogeomedia import encode, fixtiles, frames, subtitles
 
@@ -28,22 +29,22 @@ def fix_palette_blob() -> bytes:
 
 def _sidecar(source: Path, explicit: Path | None) -> Path | None:
     if explicit is None:
-        return subtitles.sidecar_for(source)
+        return srt.sidecar_for(source)
     sidecar = Path(explicit)
     if not sidecar.is_file():
         raise FileNotFoundError(f"subtitle file not found: {sidecar}")
     return sidecar
 
 
-def _windowed(cues: list[subtitles.Cue], start: float, duration: float) -> list[subtitles.Cue]:
+def _windowed(cues: list[srt.Cue], start: float, duration: float) -> list[srt.Cue]:
     end = start + duration
     shifted = [
-        subtitles.Cue(start=cue.start - start, end=min(cue.end, end) - start, lines=cue.lines)
+        srt.Cue(start=cue.start - start, end=min(cue.end, end) - start, lines=cue.lines)
         for cue in cues
         if cue.end > start and cue.start < end
     ]
     return [
-        subtitles.Cue(start=max(0.0, cue.start), end=cue.end, lines=cue.lines)
+        srt.Cue(start=max(0.0, cue.start), end=cue.end, lines=cue.lines)
         for cue in shifted
         if cue.end > 0.0
     ]
@@ -53,7 +54,7 @@ def subtitle_blob(*, source: Path, explicit: Path | None, start: float, duration
     sidecar = _sidecar(source, explicit)
     if sidecar is None:
         return b""
-    cues = subtitles.parse(sidecar.read_text(encoding="utf-8", errors="replace"))
+    cues = srt.parse(sidecar.read_text(encoding="utf-8", errors="replace"))
     return subtitles.encode(_windowed(cues, start, duration), fps=FPS)
 
 

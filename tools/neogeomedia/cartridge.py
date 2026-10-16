@@ -90,7 +90,9 @@ def _add_output_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--bundle", type=Path, default=None, help=bakeargs.BUNDLE_HELP)
     parser.add_argument(
         "--seek-every",
-        type=arguments.number(low=0.0, high=limits.MAX_SOURCE_SECONDS, name="--seek-every"),
+        type=arguments.number(
+            low=limits.MIN_SECONDS, high=limits.MAX_SOURCE_SECONDS, name="--seek-every"
+        ),
         default=limits.SEEK_EVERY_SECONDS,
         help=bakeargs.SEEK_EVERY_HELP,
     )

@@ -83,9 +83,7 @@ class TestSilent:
 
 
 class TestSeekEvery:
-    @pytest.mark.parametrize(
-        ("extra", "frames"), [((), 592), (("--seek-every", "4"), 237), (("--seek-every", "0"), 0)]
-    )
+    @pytest.mark.parametrize(("extra", "frames"), [((), 592), (("--seek-every", "4"), 237)])
     def test_the_spacing_reaches_the_header_in_frames(
         self, synthetic_clip, tmp_path, extra, frames
     ):
@@ -99,9 +97,10 @@ class TestSeekEvery:
         header = (build / "generated" / "movie_data.h").read_text()
         assert f"#define MOVIE_SEEK_FRAMES {frames}u\n" in header
 
-    def test_a_negative_spacing_is_refused(self, synthetic_clip, tmp_path):
+    @pytest.mark.parametrize("spacing", ["-1", "0"])
+    def test_a_spacing_shorter_than_a_frame_is_refused(self, synthetic_clip, tmp_path, spacing):
         # Arrange
-        argv = small_argv(synthetic_clip, tmp_path / "build", "--seek-every", "-1")
+        argv = small_argv(synthetic_clip, tmp_path / "build", "--seek-every", spacing)
 
         # Act
         with pytest.raises(SystemExit) as refused:

@@ -20,7 +20,9 @@ PROFILE_SECONDS: Final = 30.0
 DITHER_HELP: Final = "ordered dither strength across palette entries, 0 for none. Default: 0"
 BUNDLE_HELP: Final = "a folder to write a drop-in copy of the player library and this film into"
 SILENT_HELP: Final = "leave sound out; it has its own ROM, so the picture gains no room"
-SEEK_EVERY_HELP: Final = "seconds between the points C and D jump to; 0 leaves only the start"
+SEEK_EVERY_HELP: Final = (
+    f"seconds between the points C and D jump to. Default: {limits.SEEK_EVERY_SECONDS:g}"
+)
 
 _AUTO_REFUSAL: Final = (
     "'auto' is gone: it guessed the tier from a sample and the guess was wrong "
@@ -183,7 +185,9 @@ def _add_output_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--silent", action="store_true", help=SILENT_HELP)
     parser.add_argument(
         "--seek-every",
-        type=arguments.number(low=0.0, high=limits.MAX_SOURCE_SECONDS, name="--seek-every"),
+        type=arguments.number(
+            low=limits.MIN_SECONDS, high=limits.MAX_SOURCE_SECONDS, name="--seek-every"
+        ),
         default=limits.SEEK_EVERY_SECONDS,
         help=SEEK_EVERY_HELP,
     )

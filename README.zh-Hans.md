@@ -1,5 +1,3 @@
-[English](README.md) | [日本語](README.ja.md) | 简体中文 | [繁體中文（香港）](README.zh-HK.md)
-
 <div align="center">
 
 # Neo Geo Media Player
@@ -7,7 +5,7 @@
 <strong>在原装 Neo Geo AES 上播放带声音的全屏影片，<br>
 并提供一个能把影片放进你自己游戏里的库。</strong>
 
-<br>
+[English](README.md) &nbsp;|&nbsp; [日本語](README.ja.md) &nbsp;|&nbsp; 简体中文 &nbsp;|&nbsp; [繁體中文（香港）](README.zh-HK.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/gufranco/neogeo-media-player/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/gufranco/neogeo-media-player/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)](RELEASES.md)

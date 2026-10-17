@@ -250,8 +250,24 @@ That choice has a price, paid deliberately:
 - **Every member is a solo repository** and lands on `main` directly, after
   every gate passes.
 - **The demo film is the Sintel trailer** by the Blender Foundation, CC BY 3.0,
-  credited wherever it appears. A demo GIF is a capture from the emulator
-  running the cartridge, never a render of the baker's own preview.
+  credited wherever it appears. A demo GIF shows the cartridge's own stream:
+  a capture from the emulator running it, or the replay oracle's drawing of
+  that stream once a headless capture has matched it pixel for pixel
+  outside the player's overlay. It is never a render of the baker's preview.
+- **A player's demos match frame for frame.** When a player carries more
+  than one console, every console's demo is baked from the same window of
+  the demo film with the same settings, drawn the same way and cut to the
+  same fields, so each GIF has the same frame count and timing and the same
+  frame shows the same moment. One committed script makes them all. They are
+  made again after any change to the picture, and only once the consoles'
+  pictures are perceptually alike: a console whose picture looks visibly
+  worse is a defect to fix first (owner, 2026-10-17).
+- **Every file is covered and every test is end to end** (owner,
+  2026-10-17). Coverage is 100% of the statements and branches of every
+  file, the scripts included, and a test drives the code the way a bake or a
+  console does: real files, the real decoder, the built ROM on a Z80 or an
+  emulator, with no mock of the family's own code. A member below either bar
+  lists the gap in its state section until it closes.
 
 ## Verification
 
@@ -279,7 +295,7 @@ That choice has a price, paid deliberately:
 | Static analysis | `cppcheck` at exhaustive level on the player, zero findings |
 | Test shape | Arrange, Act, Assert, each opened by its bare marker, one act |
 | Test data | Values that do not matter come from the core's seeded fakes |
-| Coverage | 95% of statements and branches, including the scripts |
+| Coverage | 100% of statements and branches in every file, the scripts included; the floor each member's CI enforces never drops, and rises to 100% as its gap closes |
 | Commits | Conventional Commits, subject at most 50 characters, lowercase start |
 | Actions | Pinned by full commit SHA |
 | Films | Fetched and verified by manifest, never committed |
@@ -303,8 +319,11 @@ real bakes rather than paging patterns, and its sound is ADPCM-B samples in
 their own V-ROM. It decodes, scores, verifies films and measures captures
 through `fmv-core-python`.
 
-Gaps against "What every player does" (as of 2026-10-16):
+Gaps against "What every player does" (as of 2026-10-17):
 
+- Coverage per file and the share of end-to-end tests have not yet been
+  measured against the 2026-10-17 requirement of 100% in every file and
+  end-to-end tests; CI enforces 95%.
 - `--dither` is off by default here and on by default on the Master
   System. The default waits on the owner's dither verdict.
 

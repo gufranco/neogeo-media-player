@@ -125,7 +125,7 @@ The whole path runs: preprocessing, the encoder, the quality ladder, the ROM con
 | Controls | The transport in [Running it](#running-it): play, pause, fast forward, rewind, seek, mute, subtitles, stop and the diagnostics, with a menu that shows for three seconds after any press |
 | Field rate | 59.185 Hz on every board, so a cartridge plays at the same speed in every region |
 | Regression set | Six clips of different kinds baked on every test run |
-| Hardware run | Done on a real AES and a real MVS from a NeoSD. The changes made since are listed in [AGENTS.md](AGENTS.md) as waiting for a board run |
+| Hardware run | Done on a real AES and a real MVS from a NeoSD, and again on 2026-10-17 with the changes listed in [AGENTS.md](AGENTS.md), with no defect seen |
 
 ## What every player does
 
@@ -158,7 +158,7 @@ feature a console cannot carry says "Not possible" with the hardware reason.
 | A preview of what the console will draw | Yes, a video, or four frames beside their source | Yes, a video, or four frames beside their source |
 | A write-timing gate on every build | Yes | Yes |
 | A regression set of films baked on every test run | Yes, six films | Yes, six films |
-| Run on the original hardware | Yes, AES and MVS | Not yet. A Game Gear run is pending |
+| Run on the original hardware | Yes, AES and MVS | Yes, a Master System and a Game Gear |
 
 ## How it works
 

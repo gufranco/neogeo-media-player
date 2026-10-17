@@ -198,11 +198,15 @@ backdrop red. A movie whose layout the board cannot hold fails in
   and another in CI. Pick a nearest with `np.argmin` and rank with
   `np.argsort(kind="stable")` wherever a tie can change what is baked.
 
-## Unverified on hardware
+## Run on hardware on 2026-10-17
 
-Each of these ran in geolith and nowhere else, and each needs a board run:
+Each of these had run only in geolith. On 2026-10-17 the owner ran the
+current build on a Neo Geo and reported no defect so far. The report did not
+itemise each check, so a defect found later on any of them comes back here
+with what was seen. The next change to the player is unverified again until it
+runs on a board.
 
-| Change | What a board run settles |
+| Change | What the run covered |
 |---|---|
 | The 40-line blanking budget | That the overrun counter stays at zero across a full film |
 | Eye-catcher mode 2 | That the stock AES BIOS skips its logo and starts the film |

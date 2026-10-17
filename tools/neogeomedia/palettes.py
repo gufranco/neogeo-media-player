@@ -245,7 +245,8 @@ class PaletteAssigner:
             self._slot[index] = np.argmin(distance, axis=1).astype(np.uint8)
             self._error[index] = np.min(distance, axis=1).astype(np.float32)
             if self._second is not None and self._mix is not None:
-                nearest, runner, share = ordered.two_nearest(distance, dither)
+                spacing = ((palette_lab[:, None, :] - palette_lab[None, :, :]) ** 2).sum(axis=2)
+                nearest, runner, share = ordered.two_nearest(distance, spacing, dither)
                 self._slot[index] = nearest
                 self._second[index] = runner
                 self._mix[index] = share

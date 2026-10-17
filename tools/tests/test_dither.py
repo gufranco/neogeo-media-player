@@ -3,14 +3,21 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from neogeomedia import palettes
+from neogeomedia import neocolor, palettes
 
-THREE_ENTRIES = [0, 0x1000, 0x7FFF]
+
+def greys(*levels: int) -> np.ndarray:
+    rgb = np.repeat(np.array(levels, dtype=np.uint8)[:, None], 3, axis=1)
+    return neocolor.rgb_to_color_index(rgb)
+
+
+BLACK, MID_GREY, WHITE = (int(index) for index in greys(0, 128, 255))
+THREE_ENTRIES = [BLACK, MID_GREY, WHITE]
 
 
 def a_ramp_tile(low: int, high: int) -> np.ndarray:
-    row = np.linspace(low, high, palettes.TILE_PX, dtype=np.float64)
-    return np.tile(row, (palettes.TILE_PX, 1)).astype(np.uint16)
+    row = np.rint(np.linspace(low, high, palettes.TILE_PX)).astype(np.uint8)
+    return np.tile(greys(*row.tolist()), (palettes.TILE_PX, 1)).astype(np.uint16)
 
 
 def a_palette_set(colors: list[int]) -> palettes.PaletteSet:
@@ -27,7 +34,7 @@ def dithering() -> palettes.PaletteAssigner:
 class TestItKeepsTilesInternable:
     def test_two_identical_tiles_still_quantise_identically(self):
         # Arrange
-        tiles = np.stack([a_ramp_tile(0, 0x7FFF)] * 2)
+        tiles = np.stack([a_ramp_tile(0, 255)] * 2)
         assigner = dithering()
 
         # Act
@@ -38,8 +45,8 @@ class TestItKeepsTilesInternable:
 
     def test_a_tile_quantises_the_same_wherever_it_sits_in_the_frame(self):
         # Arrange
-        one = a_ramp_tile(0, 0x7FFF)
-        other = a_ramp_tile(0x2000, 0x5000)
+        one = a_ramp_tile(0, 255)
+        other = a_ramp_tile(64, 160)
         assigner = dithering()
         elsewhere = assigner.assign(np.stack([other, one]))
 
@@ -54,7 +61,7 @@ class TestItKeepsTilesInternable:
 class TestItActuallyDithers:
     def test_a_gradient_gains_intermediate_levels(self):
         # Arrange
-        tiles = a_ramp_tile(0, 0x7FFF)[None, :, :]
+        tiles = a_ramp_tile(0, 255)[None, :, :]
         plain = palettes.PaletteAssigner(a_palette_set(THREE_ENTRIES)).assign(tiles)
 
         # Act
@@ -65,7 +72,7 @@ class TestItActuallyDithers:
 
     def test_a_colour_sitting_on_a_palette_entry_is_never_swapped(self):
         # Arrange
-        flat = np.full((1, palettes.TILE_PX, palettes.TILE_PX), 0x1000, dtype=np.uint16)
+        flat = np.full((1, palettes.TILE_PX, palettes.TILE_PX), MID_GREY, dtype=np.uint16)
         assigner = dithering()
 
         # Act
@@ -76,7 +83,7 @@ class TestItActuallyDithers:
 
     def test_leaving_it_off_changes_nothing(self):
         # Arrange
-        tiles = a_ramp_tile(0, 0x7FFF)[None, :, :]
+        tiles = a_ramp_tile(0, 255)[None, :, :]
         palette = a_palette_set(THREE_ENTRIES)
         before = palettes.PaletteAssigner(palette).assign(tiles)
 
@@ -88,7 +95,7 @@ class TestItActuallyDithers:
 
 
 def swapped_pixels(strength: float) -> int:
-    tiles = a_ramp_tile(0, 0x7FFF)[None, :, :]
+    tiles = a_ramp_tile(0, 255)[None, :, :]
     palette = a_palette_set(THREE_ENTRIES)
     plain = palettes.PaletteAssigner(palette).assign(tiles)
     mixed = palettes.PaletteAssigner(palette, dither=strength).assign(tiles)

@@ -1138,10 +1138,14 @@ The threshold field and the two-entry mix live in the core,
 palettes the same way. `bayer_thresholds(TILE_PX)` tiles the 8x8 matrix
 over a 16x16 tile, so every tile sees the same field and identical
 tiles still quantise identically. `two_nearest` returns the closest
-entry, the runner-up and the share between them: the nearer radius
-over the sum of both, 0 on a palette entry and a half when the two are
-equidistant. `mix` swaps in the runner-up for that fraction of a tile's
-pixels.
+entry, the runner-up and the share between them: how far along the
+segment between the two the colour projects, 0 on a palette entry, a
+half midway and 0 when the pair does not bracket the colour. `mix` swaps
+in the runner-up for that fraction of a tile's pixels. With dither on,
+the projection took blurred error from 0.00445 to 0.00427 on two seconds
+of the Sintel trailer and from 0.00970 to 0.00920 on Popeye, with 4 to
+5% fewer tiles, against the earlier radius share; both now sit below no
+dither, 0.00434 and 0.00930. The default stays off.
 
 #### `oklab_grid`
 

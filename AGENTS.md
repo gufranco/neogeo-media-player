@@ -193,6 +193,10 @@ backdrop red. A movie whose layout the board cannot hold fails in
   cycles. The baker charges 64 cycles a slot, so a keyframe's 280 slots take
   17,920 of them by that model. Anything added inside the write loop comes
   out of what is left.
+- `np.argpartition` does not order equal values the same way on x86 and Arm
+  NumPy builds, so a tie broken by its order gives one output on this Mac
+  and another in CI. Pick a nearest with `np.argmin` and rank with
+  `np.argsort(kind="stable")` wherever a tie can change what is baked.
 
 ## Unverified on hardware
 

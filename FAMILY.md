@@ -177,7 +177,7 @@ That choice has a price, paid deliberately:
 | File | Holds |
 |:--|:--|
 | [`README.md`](README.md) | The document for a person: what it is, how to build and run it, and why it can be trusted. Every player's README has the same sections in the same order, opens with an animated GIF of at least five seconds of the shared demo film playing from that player's cartridge in an emulator, and has translations |
-| `README.ja.md`, `README.zh-Hans.md`, `README.zh-HK.md` | Japanese, Simplified Chinese and Hong Kong Traditional Chinese translations of the README, each translated from the English file, keeping its headings, code blocks and links, with a language switcher on the first line of every version |
+| `README.ja.md`, `README.zh-Hans.md`, `README.zh-HK.md` | Japanese, Simplified Chinese and Hong Kong Traditional Chinese translations of the README, each translated from the English file, keeping its headings, code blocks and links, with a language switcher under the tagline of every version, above the badges |
 | `AGENTS.md` | The engineering contract: the hardware's binding numbers with their sources, the gates, the things that bite, what is not done |
 | `FAMILY.md` | This file, identical in every member |
 | `DESIGN.md` | Why each part of the code is shaped as it is, with the measurements behind it. Source files carry none of this |

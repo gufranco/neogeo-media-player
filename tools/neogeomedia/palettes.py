@@ -353,4 +353,4 @@ class PaletteAssigner:
         descriptors = _tile_descriptors(tiles)
         centroids = self._palette_set.descriptors
         distance = _sqdist(descriptors, centroids)
-        return np.argpartition(distance, self._candidates - 1, axis=1)[:, : self._candidates]
+        return np.argsort(distance, axis=1, kind="stable")[:, : self._candidates]

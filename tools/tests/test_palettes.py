@@ -252,6 +252,17 @@ class TestAssignment:
         # Assert
         assert assignment.palette_ids.shape == (5,)
 
+    def test_a_tie_between_palettes_goes_to_the_first_as_the_full_search_does(self):
+        # Arrange
+        tiles = np.stack([tile_of(FIFTEEN_COLORS) for _ in range(4)])
+        palette_set = built(tiles, 3)
+
+        # Act
+        assignment = palettes.PaletteAssigner(palette_set, candidates=1).assign(tiles)
+
+        # Assert
+        assert assignment.palette_ids.tolist() == [0, 0, 0, 0]
+
     def test_exhaustive_search_is_never_worse_than_a_restricted_search(self):
         # Arrange
         rng = np.random.default_rng(SEED)

@@ -11,7 +11,7 @@ the hardware forces.
 | Member | What it is | Kind |
 |:--|:--|:--|
 | [neogeo-media-player](https://github.com/gufranco/neogeo-media-player) | A full-screen movie with sound on a Neo Geo AES or MVS, and a library that plays one inside another game | Player |
-| [sms-media-player](https://github.com/gufranco/sms-media-player) | A full-screen film on a Sega Master System, its tiles paged through VRAM as it plays | Player |
+| [smsgg-media-player](https://github.com/gufranco/smsgg-media-player) | A full-screen film on a Sega Master System, its tiles paged through VRAM as it plays | Player |
 | [fmv-core-python](https://github.com/gufranco/fmv-core-python) | The baker and measurement code both players share: decoding, colour, dither, the regression set, capture comparison, the write-timing walk, the test helpers | Core |
 
 ## How a repository joins

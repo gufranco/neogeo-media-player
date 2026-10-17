@@ -190,7 +190,7 @@ flowchart LR
 
 ### すべてを決める制約
 
-このプレイヤーとMaster Systemの[`sms-media-player`](https://github.com/gufranco/sms-media-player)は同じファミリーのメンバーであり、2つのマシンは設計が依存するただ1つの次元で異なります。
+このプレイヤーとMaster Systemの[`smsgg-media-player`](https://github.com/gufranco/smsgg-media-player)は同じファミリーのメンバーであり、2つのマシンは設計が依存するただ1つの次元で異なります。
 
 Neo Geoは**キャラクターROMに1,048,576個のタイルを常駐**させているので、プレイヤーはスプライトコントロールブロックにタイル番号を書き込むだけで、実行時にはそれ以外何もしません。Master Systemが扱えるのは16 KBのVRAMにある512パターンだけなので、そのプレイヤーは再生しながら映像のパターンをページングする必要があります。
 
@@ -503,7 +503,7 @@ MAMEは224行すべてで列0を黒で返します。それを除くと、残差
 | [`tools/DESIGN.md`](tools/DESIGN.md) | ベイカーの各モジュール、スクリプト、テストがなぜその形なのかと、その裏付けとなる測定 |
 | [`tools/scripts/`](tools/scripts) | キャプチャ、検証、タイミング、ラダーのスイープ用のヘルパー |
 | [`toolchain/`](toolchain) | ツールチェーンイメージ内で実行するngdevkitビルド |
-| [`FAMILY.md`](FAMILY.md) | sms-media-playerおよびfmv-core-pythonと共有する標準で、それぞれで同一です |
+| [`FAMILY.md`](FAMILY.md) | smsgg-media-playerおよびfmv-core-pythonと共有する標準で、それぞれで同一です |
 | [`CHANGELOG.md`](CHANGELOG.md) | 何を計測し、何を却下したか |
 | [`RELEASES.md`](RELEASES.md) | 生成されたリリースノートで、バージョンごとに1エントリー |
 
@@ -553,7 +553,7 @@ uv --project tools run python tools/scripts/fetch_clips.py
 | ファイル | 内容 |
 |---|---|
 | [`AGENTS.md`](AGENTS.md) | エンジニアリング上の取り決め。ハードウェアの拘束値とその出典、ゲート、未完了の事項 |
-| [`FAMILY.md`](FAMILY.md) | sms-media-playerとfmv-core-pythonと共有する規格で、どれでも同一です |
+| [`FAMILY.md`](FAMILY.md) | smsgg-media-playerとfmv-core-pythonと共有する規格で、どれでも同一です |
 | [`tools/DESIGN.md`](tools/DESIGN.md) | ベイカーの各モジュール、スクリプト、テストがなぜその形なのかと、その裏付けとなる測定 |
 | [`docs/hardware.md`](docs/hardware.md) | 両エミュレーターから読み取ったビット配置と、タイミングゲートが検査する内容 |
 | [`docs/quality-ladder.md`](docs/quality-ladder.md) | 35段すべてとその設定 |
@@ -655,7 +655,7 @@ Cライブラリの公開範囲は[`fmv.h`](src/fmv/fmv.h)です。
 | メンバー | 内容 |
 |:--|:--|
 | [neogeo-media-player](https://github.com/gufranco/neogeo-media-player) | このリポジトリ |
-| [sms-media-player](https://github.com/gufranco/sms-media-player) | Sega Master System上のフルスクリーン映像で、再生中にタイルをVRAMへページングします |
+| [smsgg-media-player](https://github.com/gufranco/smsgg-media-player) | Sega Master System上のフルスクリーン映像で、再生中にタイルをVRAMへページングします |
 | [fmv-core-python](https://github.com/gufranco/fmv-core-python) | プレイヤー間で共有するベイカーと計測のコード |
 
 ## ライセンスとクレジット

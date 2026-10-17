@@ -192,7 +192,7 @@ Keyframes rewrite all 280 slots and act as seek targets. The transport jumps any
 
 ### The constraint that shapes everything
 
-This player and the Master System's [`sms-media-player`](https://github.com/gufranco/sms-media-player) are members of one family, and the two machines differ in the one dimension the design leans on.
+This player and the Master System's [`smsgg-media-player`](https://github.com/gufranco/smsgg-media-player) are members of one family, and the two machines differ in the one dimension the design leans on.
 
 The Neo Geo holds **1,048,576 tiles resident in character ROM**, so the player writes tile numbers into sprite control blocks and does nothing else at runtime. The Master System addresses 512 patterns in 16 KB of VRAM, so its player has to page the film's patterns in while it plays.
 
@@ -508,7 +508,7 @@ The [cutscene example](examples/cutscene) has run on a board too and came back t
 | [`tools/DESIGN.md`](tools/DESIGN.md) | Why each baker module, script and test is shaped as it is, with the measurements behind it |
 | [`tools/scripts/`](tools/scripts) | Capture, verification, timing and ladder-sweep helpers |
 | [`toolchain/`](toolchain) | The ngdevkit build, run in the toolchain image |
-| [`FAMILY.md`](FAMILY.md) | The standard shared with sms-media-player and fmv-core-python, identical in each |
+| [`FAMILY.md`](FAMILY.md) | The standard shared with smsgg-media-player and fmv-core-python, identical in each |
 | [`CHANGELOG.md`](CHANGELOG.md) | What was measured, and what was rejected |
 | [`RELEASES.md`](RELEASES.md) | Generated release notes, one entry per version |
 
@@ -562,7 +562,7 @@ Coverage is gated at 95% in [CI](.github/workflows/ci.yml), which also builds a 
 | File | Contents |
 |---|---|
 | [`AGENTS.md`](AGENTS.md) | The engineering contract: the hardware's binding numbers with their sources, the gates, and what is not done |
-| [`FAMILY.md`](FAMILY.md) | The standard shared with sms-media-player and fmv-core-python, identical in each |
+| [`FAMILY.md`](FAMILY.md) | The standard shared with smsgg-media-player and fmv-core-python, identical in each |
 | [`tools/DESIGN.md`](tools/DESIGN.md) | Why each baker module, script and test is shaped as it is, with the measurements behind it |
 | [`docs/hardware.md`](docs/hardware.md) | The bit layouts read out of both emulators and what the timing gate checks |
 | [`docs/quality-ladder.md`](docs/quality-ladder.md) | All 35 rungs with their settings |
@@ -667,7 +667,7 @@ force lives once in the core.
 | Member | What it is |
 |:--|:--|
 | [neogeo-media-player](https://github.com/gufranco/neogeo-media-player) | This repository |
-| [sms-media-player](https://github.com/gufranco/sms-media-player) | A full-screen film on a Sega Master System, its tiles paged through VRAM as it plays |
+| [smsgg-media-player](https://github.com/gufranco/smsgg-media-player) | A full-screen film on a Sega Master System, its tiles paged through VRAM as it plays |
 | [fmv-core-python](https://github.com/gufranco/fmv-core-python) | The baker and measurement code the players share |
 
 ## Licence and credits

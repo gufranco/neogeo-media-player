@@ -190,7 +190,7 @@ flowchart LR
 
 ### 决定一切的约束
 
-这个播放器与 Master System 的 [`sms-media-player`](https://github.com/gufranco/sms-media-player) 是同一个家族的成员，两台机器只在设计所依赖的那一个维度上不同。
+这个播放器与 Master System 的 [`smsgg-media-player`](https://github.com/gufranco/smsgg-media-player) 是同一个家族的成员，两台机器只在设计所依赖的那一个维度上不同。
 
 Neo Geo **在字符 ROM 中常驻 1,048,576 个图块**，因此播放器只需把图块编号写入精灵控制块，运行时不做别的事。Master System 只能寻址 16 KB VRAM 中的 512 个图案，因此它的播放器必须在播放时把影片的图案分页调入。
 
@@ -503,7 +503,7 @@ MAME 在全部 224 行中把第 0 列返回为黑色。排除该列后，剩余�
 | [`tools/DESIGN.md`](tools/DESIGN.md) | 每个烘焙器模块、脚本和测试为何如此设计，以及背后的测量数据 |
 | [`tools/scripts/`](tools/scripts) | 录制、验证、时序和阶梯扫描辅助脚本 |
 | [`toolchain/`](toolchain) | 在工具链镜像中运行的 ngdevkit 构建 |
-| [`FAMILY.md`](FAMILY.md) | 与 sms-media-player 和 fmv-core-python 共享的标准，在各仓库中完全相同 |
+| [`FAMILY.md`](FAMILY.md) | 与 smsgg-media-player 和 fmv-core-python 共享的标准，在各仓库中完全相同 |
 | [`CHANGELOG.md`](CHANGELOG.md) | 测量了什么，以及否决了什么 |
 | [`RELEASES.md`](RELEASES.md) | 自动生成的发布说明，每个版本一条 |
 
@@ -553,7 +553,7 @@ uv --project tools run python tools/scripts/fetch_clips.py
 | 文件 | 内容 |
 |---|---|
 | [`AGENTS.md`](AGENTS.md) | 工程约定：硬件的约束数值及其来源、门禁，以及尚未完成的事项 |
-| [`FAMILY.md`](FAMILY.md) | 与 sms-media-player 和 fmv-core-python 共享的标准，各处完全相同 |
+| [`FAMILY.md`](FAMILY.md) | 与 smsgg-media-player 和 fmv-core-python 共享的标准，各处完全相同 |
 | [`tools/DESIGN.md`](tools/DESIGN.md) | 烘焙器的每个模块、脚本和测试为何是现在的样子，以及背后的测量 |
 | [`docs/hardware.md`](docs/hardware.md) | 从两个模拟器中读出的位布局，以及时序门禁检查的内容 |
 | [`docs/quality-ladder.md`](docs/quality-ladder.md) | 全部 35 个档位及其设置 |
@@ -655,7 +655,7 @@ C 库接口是 [`fmv.h`](src/fmv/fmv.h)：
 | 成员 | 说明 |
 |:--|:--|
 | [neogeo-media-player](https://github.com/gufranco/neogeo-media-player) | 本仓库 |
-| [sms-media-player](https://github.com/gufranco/sms-media-player) | 在 Sega Master System 上播放全屏影片，播放时通过 VRAM 分页传输图块 |
+| [smsgg-media-player](https://github.com/gufranco/smsgg-media-player) | 在 Sega Master System 上播放全屏影片，播放时通过 VRAM 分页传输图块 |
 | [fmv-core-python](https://github.com/gufranco/fmv-core-python) | 各播放器共享的烘焙器和测量代码 |
 
 ## 许可证与致谢

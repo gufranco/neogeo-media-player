@@ -5,7 +5,7 @@
 <strong>改造なしのNeo Geo AESで動く音声付きのフルスクリーン映像と、<br>
 それを自作ゲームに組み込むライブラリです。</strong>
 
-[English](README.md) &nbsp;|&nbsp; 日本語 &nbsp;|&nbsp; [简体中文](README.zh-Hans.md) &nbsp;|&nbsp; [繁體中文（香港）](README.zh-HK.md)
+[English](README.md) | 日本語 | [简体中文](README.zh-Hans.md) | [繁體中文（香港）](README.zh-HK.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/gufranco/neogeo-media-player/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/gufranco/neogeo-media-player/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)](RELEASES.md)
@@ -16,10 +16,10 @@
 </div>
 
 <p align="center">
-  <a href="#クイックスタート"><strong>クイックスタート</strong></a> &nbsp;|&nbsp;
-  <a href="#仕組み"><strong>仕組み</strong></a> &nbsp;|&nbsp;
-  <a href="#品質"><strong>品質</strong></a> &nbsp;|&nbsp;
-  <a href="#検証"><strong>検証</strong></a> &nbsp;|&nbsp;
+  <a href="#クイックスタート"><strong>クイックスタート</strong></a> |
+  <a href="#仕組み"><strong>仕組み</strong></a> |
+  <a href="#品質"><strong>品質</strong></a> |
+  <a href="#検証"><strong>検証</strong></a> |
   <a href="#ファミリー"><strong>ファミリー</strong></a>
 </p>
 
@@ -153,7 +153,7 @@ Neo Geoにはビデオデコーダーも、フレームバッファも、スケ�
 | 自作ゲームへの映像の組み込み | はい。`--bundle`がそのまま組み込めるライブラリを出力します | はい。`--bundle`がそのまま組み込めるライブラリを出力し、`examples/cutscene`がそれでゲームをビルドします | はい。`--bundle`と`--target gg`でGame Gear用のライブラリを出力します |
 | コンソールが描画する内容のプレビュー | はい。動画、またはソースと並べた4フレーム | はい。動画、またはソースと並べた4フレーム | はい。動画、またはソースと並べた4フレーム |
 | 全ビルドでの書き込みタイミングゲート | はい | はい | はい |
-| テスト実行ごとにベイクする回帰用の映像セット | はい。6本の映像 | はい。6本の映像 | 予定。6本の映像はMaster System向けにのみベイクしています |
+| テスト実行ごとにベイクする回帰用の映像セット | はい。6本の映像 | はい。6本の映像 | はい。同じ6本をGame Gearの表示範囲にベイクします |
 | 実機での動作 | はい。AESとMVS | はい。Master SystemとGame Gear | 予定。Master SystemのカートリッジはGame Gearで動作済みですが、ネイティブ版はまだです |
 
 ## 仕組み

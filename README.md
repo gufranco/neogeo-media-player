@@ -5,7 +5,7 @@
 <strong>A full-screen film with sound on a stock Neo Geo AES,<br>
 and a library that puts one inside your own game.</strong>
 
-English &nbsp;|&nbsp; [日本語](README.ja.md) &nbsp;|&nbsp; [简体中文](README.zh-Hans.md) &nbsp;|&nbsp; [繁體中文（香港）](README.zh-HK.md)
+English | [日本語](README.ja.md) | [简体中文](README.zh-Hans.md) | [繁體中文（香港）](README.zh-HK.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/gufranco/neogeo-media-player/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/gufranco/neogeo-media-player/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)](RELEASES.md)
@@ -16,10 +16,10 @@ English &nbsp;|&nbsp; [日本語](README.ja.md) &nbsp;|&nbsp; [简体中文](REA
 </div>
 
 <p align="center">
-  <a href="#quick-start"><strong>Quick start</strong></a> &nbsp;|&nbsp;
-  <a href="#how-it-works"><strong>How it works</strong></a> &nbsp;|&nbsp;
-  <a href="#quality"><strong>Quality</strong></a> &nbsp;|&nbsp;
-  <a href="#verification"><strong>Verification</strong></a> &nbsp;|&nbsp;
+  <a href="#quick-start"><strong>Quick start</strong></a> |
+  <a href="#how-it-works"><strong>How it works</strong></a> |
+  <a href="#quality"><strong>Quality</strong></a> |
+  <a href="#verification"><strong>Verification</strong></a> |
   <a href="#the-family"><strong>The family</strong></a>
 </p>
 
@@ -155,7 +155,7 @@ feature a console cannot carry says "Not possible" with the hardware reason.
 | A film inside your own game | Yes, `--bundle` emits a drop-in library | Yes, `--bundle` emits a drop-in library and `examples/cutscene` builds a game from it | Yes, `--bundle` with `--target gg` emits a Game Gear library |
 | A preview of what the console will draw | Yes, a video, or four frames beside their source | Yes, a video, or four frames beside their source | Yes, a video, or four frames beside their source |
 | A write-timing gate on every build | Yes | Yes | Yes |
-| A regression set of films baked on every test run | Yes, six films | Yes, six films | Planned: the six films are baked for the Master System only |
+| A regression set of films baked on every test run | Yes, six films | Yes, six films | Yes, the same six films baked into the Game Gear window |
 | Run on the original hardware | Yes, AES and MVS | Yes, a Master System and a Game Gear | Planned: the Master System cartridge has run on a Game Gear, the native one has not yet |
 
 ## How it works

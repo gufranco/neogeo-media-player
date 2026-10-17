@@ -5,7 +5,7 @@
 <strong>在原裝 Neo Geo AES 上播放有聲音的全螢幕影片，<br>
 並提供一個程式庫，把影片放進你自己的遊戲。</strong>
 
-[English](README.md) &nbsp;|&nbsp; [日本語](README.ja.md) &nbsp;|&nbsp; [简体中文](README.zh-Hans.md) &nbsp;|&nbsp; 繁體中文（香港）
+[English](README.md) | [日本語](README.ja.md) | [简体中文](README.zh-Hans.md) | 繁體中文（香港）
 
 [![CI](https://img.shields.io/github/actions/workflow/status/gufranco/neogeo-media-player/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/gufranco/neogeo-media-player/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)](RELEASES.md)
@@ -16,10 +16,10 @@
 </div>
 
 <p align="center">
-  <a href="#快速開始"><strong>快速開始</strong></a> &nbsp;|&nbsp;
-  <a href="#運作原理"><strong>運作原理</strong></a> &nbsp;|&nbsp;
-  <a href="#質素"><strong>質素</strong></a> &nbsp;|&nbsp;
-  <a href="#驗證"><strong>驗證</strong></a> &nbsp;|&nbsp;
+  <a href="#快速開始"><strong>快速開始</strong></a> |
+  <a href="#運作原理"><strong>運作原理</strong></a> |
+  <a href="#質素"><strong>質素</strong></a> |
+  <a href="#驗證"><strong>驗證</strong></a> |
   <a href="#播放器家族"><strong>系列</strong></a>
 </p>
 
@@ -153,7 +153,7 @@ Neo Geo 沒有影片解碼器、沒有影格緩衝區，也沒有縮放器。它
 | 在你自己的遊戲中播放影片 | 是，`--bundle` 會產生可直接嵌入的程式庫 | 是，`--bundle` 會產生可直接嵌入的程式庫，`examples/cutscene` 用它建置一個遊戲 | 是，`--bundle` 配合 `--target gg` 會產生 Game Gear 用的程式庫 |
 | 預覽主機將會繪製的畫面 | 是，影片，或四幀畫面並列於其來源旁 | 是，影片，或四幀畫面並列於其來源旁 | 是，影片，或四幀畫面並列於其來源旁 |
 | 每次建置都檢查寫入時序 | 是 | 是 | 是 |
-| 每次測試都會烘焙的回歸影片集 | 是，六段影片 | 是，六段影片 | 已計劃：六段影片目前只為 Master System 烘焙 |
+| 每次測試都會烘焙的回歸影片集 | 是，六段影片 | 是，六段影片 | 是，同樣六段影片烘焙到 Game Gear 的顯示範圍 |
 | 在原裝硬件上運行 | 是，AES 及 MVS | 是，Master System 及 Game Gear | 已計劃：Master System 卡帶已在 Game Gear 上運行，原生卡帶尚未運行 |
 
 ## 運作原理

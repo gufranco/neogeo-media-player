@@ -156,6 +156,14 @@ other player.
 When both players have a module, the better-tested and better-guarded one moves
 to the core and the other player adapts to it.
 
+Owner's instruction, 2026-10-17: the consoles one player serves share as much
+code as they can, so that nothing differs between their cartridges except what
+the hardware forces, and every player shares as much as it can with the rest
+of the family. A difference between two consoles is data, such as a colour
+lattice, a screen size or a port, passed to one code path, never a second
+path. Integrity and reuse across the family are checked on every change: a
+fix made in one member is looked for in every other member in the same task.
+
 ## How a player depends on the core
 
 The core is a git submodule on the import path, at the repository root under its

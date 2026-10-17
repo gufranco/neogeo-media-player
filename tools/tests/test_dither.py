@@ -24,51 +24,6 @@ def dithering() -> palettes.PaletteAssigner:
     return palettes.PaletteAssigner(a_palette_set(THREE_ENTRIES), dither=True)
 
 
-class TestTheThresholdField:
-    def test_it_covers_a_whole_tile(self):
-        # Arrange
-        expected = (16, 16)
-
-        # Act
-        field = palettes.bayer_thresholds()
-
-        # Assert
-        assert field.shape == expected
-
-    def test_it_stays_inside_the_unit_interval(self):
-        # Arrange
-        low, high = 0.0, 1.0
-
-        # Act
-        field = palettes.bayer_thresholds()
-
-        # Assert
-        assert field.min() > low
-        assert field.max() < high
-
-    def test_it_repeats_on_a_period_that_divides_a_tile(self):
-        # Arrange
-        period = 8
-
-        # Act
-        field = palettes.bayer_thresholds()
-
-        # Assert
-        assert np.array_equal(field[:period, :period], field[period:, period:])
-        assert np.array_equal(field[:period, :period], field[period:, :period])
-
-    def test_every_level_appears_equally_often(self):
-        # Arrange
-        repeats_per_tile = 4
-
-        # Act
-        field = palettes.bayer_thresholds()
-
-        # Assert
-        _, counts = np.unique(field, return_counts=True)
-        assert set(counts.tolist()) == {repeats_per_tile}
-
-
 class TestItKeepsTilesInternable:
     def test_two_identical_tiles_still_quantise_identically(self):
         # Arrange
@@ -138,30 +93,6 @@ def swapped_pixels(strength: float) -> int:
     plain = palettes.PaletteAssigner(palette).assign(tiles)
     mixed = palettes.PaletteAssigner(palette, dither=strength).assign(tiles)
     return int(np.count_nonzero(plain.nibbles != mixed.nibbles))
-
-
-class TestTies:
-    def test_a_tie_takes_the_first_entry_as_the_undithered_choice_does(self):
-        # Arrange
-        rng = np.random.default_rng(7)
-        base = rng.random((4096, 8), dtype=np.float32)
-        distance = np.concatenate([base, base], axis=1)[:, rng.permutation(16)]
-
-        # Act
-        nearest, _, _ = palettes._two_nearest(distance, palettes.MAX_DITHER)
-
-        # Assert
-        assert np.array_equal(nearest, np.argmin(distance, axis=1))
-
-    def test_the_runner_up_is_never_the_nearest(self):
-        # Arrange
-        distance = np.array([[1.0, 1.0, 5.0], [3.0, 1.0, 1.0]], dtype=np.float32)
-
-        # Act
-        nearest, runner, _ = palettes._two_nearest(distance, palettes.MAX_DITHER)
-
-        # Assert
-        assert (nearest.tolist(), runner.tolist()) == ([0, 1], [1, 2])
 
 
 class TestStrength:

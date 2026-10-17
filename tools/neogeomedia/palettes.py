@@ -5,6 +5,7 @@ from typing import Final
 
 import numpy as np
 import numpy.typing as npt
+from fmvcore import dither as ordered
 
 from neogeomedia import neocolor
 
@@ -16,33 +17,10 @@ DESCRIPTOR_DIMS: Final = 9
 TABLE_DIMS: Final = 2
 _KMEANS_ITERATIONS: Final = 24
 _ASSIGN_CHUNK_BYTES: Final = 64 << 20
-_MIX_SCALE: Final = 255.0
-NO_DITHER: Final = 0.0
-MAX_DITHER: Final = 1.0
+NO_DITHER: Final = ordered.NO_DITHER
+MAX_DITHER: Final = ordered.MAX_DITHER
 
 DEFAULT_CHROMA_WEIGHT: Final = 1.0
-
-_BAYER_ORDER: Final = 8
-_BAYER_8 = np.array(
-    [
-        [0, 32, 8, 40, 2, 34, 10, 42],
-        [48, 16, 56, 24, 50, 18, 58, 26],
-        [12, 44, 4, 36, 14, 46, 6, 38],
-        [60, 28, 52, 20, 62, 30, 54, 22],
-        [3, 35, 11, 43, 1, 33, 9, 41],
-        [51, 19, 59, 27, 49, 17, 57, 25],
-        [15, 47, 7, 39, 13, 45, 5, 37],
-        [63, 31, 55, 23, 61, 29, 53, 21],
-    ],
-    dtype=np.float32,
-)
-
-
-def bayer_thresholds() -> npt.NDArray[np.float32]:
-    unit = (_BAYER_8 + 0.5) / float(_BAYER_ORDER * _BAYER_ORDER)
-    repeat = TILE_PX // _BAYER_ORDER
-    return np.tile(unit, (repeat, repeat)).astype(np.float32)
-
 
 _OKLAB_GRIDS: dict[float, npt.NDArray[np.float32]] = {}
 
@@ -103,25 +81,6 @@ class Assignment:
         if self.palette_ids.size == 0:
             return np.zeros((0, TILE_PX, TILE_PX), dtype=np.uint16)
         return palette_set.colors[self.palette_ids[:, None, None], self.nibbles - 1]
-
-
-def _two_nearest(
-    distance: npt.NDArray[np.float32], strength: float
-) -> tuple[npt.NDArray[np.uint8], npt.NDArray[np.uint8], npt.NDArray[np.uint8]]:
-    rows = np.arange(distance.shape[0])
-    nearest = np.argmin(distance, axis=1)
-    others = distance.copy()
-    others[rows, nearest] = np.inf
-    runner = np.argmin(others, axis=1)
-    near = np.sqrt(distance[rows, nearest])
-    far = np.sqrt(others[rows, runner])
-    total = near + far
-    share = np.divide(near, total, out=np.zeros_like(near), where=total > 0.0)
-    return (
-        nearest.astype(np.uint8),
-        runner.astype(np.uint8),
-        np.rint(share * _MIX_SCALE * strength).astype(np.uint8),
-    )
 
 
 def _sqdist(
@@ -266,17 +225,11 @@ def build_palette_set(
     )
 
 
-def _check_dither(strength: float) -> None:
-    if not NO_DITHER <= strength <= MAX_DITHER:
-        msg = f"a dither strength lies between {NO_DITHER:g} and {MAX_DITHER:g}, got {strength:g}"
-        raise ValueError(msg)
-
-
 class PaletteAssigner:
     def __init__(
         self, palette_set: PaletteSet, *, candidates: int = 0, dither: float = NO_DITHER
     ) -> None:
-        _check_dither(dither)
+        ordered.check_strength(dither)
         self._palette_set = palette_set
         self._candidates = min(candidates if candidates > 0 else len(palette_set), len(palette_set))
         grid = oklab_grid(palette_set.chroma_weight)
@@ -292,11 +245,11 @@ class PaletteAssigner:
             self._slot[index] = np.argmin(distance, axis=1).astype(np.uint8)
             self._error[index] = np.min(distance, axis=1).astype(np.float32)
             if self._second is not None and self._mix is not None:
-                nearest, runner, share = _two_nearest(distance, dither)
+                nearest, runner, share = ordered.two_nearest(distance, dither)
                 self._slot[index] = nearest
                 self._second[index] = runner
                 self._mix[index] = share
-        self._threshold = (bayer_thresholds().reshape(TILE_PIXELS) * _MIX_SCALE).astype(np.float32)
+        self._threshold = ordered.bayer_thresholds(TILE_PX).reshape(TILE_PIXELS)
         self._chunk = max(1, _ASSIGN_CHUNK_BYTES // (self._candidates * TILE_PIXELS * 4))
 
     def assign(self, tiles: npt.NDArray[np.uint16]) -> Assignment:
@@ -344,7 +297,7 @@ class PaletteAssigner:
             return nearest
         share = self._mix[chosen[:, None], pixels]
         runner = self._second[chosen[:, None], pixels]
-        return np.where(share > self._threshold[None, :], runner, nearest).astype(np.uint8)
+        return ordered.mix(nearest, runner, share, self._threshold[None, :])
 
     def _shortlist(self, tiles: npt.NDArray[np.uint16]) -> npt.NDArray[np.int64]:
         total = len(self._palette_set)

@@ -1133,12 +1133,15 @@ problem. It depends only on where a pixel sits inside its own tile, and
 because the matrix is 8x8 and a tile is 16x16 it also runs continuously
 across tile boundaries, so identical tiles still collapse to one entry.
 
-#### `bayer_thresholds`
-
-A tile-sized threshold field in [0, 1), tiled from the 8x8 matrix.
-
-TILE_PX is a multiple of the matrix order, so every tile sees the
-same field and identical tiles still quantise identically.
+The threshold field and the two-entry mix live in the core,
+`fmvcore.dither`, so every player of the family dithers against its
+palettes the same way. `bayer_thresholds(TILE_PX)` tiles the 8x8 matrix
+over a 16x16 tile, so every tile sees the same field and identical
+tiles still quantise identically. `two_nearest` returns the closest
+entry, the runner-up and the share between them: the nearer radius
+over the sum of both, 0 on a palette entry and a half when the two are
+equidistant. `mix` swaps in the runner-up for that fraction of a tile's
+pixels.
 
 #### `oklab_grid`
 
@@ -1172,15 +1175,6 @@ CRAM words for every palette, transparent slot first.
 #### `rendered`
 
 Color indices the hardware will actually display.
-
-#### `_two_nearest`
-
-The two closest slots per colour, and how far between them it sits.
-
-The share is the nearer radius over the sum of both, so it is 0 when
-the colour lands on a palette entry and rises to half when the two
-are equidistant. Ordered dithering then swaps in the runner-up for
-that fraction of the pixels in a tile.
 
 #### `_sqdist`
 

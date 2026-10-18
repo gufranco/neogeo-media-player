@@ -13,6 +13,13 @@ of another, in a README, a commit, a comment or any other text, in any
 language, and never tell which member came first: work moves between the
 members in every direction, and more consoles will join.
 
+Owner's instruction, 2026-10-17: the menu is one menu across the family, as
+alike in function and look as each console allows, and this player's menu in
+`src/player/menu.c` is the model the others copy. Its colours come from
+`fmvcore.font.MENU_COLOURS` and its art from the core's glyphs, so a change to
+either reaches every player; a change to the menu's layout or behaviour is
+made in smsgg-media-player in the same task. The rule is in FAMILY.md.
+
 ## Original hardware is the only target
 
 Everything here is built to run on a real AES or MVS board. A clean emulator

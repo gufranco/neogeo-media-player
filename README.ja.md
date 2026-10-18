@@ -27,7 +27,7 @@
 
 <img src="readme/demo.gif" alt="ビルドしたNeo GeoカートリッジでSintelの予告編を再生した6秒間の映像。MAMEでキャプチャしたものです" width="640">
 
-<sub>Sintelの予告編の6秒間です。ビルドしたカートリッジをコンソール本来の320x224で実行するMAMEからキャプチャしたもので、映像の開始とともに再生位置バーが表示されています。同じ映像がMaster SystemプレイヤーのREADMEの冒頭にもあります。SintelはBlender Foundationによる作品で、CC BY 3.0です。</sub>
+<sub>Sintelの予告編の6秒間です。ビルドしたカートリッジをコンソール本来の320x224で実行するMAMEからキャプチャしたもので、映像の開始とともに再生位置バーが表示されています。同じ映像がMaster SystemとGame GearのプレイヤーのREADMEの冒頭にもあります。SintelはBlender Foundationによる作品で、CC BY 3.0です。</sub>
 
 </div>
 
@@ -190,11 +190,11 @@ flowchart LR
 
 ### すべてを決める制約
 
-このプレイヤーとMaster Systemの[`smsgg-media-player`](https://github.com/gufranco/smsgg-media-player)は同じファミリーのメンバーであり、2つのマシンは設計が依存するただ1つの次元で異なります。
+このプレイヤーとMaster SystemおよびGame Gearの[`smsgg-media-player`](https://github.com/gufranco/smsgg-media-player)は同じファミリーのメンバーであり、2つのマシンは設計が依存するただ1つの次元で異なります。
 
-Neo Geoは**キャラクターROMに1,048,576個のタイルを常駐**させているので、プレイヤーはスプライトコントロールブロックにタイル番号を書き込むだけで、実行時にはそれ以外何もしません。Master Systemが扱えるのは16 KBのVRAMにある512パターンだけなので、そのプレイヤーは再生しながら映像のパターンをページングする必要があります。
+Neo Geoは**キャラクターROMに1,048,576個のタイルを常駐**させているので、プレイヤーはスプライトコントロールブロックにタイル番号を書き込むだけで、実行時にはそれ以外何もしません。Master SystemとGame Gearが扱えるのは16 KBのVRAMにある512パターンだけなので、そのプレイヤーは再生しながら映像のパターンをページングする必要があります。
 
-| | Neo Geo | Master System |
+| | Neo Geo | Master SystemとGame Gear |
 |---|---|---|
 | 支配的な制約 | キャラクターROM | カートリッジのバイト数 |
 | フレームごとの作業 | タイル番号を書き込む | パターンをアップロードし、ネームテーブルのエントリを書き込む |
@@ -251,7 +251,7 @@ ffmpegで読み込める動画ファイルなら何でも使えます。特定�
 
 ### コードの取得
 
-ベイカーはデコード、色、映像、キャプチャのコードを[fmv-core-python](https://github.com/gufranco/fmv-core-python)サブモジュールを通じてMaster Systemプレイヤーと共有しているため、サブモジュールごとクローンしてください。ダウンロードボタンのソースアーカイブにはサブモジュールが含まれないため、動作しません。
+ベイカーはデコード、色、映像、キャプチャのコードを[fmv-core-python](https://github.com/gufranco/fmv-core-python)サブモジュールを通じてMaster SystemとGame Gearのプレイヤーと共有しているため、サブモジュールごとクローンしてください。ダウンロードボタンのソースアーカイブにはサブモジュールが含まれないため、動作しません。
 
 ```bash
 git clone --recurse-submodules https://github.com/gufranco/neogeo-media-player.git
@@ -655,7 +655,7 @@ Cライブラリの公開範囲は[`fmv.h`](src/fmv/fmv.h)です。
 | メンバー | 内容 |
 |:--|:--|
 | [neogeo-media-player](https://github.com/gufranco/neogeo-media-player) | このリポジトリ |
-| [smsgg-media-player](https://github.com/gufranco/smsgg-media-player) | Sega Master System上のフルスクリーン映像で、再生中にタイルをVRAMへページングします |
+| [smsgg-media-player](https://github.com/gufranco/smsgg-media-player) | Sega Master SystemまたはGame Gear上のフルスクリーン映像で、再生中にタイルをVRAMへページングします |
 | [fmv-core-python](https://github.com/gufranco/fmv-core-python) | プレイヤー間で共有するベイカーと計測のコード |
 
 ## ライセンスとクレジット

@@ -27,7 +27,7 @@ English | [日本語](README.ja.md) | [简体中文](README.zh-Hans.md) | [繁�
 
 <img src="readme/demo.gif" alt="Six seconds of the Sintel trailer playing from the built Neo Geo cartridge, captured from MAME" width="640">
 
-<sub>Six seconds of the Sintel trailer, captured from MAME running the built cartridge at the console's own 320x224, with the position bar showing as the film starts. The same film opens the Master System player's README. Sintel is by the Blender Foundation, CC BY 3.0.</sub>
+<sub>Six seconds of the Sintel trailer, captured from MAME running the built cartridge at the console's own 320x224, with the position bar showing as the film starts. The same film opens the Master System and Game Gear player's README. Sintel is by the Blender Foundation, CC BY 3.0.</sub>
 
 </div>
 
@@ -192,11 +192,11 @@ Keyframes rewrite all 280 slots and act as seek targets. The transport jumps any
 
 ### The constraint that shapes everything
 
-This player and the Master System's [`smsgg-media-player`](https://github.com/gufranco/smsgg-media-player) are members of one family, and the two machines differ in the one dimension the design leans on.
+This player and the Master System and Game Gear's [`smsgg-media-player`](https://github.com/gufranco/smsgg-media-player) are members of one family, and the two machines differ in the one dimension the design leans on.
 
-The Neo Geo holds **1,048,576 tiles resident in character ROM**, so the player writes tile numbers into sprite control blocks and does nothing else at runtime. The Master System addresses 512 patterns in 16 KB of VRAM, so its player has to page the film's patterns in while it plays.
+The Neo Geo holds **1,048,576 tiles resident in character ROM**, so the player writes tile numbers into sprite control blocks and does nothing else at runtime. The Master System and the Game Gear address 512 patterns in 16 KB of VRAM, so their player has to page the film's patterns in while it plays.
 
-| | Neo Geo | Master System |
+| | Neo Geo | Master System and Game Gear |
 |---|---|---|
 | Binding constraint | Character ROM | Cartridge bytes |
 | Per-frame work | Write tile numbers | Upload patterns, then write name table entries |
@@ -667,7 +667,7 @@ force lives once in the core.
 | Member | What it is |
 |:--|:--|
 | [neogeo-media-player](https://github.com/gufranco/neogeo-media-player) | This repository |
-| [smsgg-media-player](https://github.com/gufranco/smsgg-media-player) | A full-screen film on a Sega Master System, its tiles paged through VRAM as it plays |
+| [smsgg-media-player](https://github.com/gufranco/smsgg-media-player) | A full-screen film on a Sega Master System or Game Gear, its tiles paged through VRAM as it plays |
 | [fmv-core-python](https://github.com/gufranco/fmv-core-python) | The baker and measurement code the players share |
 
 ## Licence and credits

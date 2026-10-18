@@ -20,18 +20,12 @@ ACCENT: Final = 3
 DIM: Final = 4
 EDGE: Final = 5
 
-_INK_COLOR: Final = (31, 31, 31)
-_PANEL_COLOR: Final = (1, 1, 3)
-_ACCENT_COLOR: Final = (31, 18, 2)
-_DIM_COLOR: Final = (13, 13, 15)
-_EDGE_COLOR: Final = (7, 7, 9)
-
 _PIXEL_CODES: Final = {
-    ".": PANEL,
-    "#": INK,
-    "*": ACCENT,
-    "-": DIM,
-    "=": EDGE,
+    font.PANEL: PANEL,
+    font.INK: INK,
+    font.ACCENT: ACCENT,
+    font.DIM: DIM,
+    font.EDGE: EDGE,
     " ": TRANSPARENT,
 }
 
@@ -104,9 +98,6 @@ def build_rom(*, pad_to: int | None = None) -> bytes:
 
 def palette_words() -> list[int]:
     words = [0] * 16
-    words[INK] = pack_palette_word(*_INK_COLOR)
-    words[PANEL] = pack_palette_word(*_PANEL_COLOR)
-    words[ACCENT] = pack_palette_word(*_ACCENT_COLOR)
-    words[DIM] = pack_palette_word(*_DIM_COLOR)
-    words[EDGE] = pack_palette_word(*_EDGE_COLOR)
+    for code, colour in font.MENU_COLOURS.items():
+        words[_PIXEL_CODES[code]] = pack_palette_word(*colour)
     return words

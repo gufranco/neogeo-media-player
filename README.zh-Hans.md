@@ -27,7 +27,7 @@
 
 <img src="readme/demo.gif" alt="由构建出的 Neo Geo 卡带播放的六秒 Sintel 预告片，从 MAME 中录制" width="640">
 
-<sub>六秒 Sintel 预告片，录制自运行所构建卡带的 MAME，分辨率为主机原生的 320x224，影片开始时显示进度条。Master System 播放器的 README 也以同一部影片开篇。Sintel 由 Blender Foundation 制作，采用 CC BY 3.0 许可。</sub>
+<sub>六秒 Sintel 预告片，录制自运行所构建卡带的 MAME，分辨率为主机原生的 320x224，影片开始时显示进度条。Master System 和 Game Gear 播放器的 README 也以同一部影片开篇。Sintel 由 Blender Foundation 制作，采用 CC BY 3.0 许可。</sub>
 
 </div>
 
@@ -190,11 +190,11 @@ flowchart LR
 
 ### 决定一切的约束
 
-这个播放器与 Master System 的 [`smsgg-media-player`](https://github.com/gufranco/smsgg-media-player) 是同一个家族的成员，两台机器只在设计所依赖的那一个维度上不同。
+这个播放器与 Master System 和 Game Gear 的 [`smsgg-media-player`](https://github.com/gufranco/smsgg-media-player) 是同一个家族的成员，两台机器只在设计所依赖的那一个维度上不同。
 
-Neo Geo **在字符 ROM 中常驻 1,048,576 个图块**，因此播放器只需把图块编号写入精灵控制块，运行时不做别的事。Master System 只能寻址 16 KB VRAM 中的 512 个图案，因此它的播放器必须在播放时把影片的图案分页调入。
+Neo Geo **在字符 ROM 中常驻 1,048,576 个图块**，因此播放器只需把图块编号写入精灵控制块，运行时不做别的事。Master System 和 Game Gear 只能寻址 16 KB VRAM 中的 512 个图案，因此它们的播放器必须在播放时把影片的图案分页调入。
 
-| | Neo Geo | Master System |
+| | Neo Geo | Master System 和 Game Gear |
 |---|---|---|
 | 决定性约束 | 字符 ROM | 卡带字节数 |
 | 每帧的工作 | 写入图块编号 | 上传图案，然后写入名称表项 |
@@ -251,7 +251,7 @@ ffmpeg 能读取的任何视频文件都可以。文件不需要放在特定文�
 
 ### 获取代码
 
-烘焙器通过 [fmv-core-python](https://github.com/gufranco/fmv-core-python) 子模块与 Master System 播放器共享解码、色彩、影片与捕获代码，因此请连同子模块一起克隆。下载按钮提供的源码压缩包无法包含子模块，因此无法运行。
+烘焙器通过 [fmv-core-python](https://github.com/gufranco/fmv-core-python) 子模块与 Master System 和 Game Gear 播放器共享解码、色彩、影片与捕获代码，因此请连同子模块一起克隆。下载按钮提供的源码压缩包无法包含子模块，因此无法运行。
 
 ```bash
 git clone --recurse-submodules https://github.com/gufranco/neogeo-media-player.git
@@ -655,7 +655,7 @@ C 库接口是 [`fmv.h`](src/fmv/fmv.h)：
 | 成员 | 说明 |
 |:--|:--|
 | [neogeo-media-player](https://github.com/gufranco/neogeo-media-player) | 本仓库 |
-| [smsgg-media-player](https://github.com/gufranco/smsgg-media-player) | 在 Sega Master System 上播放全屏影片，播放时通过 VRAM 分页传输图块 |
+| [smsgg-media-player](https://github.com/gufranco/smsgg-media-player) | 在 Sega Master System 或 Game Gear 上播放全屏影片，播放时通过 VRAM 分页传输图块 |
 | [fmv-core-python](https://github.com/gufranco/fmv-core-python) | 各播放器共享的烘焙器和测量代码 |
 
 ## 许可证与致谢

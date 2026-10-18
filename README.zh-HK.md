@@ -27,7 +27,7 @@
 
 <img src="readme/demo.gif" alt="由建置好的 Neo Geo 卡帶播放 Sintel 預告片的六秒片段，擷取自 MAME" width="640">
 
-<sub>Sintel 預告片的六秒片段，擷取自以主機原生 320x224 運行建置好卡帶的 MAME，影片開始時顯示位置列。Master System 播放器的 README 開首也是同一部影片。Sintel 由 Blender Foundation 製作，採用 CC BY 3.0。</sub>
+<sub>Sintel 預告片的六秒片段，擷取自以主機原生 320x224 運行建置好卡帶的 MAME，影片開始時顯示位置列。Master System 及 Game Gear 播放器的 README 開首也是同一部影片。Sintel 由 Blender Foundation 製作，採用 CC BY 3.0。</sub>
 
 </div>
 
@@ -190,11 +190,11 @@ flowchart LR
 
 ### 決定一切的限制
 
-這個播放器與 Master System 的 [`smsgg-media-player`](https://github.com/gufranco/smsgg-media-player) 是同一系列的成員，兩部機器只在設計所倚賴的那一個方面不同。
+這個播放器與 Master System 及 Game Gear 的 [`smsgg-media-player`](https://github.com/gufranco/smsgg-media-player) 是同一系列的成員，兩部機器只在設計所倚賴的那一個方面不同。
 
-Neo Geo **在字元 ROM 中常駐 1,048,576 個 tile**，所以播放器只需把 tile 編號寫入 sprite 控制區塊，執行時不做其他事。Master System 只能定址 16 KB VRAM 中的 512 個圖案，所以它的播放器必須在播放時把影片的圖案分頁載入。
+Neo Geo **在字元 ROM 中常駐 1,048,576 個 tile**，所以播放器只需把 tile 編號寫入 sprite 控制區塊，執行時不做其他事。Master System 及 Game Gear 只能定址 16 KB VRAM 中的 512 個圖案，所以它們的播放器必須在播放時把影片的圖案分頁載入。
 
-| | Neo Geo | Master System |
+| | Neo Geo | Master System 及 Game Gear |
 |---|---|---|
 | 約束所在 | 字元 ROM | 卡帶字節數 |
 | 每格的工作 | 寫入 tile 編號 | 上傳圖案，然後寫入名稱表項目 |
@@ -251,7 +251,7 @@ Neo Geo **在字元 ROM 中常駐 1,048,576 個 tile**，所以播放器只需�
 
 ### 取得程式碼
 
-烘焙器透過 [fmv-core-python](https://github.com/gufranco/fmv-core-python) 子模組與 Master System 播放器共用解碼、色彩、影片及擷取程式碼，因此請連同子模組一併複製。下載按鈕提供的原始碼壓縮檔無法包含子模組，因此無法執行。
+烘焙器透過 [fmv-core-python](https://github.com/gufranco/fmv-core-python) 子模組與 Master System 及 Game Gear 播放器共用解碼、色彩、影片及擷取程式碼，因此請連同子模組一併複製。下載按鈕提供的原始碼壓縮檔無法包含子模組，因此無法執行。
 
 ```bash
 git clone --recurse-submodules https://github.com/gufranco/neogeo-media-player.git
@@ -655,7 +655,7 @@ C 程式庫介面是 [`fmv.h`](src/fmv/fmv.h)：
 | 成員 | 內容 |
 |:--|:--|
 | [neogeo-media-player](https://github.com/gufranco/neogeo-media-player) | 本儲存庫 |
-| [smsgg-media-player](https://github.com/gufranco/smsgg-media-player) | 在 Sega Master System 上播放的全螢幕影片，播放時經 VRAM 分頁載入 tile |
+| [smsgg-media-player](https://github.com/gufranco/smsgg-media-player) | 在 Sega Master System 或 Game Gear 上播放的全螢幕影片，播放時經 VRAM 分頁載入 tile |
 | [fmv-core-python](https://github.com/gufranco/fmv-core-python) | 各播放器共用的烘焙器和測量程式碼 |
 
 ## 授權及鳴謝

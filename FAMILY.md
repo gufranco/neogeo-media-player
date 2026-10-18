@@ -110,6 +110,12 @@ the requirement.
   never differently, and its state section names the limit, such as the
   Master System's eight sprites a line, with its figure and source. A change
   to one player's menu is made in every player in the same task.
+- **A menu that costs the picture is off by default.** Owner's instruction,
+  2026-10-17: where drawing the menu takes something from the film, as the
+  Master System and Game Gear menu takes 4 of the film's 32 colours, the
+  baker leaves it out unless asked, and asking for it prints a warning that
+  the picture will lose quality. The controls work either way; only what is
+  drawn over the picture changes.
 
 ## How a new member starts
 

@@ -141,7 +141,11 @@ a lower rung never overrules a higher one.
 1. **The manufacturer's documentation.** Cited with the page or section it came
    from.
 2. **A run on the original hardware.** A board, a console or a handheld running
-   the build in question, reported with what was run and what was seen.
+   the build in question, reported with what was run, what was seen, and the
+   model and video chip revision it ran on. Timing differs between revisions:
+   the Master System 2's VDP drops rapid palette writes that the Master System
+   1 and the Game Gear accept, per MacDonald's VDP notes, so a run on one
+   revision does not settle another.
 3. **An emulator's source, read.** The decoder or core that implements the
    behaviour, cited by file and function, never a prose summary of it.
 4. **Anything else.** A community measurement or another implementation, cited
@@ -228,6 +232,15 @@ That choice has a price, paid deliberately:
   purpose, so a per-pixel error always scores it as loss. It is judged by the
   error after the same blur on both sides and by a rendered sheet looked at
   beside the source, and both must agree.
+- **The blur averages light, as the eye does.** It runs on linear light, and the
+  Oklab error is taken after it. A blur taken in Oklab reads a dither of black
+  and a dark level as darker than it looks, and scored a flat grey of the wrong
+  brightness above a correct dither in every dark scene measured on
+  2026-10-18. For the same reason an ordered dither between two levels of a
+  colour channel takes each by its share of light, never by its code value.
+  The core's two-entry palette mix weighs by Oklab distance: weighing it by
+  light measured 0.3% to 1.6% worse on the Game Gear, because the entries it
+  mixes sit close together.
 - **Nothing aimed at a CRT.** A dither is allowed when it raises the picture's
   quality on a sharp screen. No composite model and no technique that needs a
   display to blend colours the console cannot show.

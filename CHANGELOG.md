@@ -8,6 +8,7 @@ was paid for once and does not need paying for again.
 
 ## Contents
 
+- [The blurred error averages light](#the-blurred-error-averages-light)
 - [Denoise and dither, measured on six films](#denoise-and-dither-measured-on-six-films)
 - [Six films on every test run](#six-films-on-every-test-run)
 - [A corrupt stream stops on red](#a-corrupt-stream-stops-on-red)
@@ -24,6 +25,19 @@ was paid for once and does not need paying for again.
 - [It plays on a board](#it-plays-on-a-board)
 - [What is left](#what-is-left)
 - [Standing rules for this project](#standing-rules-for-this-project)
+
+## The blurred error averages light
+
+The family's blurred error now runs its low-pass on linear light and takes
+the Oklab error after it. Run on Oklab values, it read a dither of black and a
+dark level as darker than it looks, and on the Master System and Game Gear
+regression clips it scored a flat grey of the wrong brightness above a
+correct dither in every dark scene. The denoise search here scores with it,
+so a bake can now pick a different denoise than before. The dither figures
+in the entry below were measured with the old blur. Measured again with the
+new one, dither on against off moves blurred error between -1.0% and +0.7%
+across the six films, a tie where the old blur called it a loss on all six,
+and displayed error still rises. It stays off by default.
 
 ## Denoise and dither, measured on six films
 

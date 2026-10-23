@@ -7,7 +7,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN printf 'Acquire::Retries "8";\nAcquire::http::Timeout "60";\nAcquire::https::Timeout "60";\n' > /etc/apt/apt.conf.d/80retries
 
 ARG UBUNTU_SNAPSHOT=20261014T000000Z
-ARG CA_CERTIFICATES=20260601~26.04.1
 ARG PPA_POOL=https://ppa.launchpadcontent.net/dciabrin/ngdevkit/ubuntu/pool/main/n
 ARG NGDEVKIT_TOOLCHAIN=ngdevkit-toolchain/ngdevkit-toolchain_0.1%2b202606181616-15%7eubuntu26.04.1_amd64.deb
 ARG NGDEVKIT=ngdevkit/ngdevkit_0.5%2b202607191609-17%7eubuntu26.04.1_amd64.deb
@@ -15,7 +14,7 @@ ARG NGDEVKIT_GNGEO=ngdevkit-gngeo/ngdevkit-gngeo_0.8.1%2b202607271849-11%7eubunt
 
 # hadolint ignore=DL3008
 RUN apt-get update \
- && apt-get install -y --no-install-recommends "ca-certificates=${CA_CERTIFICATES}" \
+ && apt-get install -y --no-install-recommends ca-certificates \
  && apt-get update --snapshot "${UBUNTU_SNAPSHOT}" \
  && apt-get install -y --no-install-recommends --snapshot "${UBUNTU_SNAPSHOT}" \
       autoconf=2.72-3.1ubuntu2 \

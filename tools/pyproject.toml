@@ -21,9 +21,6 @@ dev = [
     "faker==40.43.0",
     "z80 @ git+https://github.com/gufranco/zilog-z80-python.git@e2fedbd600640f1f5079a15668cda0662037133c",
 ]
-release = [
-    "python-semantic-release==10.7.0",
-]
 
 [build-system]
 requires = ["hatchling==1.32.4"]

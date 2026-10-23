@@ -2,148 +2,61 @@
 name: Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      level:
-        description: >-
-          Force a bump level. Leave as commits to let the history decide.
-        required: false
-        default: commits
-        type: choice
-        options: [commits, patch, minor, major]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
 
-permissions:
-  contents: read
+permissions: {}
 
-env:
-  UV_FROZEN: "1"
-  NEOGEOMEDIA_CC_REQUIRED: "1"
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  gates:
-    name: Gates
-    runs-on: ubuntu-26.04
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-          submodules: true
-
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
-        with:
-          version: "0.12.23"
-          enable-cache: true
-          cache-suffix: release
-
-      - name: Install ffmpeg, which the decode path shells out to
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ffmpeg
-
-      - name: Cache the regression films
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        with:
-          path: media/clips
-          key: clips-${{ hashFiles('tools/clips.manifest.json') }}
-
-      - name: The gate the baker job runs
-        env:
-          NEOGEOMEDIA_CLIPS_REQUIRED: "1"
-          NEOGEOMEDIA_FFMPEG_REQUIRED: "1"
-        run: |
-          set -euo pipefail
-          uv --project tools sync --all-groups
-          uv --project tools run ruff format --check tools/
-          uv --project tools run ruff check tools/
-          uv --project tools run mypy tools/neogeomedia tools/scripts
-          uv --project tools run python tools/scripts/fetch_clips.py
-          uv --project tools run python -m pytest tools/tests \
-            --cov=neogeomedia \
-            --cov=tools/scripts \
-            --cov-config=tools/pyproject.toml \
-            --cov-report=term-missing \
-            --cov-fail-under=95
-          git diff --exit-code -- neogeomedia-tiers.json
-
-      - name: The gate the cartridge job runs
-        env:
-          NEOGEOMEDIA_ROM_REQUIRED: "1"
-        run: |
-          set -euo pipefail
-          make image
-          make analyse
-          ffmpeg -y -loglevel error \
-            -f lavfi -i "testsrc2=size=640x480:rate=24:duration=8" \
-            -f lavfi -i "sine=frequency=440:duration=8" \
-            -pix_fmt yuv420p -c:a aac ci-source.mp4
-          uv --project tools run python -m neogeomedia.cartridge ci-source.mp4 \
-            --quality q17 --build-dir build
-          make timing
-          uv --project tools run python -m pytest \
-            tools/tests/test_sound_on_z80.py
-          test -s build/neogeomedia.neo
-          test -s build/neogeomedia.zip
-          size=$(wc -c < build/neogeomedia.neo)
-          echo "neogeomedia.neo is $size bytes"
-          test "$size" -ge 1048576
-          uv --project tools run python -m neogeomedia.bake \
-            --source ci-source.mp4 --quality q17 --duration 4 \
-            --build-dir build --bundle build/bundle
-          make example
-          rom=build/example/cutscene/build/rom
-          test -s "$rom/ngdevkit.zip"
-          test -s "$rom/ngdevkit-p1.p1"
-          test -s "$rom/ngdevkit-p2.p2"
-          echo "the example cartridge is $(wc -c < "$rom/ngdevkit.zip") bytes"
-          make example EXAMPLE=build/example-audio FMV_AUDIO=yes
-          docker run --rm --platform linux/amd64 --user "$(id -u):$(id -g)" \
-            -v "$PWD:/work" -w /work neogeo-media-player-toolchain \
-            bash examples/cutscene/check_audio.sh build/example-audio
-
-  publish:
-    name: Publish
-    needs: gates
+  release:
+    name: Version and publish
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-26.04
     permissions:
       contents: write
+      issues: write
+      pull-requests: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          ref: main
           fetch-depth: 0
           submodules: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
 
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+      - name: Release only the commit CI passed
+        id: fresh
+        env:
+          PASSED: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -eu
+          if [ "$(git rev-parse HEAD)" = "$PASSED" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "main has moved past $PASSED; its own CI run will release it"
+            echo "current=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v6.9.0
+        if: steps.fresh.outputs.current == 'true'
         with:
           version: "0.12.23"
 
-      - name: What the next version will be
+      - name: Run semantic-release
+        id: semrel
+        if: steps.fresh.outputs.current == 'true'
+        uses: cycjimmy/semantic-release-action@b12c8f6015dc215fe37bc154d4ad456dd3833c90  # v6.0.0
+        with:
+          semantic_version: 25.0.9
+          extra_plugins: |
+            @semantic-release/changelog@7.0.0
+            @semantic-release/exec@7.1.0
+            @semantic-release/git@11.0.1
         env:
-          LEVEL: ${{ inputs.level }}
-        run: |
-          set -euo pipefail
-          release=(uv --project tools run --only-group release)
-          if [ "$LEVEL" = "commits" ]; then
-            "${release[@]}" semantic-release --noop version --print
-          else
-            "${release[@]}" semantic-release --noop version "--$LEVEL" --print
-          fi
-
-      - name: Tag and publish
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LEVEL: ${{ inputs.level }}
-        run: |
-          set -euo pipefail
-          git config user.name "${GITHUB_ACTOR}"
-          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
-          release=(uv --project tools run --only-group release)
-          if [ "$LEVEL" = "commits" ]; then
-            "${release[@]}" semantic-release version --push --vcs-release
-          else
-            "${release[@]}" semantic-release \
-              version "--$LEVEL" --push --vcs-release
-          fi
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

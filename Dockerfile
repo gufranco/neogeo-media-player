@@ -9,7 +9,7 @@ RUN printf 'Acquire::Retries "8";\nAcquire::http::Timeout "60";\nAcquire::https:
 ARG UBUNTU_SNAPSHOT=20261014T000000Z
 ARG PPA_POOL=https://ppa.launchpadcontent.net/dciabrin/ngdevkit/ubuntu/pool/main/n
 ARG NGDEVKIT_TOOLCHAIN=ngdevkit-toolchain/ngdevkit-toolchain_0.1%2b202606181616-15%7eubuntu26.04.1_amd64.deb
-ARG NGDEVKIT=ngdevkit/ngdevkit_0.5%2b202607191609-17%7eubuntu26.04.1_amd64.deb
+ARG NGDEVKIT=ngdevkit/ngdevkit_0.5%2b202610171524-17%7eubuntu26.04.1_amd64.deb
 ARG NGDEVKIT_GNGEO=ngdevkit-gngeo/ngdevkit-gngeo_0.8.1%2b202607271849-11%7eubuntu26.04.1_amd64.deb
 
 # hadolint ignore=DL3008

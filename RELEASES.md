@@ -1,3 +1,38 @@
+# [3.0.0](https://github.com/gufranco/neogeo-media-player/compare/v2.0.0...v3.0.0) (2026-10-24)
+
+
+### Bug Fixes
+
+* **baker:** refuse a seek interval under a frame ([6506f03](https://github.com/gufranco/neogeo-media-player/commit/6506f033e5d8d1ac6df5fb571d898bfa677d1a91))
+* count all 40 blank lines of the frame ([0a55bc6](https://github.com/gufranco/neogeo-media-player/commit/0a55bc6bdf813eeeb767ebdc6bed79d97765ce03))
+* **dither:** break palette ties as the plain path ([e04c907](https://github.com/gufranco/neogeo-media-player/commit/e04c90794e2011c1bff1250c19bcecc18dd9354d))
+* **docker:** bump the pruned ngdevkit deb ([ce58326](https://github.com/gufranco/neogeo-media-player/commit/ce58326d3a632389249128a61a3e1e6d5c22c5f2))
+* **docker:** stop pinning the bootstrap CA bundle ([aed8e45](https://github.com/gufranco/neogeo-media-player/commit/aed8e456faec3939d3cbdff8f54849a3756ccc71))
+* launch every emulator headless ([35661d4](https://github.com/gufranco/neogeo-media-player/commit/35661d4862bb95795bf7b2d66da8b1f6314389af))
+* **palettes:** rank shortlist candidates stably ([2d2eeda](https://github.com/gufranco/neogeo-media-player/commit/2d2eeda8851644ba4638ffee36df3b8796869720))
+* take the synthetic film from the core ([557d951](https://github.com/gufranco/neogeo-media-player/commit/557d951a2f8824bcddfc9a75eaa79eb8289fcb31))
+* turn the bios eye-catcher off ([3d818d7](https://github.com/gufranco/neogeo-media-player/commit/3d818d7e2e899b72bf46829f4585e3ad5a25acdf))
+
+
+### Features
+
+* **baker:** align cartridge flags with the family ([b66ad9f](https://github.com/gufranco/neogeo-media-player/commit/b66ad9fb4868c9a992c7fb0df0e44098d19ebe7c))
+* check every command-line value's range ([787290a](https://github.com/gufranco/neogeo-media-player/commit/787290a00041e37e0f1ad219c26e2e2ab746a5b9))
+* fault on corrupt streams, add stop and mute ([92578f5](https://github.com/gufranco/neogeo-media-player/commit/92578f570b856704f41f9f40d2af083eb3474270))
+* measure a cartridge against its source film ([a71bae3](https://github.com/gufranco/neogeo-media-player/commit/a71bae31925c5d6c4a6e36bd19babd2bfae3b6e9))
+* measure denoise on the film in the search ([59832a7](https://github.com/gufranco/neogeo-media-player/commit/59832a74506bc981c8bea12b35de0852927f6f75))
+* **palettes:** mix only a pair that brackets ([49bee23](https://github.com/gufranco/neogeo-media-player/commit/49bee232e46c3f01be0a491d38e52a7390417cf2))
+* **player:** seek between baked points ([1357057](https://github.com/gufranco/neogeo-media-player/commit/13570578fab0846e90e05239003ad23696bf1221))
+* report the family's blurred error per bake ([a0badda](https://github.com/gufranco/neogeo-media-player/commit/a0badda5cf0a3497a6d8451501becc9a0b55439a))
+* walk vram timing across the whole player ([23eb87d](https://github.com/gufranco/neogeo-media-player/commit/23eb87dd7a117c468c211640b0d781e19f61fe9a))
+
+
+### BREAKING CHANGES
+
+* **baker:** --fit is removed from the cartridge, bake and plan
+commands, and report.json renames stream_banks and stream_bytes to
+banks and bytes.
+
 # Releases
 
 Generated from commit subjects by semantic-release, one entry per

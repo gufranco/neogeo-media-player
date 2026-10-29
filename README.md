@@ -7,11 +7,10 @@ and a library that puts one inside your own game.</strong>
 
 English | [日本語](README.ja.md) | [简体中文](README.zh-Hans.md) | [繁體中文（香港）](README.zh-HK.md)
 
-[![CI](https://img.shields.io/github/actions/workflow/status/gufranco/neogeo-media-player/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/gufranco/neogeo-media-player/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)](RELEASES.md)
-[![Licence](https://img.shields.io/badge/licence-MIT-blue?style=flat-square)](LICENSE)
-[![Target](https://img.shields.io/badge/target-Neo%20Geo%20AES%20and%20MVS-red?style=flat-square)](#hardware-ceilings)
-[![Hardware](https://img.shields.io/badge/hardware-runs%20on%20an%20AES%20and%20an%20MVS-brightgreen?style=flat-square)](#verification)
+[![ci](https://img.shields.io/github/actions/workflow/status/gufranco/neogeo-media-player/ci.yml?branch=main&style=flat-square&label=ci)](https://github.com/gufranco/neogeo-media-player/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/gufranco/neogeo-media-player?style=flat-square&label=release)](https://github.com/gufranco/neogeo-media-player/releases/latest)
+[![coverage](https://img.shields.io/badge/coverage-95%25-brightgreen?style=flat-square)](https://github.com/gufranco/neogeo-media-player/actions/workflows/ci.yml)
+[![license](https://img.shields.io/github/license/gufranco/neogeo-media-player?style=flat-square&label=license)](LICENSE)
 
 </div>
 

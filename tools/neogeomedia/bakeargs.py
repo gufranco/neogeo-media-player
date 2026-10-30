@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
-from fmvcore import arguments, ffmpeg
+from fmvcore import arguments, condition, ffmpeg
 
 from neogeomedia import content, epochs, frames, limits, quality
 
@@ -20,6 +20,10 @@ PROFILE_SECONDS: Final = 30.0
 DITHER_HELP: Final = "ordered dither strength across palette entries, 0 for none. Default: 0"
 BUNDLE_HELP: Final = "a folder to write a drop-in copy of the player library and this film into"
 SILENT_HELP: Final = "leave sound out; it has its own ROM, so the picture gains no room"
+AUDIO_DC_HELP: Final = "high-pass the soundtrack to remove a DC offset before it is encoded"
+AUDIO_COMPRESS_HELP: Final = "compress the soundtrack's dynamics so quiet passages carry"
+AUDIO_NORMALIZE_HELP: Final = "lift the soundtrack so its peak uses the output's full range"
+AUDIO_SOFT_CLIP_HELP: Final = "soft-clip the soundtrack's peaks instead of letting them hard-clip"
 SEEK_EVERY_HELP: Final = (
     f"seconds between the points C and D jump to. Default: {limits.SEEK_EVERY_SECONDS:g}"
 )
@@ -63,6 +67,13 @@ def _add_source_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--subtitles", type=Path, default=None)
     parser.add_argument("--build-dir", type=Path, default=Path("build"))
+
+
+def _add_audio_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--audio-remove-dc", action="store_true", help=AUDIO_DC_HELP)
+    parser.add_argument("--audio-compress", action="store_true", help=AUDIO_COMPRESS_HELP)
+    parser.add_argument("--audio-normalize", action="store_true", help=AUDIO_NORMALIZE_HELP)
+    parser.add_argument("--audio-soft-clip", action="store_true", help=AUDIO_SOFT_CLIP_HELP)
 
 
 def _add_picture_args(parser: argparse.ArgumentParser) -> None:
@@ -196,12 +207,22 @@ def _add_output_args(parser: argparse.ArgumentParser) -> None:
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Bake a video clip into Neo Geo cart data.")
     _add_source_args(parser)
+    _add_audio_args(parser)
     _add_picture_args(parser)
     _add_colour_args(parser)
     _add_budget_args(parser)
     _add_encoder_args(parser)
     _add_output_args(parser)
     return parser.parse_args(argv)
+
+
+def audio_conditioning_from(args: argparse.Namespace) -> condition.Conditioning:
+    return condition.Conditioning(
+        remove_dc=args.audio_remove_dc,
+        compress=args.audio_compress,
+        normalize=args.audio_normalize,
+        soft_clip=args.audio_soft_clip,
+    )
 
 
 def resolve_duration(args: argparse.Namespace) -> float:

@@ -8,7 +8,7 @@ from typing import Final
 
 import numpy as np
 import numpy.typing as npt
-from fmvcore import ffmpeg
+from fmvcore import condition, ffmpeg
 
 from neogeomedia import adpcmb, frames
 
@@ -17,6 +17,7 @@ SAMPLES_PER_PAGE: Final = 512
 BYTE_MASK: Final = 0xFF
 BYTE_BITS: Final = 8
 VOICE_FILE: Final = "v2.bin"
+NO_CONDITIONING: Final = condition.Conditioning()
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,11 +88,19 @@ def write_audio_params(build_dir: Path, encoded: adpcmb.EncodedAudio) -> Path:
 
 
 def bake_voice(
-    *, source: Path, start: float, duration: float, rate_hz: float, baked: Path, build_dir: Path
+    *,
+    source: Path,
+    start: float,
+    duration: float,
+    rate_hz: float,
+    baked: Path,
+    build_dir: Path,
+    conditioning: condition.Conditioning = NO_CONDITIONING,
 ) -> Voice:
     samples = decode_audio(source, start, duration, rate_hz)
     if not samples.size:
         return Voice(path=None, pages=Fraction(0))
+    samples = condition.condition_int16(samples, rate_hz=rate_hz, settings=conditioning)
     encoded = adpcmb.encode(samples, rate_hz=rate_hz)
     voice = adpcmb.build_rom(encoded, pad_to=max(V_ROM_MIN_BYTES, len(encoded.payload)))
     path = baked / VOICE_FILE

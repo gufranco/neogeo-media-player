@@ -73,6 +73,52 @@ class TestSourceDefaults:
         assert resolved == pytest.approx(full - 0.4, abs=0.05)
 
 
+class TestAudioConditioning:
+    def test_no_flags_leave_every_stage_off(self):
+        # Arrange
+        args = bakeargs.parse_args(SOURCE)
+
+        # Act
+        settings = bakeargs.audio_conditioning_from(args)
+
+        # Assert
+        assert settings.enabled is False
+
+    @pytest.mark.parametrize(
+        ("flag", "field"),
+        [
+            ("--audio-remove-dc", "remove_dc"),
+            ("--audio-compress", "compress"),
+            ("--audio-normalize", "normalize"),
+            ("--audio-soft-clip", "soft_clip"),
+        ],
+    )
+    def test_each_flag_turns_on_its_stage(self, flag, field):
+        # Arrange
+        args = bakeargs.parse_args([*SOURCE, flag])
+
+        # Act
+        settings = bakeargs.audio_conditioning_from(args)
+
+        # Assert
+        assert getattr(settings, field) is True
+
+    def test_every_flag_turns_them_all_on(self):
+        # Arrange
+        flags = ["--audio-remove-dc", "--audio-compress", "--audio-normalize", "--audio-soft-clip"]
+
+        # Act
+        settings = bakeargs.audio_conditioning_from(bakeargs.parse_args([*SOURCE, *flags]))
+
+        # Assert
+        assert (settings.remove_dc, settings.compress, settings.normalize, settings.soft_clip) == (
+            True,
+            True,
+            True,
+            True,
+        )
+
+
 class TestCommandLine:
     def test_default_arguments_target_the_full_palette_bank_allocation(self):
         # Arrange

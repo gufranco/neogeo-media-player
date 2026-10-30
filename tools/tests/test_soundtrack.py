@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 
 import pytest
+from fmvcore import condition
 
 from neogeomedia import adpcmb, soundtrack
 from neogeomedia import frames as frames_mod
@@ -107,6 +108,52 @@ class TestVoice:
         assert voice.path.stat().st_size == soundtrack.V_ROM_MIN_BYTES
         assert voice.pages == soundtrack.audio_pages_per_frame(adpcmb.delta_n_for(22050.0))
         assert (tmp_path / "generated" / "audio_params.s").is_file()
+
+
+class TestConditioning:
+    def _bake(self, tone_clip, tmp_path, settings):
+        baked = tmp_path / "baked"
+        baked.mkdir(parents=True)
+        soundtrack.bake_voice(
+            source=tone_clip,
+            start=0.0,
+            duration=0.5,
+            rate_hz=22050.0,
+            baked=baked,
+            build_dir=tmp_path,
+            conditioning=settings,
+        )
+        return (baked / "v2.bin").read_bytes()
+
+    def test_conditioning_off_bakes_byte_identical_to_no_conditioning(self, tone_clip, tmp_path):
+        # Arrange
+        default = self._bake(tone_clip, tmp_path / "a", condition.Conditioning())
+
+        # Act
+        off = self._bake(tone_clip, tmp_path / "b", condition.Conditioning())
+
+        # Assert
+        assert off == default
+
+    def test_normalize_changes_the_voice_rom(self, tone_clip, tmp_path):
+        # Arrange
+        plain = self._bake(tone_clip, tmp_path / "a", condition.Conditioning())
+
+        # Act
+        lifted = self._bake(tone_clip, tmp_path / "b", condition.Conditioning(normalize=True))
+
+        # Assert
+        assert lifted != plain
+
+    def test_conditioning_keeps_the_voice_rom_size(self, tone_clip, tmp_path):
+        # Arrange
+        plain = self._bake(tone_clip, tmp_path / "a", condition.Conditioning())
+
+        # Act
+        lifted = self._bake(tone_clip, tmp_path / "b", condition.Conditioning(normalize=True))
+
+        # Assert
+        assert len(lifted) == len(plain)
 
 
 class TestRegisterValues:

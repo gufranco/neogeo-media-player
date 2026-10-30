@@ -124,6 +124,36 @@ def encode(samples: npt.NDArray[np.integer], *, rate_hz: float = 22050.0) -> Enc
     )
 
 
+def _unpack(payload: bytes) -> list[int]:
+    nibbles: list[int] = []
+    for byte in payload:
+        nibbles.append((byte >> NIBBLE_BITS) & (NIBBLE_VALUES - 1))
+        nibbles.append(byte & (NIBBLE_VALUES - 1))
+    return nibbles
+
+
+def _decode_nibbles(nibbles: list[int]) -> list[int]:
+    accumulator = 0
+    step = STEP_MIN
+    out: list[int] = []
+    for nibble in nibbles:
+        delta = (2 * (nibble & MAGNITUDE_MASK) + 1) * step // DELTA_DIVISOR
+        if nibble & SIGN_BIT:
+            delta = -delta
+        accumulator = min(SAMPLE_MAX, max(SAMPLE_MIN, accumulator + delta))
+        step = _next_step(step, nibble)
+        out.append(accumulator)
+    return out
+
+
+def decode(payload: bytes, *, sample_count: int) -> npt.NDArray[np.int16]:
+    if sample_count < 0:
+        msg = f"sample_count is not negative, got {sample_count}"
+        raise ValueError(msg)
+    decoded = _decode_nibbles(_unpack(payload))
+    return np.asarray(decoded[:sample_count], dtype=np.int16)
+
+
 def build_rom(encoded: EncodedAudio, *, pad_to: int | None = None) -> bytes:
     target = len(encoded.payload) if pad_to is None else pad_to
     if target < len(encoded.payload):

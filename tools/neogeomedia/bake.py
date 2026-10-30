@@ -10,7 +10,7 @@ from typing import Any, Final, TypedDict
 
 import numpy as np
 import numpy.typing as npt
-from fmvcore import ffmpeg, source
+from fmvcore import condition, ffmpeg, source
 
 from neogeomedia import (
     bakeargs,
@@ -64,6 +64,7 @@ class BakeRequest:
     audio_rate_hz: float | None = None
     subtitles: Path | None = None
     audio: bool = True
+    audio_conditioning: condition.Conditioning = field(default_factory=condition.Conditioning)
     seek_every: float = limits.SEEK_EVERY_SECONDS
 
 
@@ -110,6 +111,7 @@ class BakeOutcome:
             "palette_epoch_seconds": request.palette_epoch_seconds,
             "palette_epochs": len(self.result.palette_sets),
             "has_audio": "voice" in self.artifacts,
+            "audio_conditioning": _conditioning_report(request.audio_conditioning),
             "tile_budget": request.tile_budget,
             "bars": list(self.bars) if self.bars is not None else None,
         }
@@ -245,6 +247,15 @@ def _encode(request: BakeRequest) -> encode.EncodeResult:
     return result
 
 
+def _conditioning_report(settings: condition.Conditioning) -> dict[str, bool]:
+    return {
+        "remove_dc": settings.remove_dc,
+        "compress": settings.compress,
+        "normalize": settings.normalize,
+        "soft_clip": settings.soft_clip,
+    }
+
+
 def _audio_rate(request: BakeRequest) -> float:
     if request.audio_rate_hz is not None:
         return request.audio_rate_hz
@@ -261,6 +272,7 @@ def _bake_voice(request: BakeRequest, baked: Path, rate_hz: float) -> soundtrack
         rate_hz=rate_hz,
         baked=baked,
         build_dir=request.build_dir,
+        conditioning=request.audio_conditioning,
     )
 
 
@@ -359,6 +371,7 @@ def _request_from(
         build_dir=args.build_dir,
         subtitles=args.subtitles,
         audio=not args.silent,
+        audio_conditioning=bakeargs.audio_conditioning_from(args),
         seek_every=args.seek_every,
         motion_blur=args.motion_blur,
         motion_masking=args.motion_masking,

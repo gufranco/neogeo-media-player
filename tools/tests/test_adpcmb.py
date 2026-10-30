@@ -307,3 +307,46 @@ class TestAdaptiveRates:
 
         # Assert
         assert abs(actual - rate_hz) / rate_hz < 1e-4
+
+
+class TestDecode:
+    def test_it_matches_the_reference_decoder(self):
+        # Arrange
+        payload = adpcmb.encode(sine(512, 4.0), rate_hz=18000.0).payload
+
+        # Act
+        decoded = adpcmb.decode(payload, sample_count=512)
+
+        # Assert
+        assert np.array_equal(decoded, YmfmDecoder().decode(payload)[:512].astype(np.int16))
+
+    def test_it_tracks_an_encoded_sine(self):
+        # Arrange
+        samples = sine(1024, 8.0)
+
+        # Act
+        decoded = adpcmb.decode(adpcmb.encode(samples, rate_hz=18000.0).payload, sample_count=1024)
+
+        # Assert
+        assert np.corrcoef(decoded.astype(np.float64), samples.astype(np.float64))[0, 1] > 0.99
+
+    def test_it_stops_at_the_sample_count(self):
+        # Arrange
+        payload = adpcmb.encode(noise(300), rate_hz=18000.0).payload
+
+        # Act
+        decoded = adpcmb.decode(payload, sample_count=300)
+
+        # Assert
+        assert decoded.size == 300
+
+    def test_it_rejects_a_negative_sample_count(self):
+        # Arrange
+        payload = adpcmb.encode(sine(64, 2.0), rate_hz=18000.0).payload
+
+        # Act
+        with pytest.raises(ValueError) as raised:
+            adpcmb.decode(payload, sample_count=-1)
+
+        # Assert
+        assert "sample_count" in str(raised.value)

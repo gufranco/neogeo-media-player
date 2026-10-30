@@ -132,7 +132,7 @@ wheels = [
 
 [[package]]
 name = "fmvcore"
-version = "0.1.0"
+version = "1.0.0"
 source = { editable = "../fmv-core-python" }
 dependencies = [
     { name = "numpy" },
@@ -147,9 +147,8 @@ dev = [
     { name = "mypy", specifier = "==2.4.0" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-cov", specifier = "==7.1.0" },
-    { name = "ruff", specifier = "==0.17.0" },
+    { name = "ruff", specifier = "==0.17.1" },
 ]
-release = [{ name = "python-semantic-release", specifier = "==10.7.0" }]
 
 [[package]]
 name = "iniconfig"

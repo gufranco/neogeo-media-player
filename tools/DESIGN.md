@@ -76,6 +76,16 @@ Encode 16-bit mono samples into ADPCM-B nibbles.
 
 Lay the encoded payload out as the ADPCM-B voice ROM.
 
+#### `decode`
+
+Run the same state machine forward over a payload to recover the samples the
+chip would play. It is the inverse of `encode`: it unpacks each byte high nibble
+first, moves and clamps the predictor by the same step and scale, and returns
+the first `sample_count` samples. It exists so a measurement can hear what was
+baked rather than trust the encoder, and it reproduces the encoder's own landed
+predictor values exactly, so a round trip is the chip's output, not an
+independent approximation of it.
+
 
 ### [`neogeomedia/bake.py`](neogeomedia/bake.py)
 
@@ -1692,6 +1702,14 @@ Turn the source soundtrack into the voice ROM and its register values.
 
 Whether the source has a soundtrack at all comes from `fmvcore.ffmpeg.has_audio`.
 
+The decoded samples pass through `fmvcore.condition` before ADPCM-B encoding, so
+a quiet source can be lifted to use the predictor's range and a loud one tamed
+before it clips. Every stage is off by default, so an unconditioned bake is
+byte-identical to one before the stage existed; a stage is turned on only once
+it has been measured against this console's output and heard on a board, which
+is the family's rule for an audio change. The `measure_audio.py` script is the
+yardstick that measurement reads.
+
 #### `decode_audio`
 
 Decode the source soundtrack to mono 16-bit at the target rate.
@@ -1927,6 +1945,20 @@ answer is exactly what still needs measuring.
 
 
 ## The scripts
+
+### [`scripts/measure_audio.py`](scripts/measure_audio.py)
+
+Measure a baked voice ROM against the soundtrack it came from, so a choice of
+conditioning rests on a number rather than a hope.
+
+It decodes the voice ROM through the chip's own state machine, decodes the same
+source window, and reports three things: the output's loudness, the gain the
+conditioning applied, and a segmental signal-to-noise ratio of the output
+against the source. The SNR level-matches the two first, so a stage that only
+changes loudness does not read as a loss by construction, which is the trap the
+picture measurements warn about. The loudness and gain show what a stage did;
+the SNR shows whether it cost fidelity. A number from here is a shortlist, not a
+verdict: the owner still hears it on a board before a stage ships on.
 
 ### [`scripts/measure_drift.py`](scripts/measure_drift.py)
 

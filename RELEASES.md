@@ -1,3 +1,10 @@
+# [3.1.0](https://github.com/gufranco/neogeo-media-player/compare/v3.0.0...v3.1.0) (2026-10-30)
+
+
+### Features
+
+* **audio:** pre-condition the soundtrack ([6d30253](https://github.com/gufranco/neogeo-media-player/commit/6d30253289d512e0ecf1b03a96f3c49f16cb1b48))
+
 # [3.0.0](https://github.com/gufranco/neogeo-media-player/compare/v2.0.0...v3.0.0) (2026-10-24)
 
 
